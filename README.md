@@ -176,7 +176,7 @@ python main.py ./data/Financials.csv "Predict business-relevant outcomes and gen
 You can also test with the small sample file:
 
 ```bash
-python main.py ./test_data.csv "Predict customer churn and provide business insights"
+python main.py ./data/test_data.csv "Predict customer churn and provide business insights"
 ```
 
 ### 4. Check generated outputs
