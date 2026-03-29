@@ -147,12 +147,12 @@ Sync Your Development Branch ❗❗❗
 Before starting any task, make sure your branch is up-to-date:
 
 ```bash
-git checkout develop-alice        # Switch to your development branch
+git checkout jerry_develop        # Switch to your development branch
 git fetch origin                  # Fetch latest changes from remote
 git merge origin/main             # Merge latest main into your branch
 # OR, if you prefer linear history:
 git rebase origin/main
-git push origin develop-alice     # Update remote branch
+git push origin jerry_develop     # Update remote branch
 ```
 
 ## 8. Common Authentication and Push Issues
