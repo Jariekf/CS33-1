@@ -1,7 +1,7 @@
 # Multi-Agent AutoDS Workflow System
 
-![python](https://img.shields.io/badge/python-3.9%2B-blue?logo=python&logoColor=white)
-![LangGraph](https://img.shields.io/badge/langgraph-workflow-green)
+![python](https://img.shields.io/badge/python-3.10%2B-blue?logo=python&logoColor=white)
+![LangGraph](https://img.shields.io/badge/LangGraph-workflow-green)
 ![llm](https://img.shields.io/badge/llm-openai%20compatible-black)
 ![status](https://img.shields.io/badge/status-prototype-orange)
 
@@ -88,15 +88,15 @@ CS33-1/
 
 ### Directory Notes
 
-- [agents](/d:/CS33-1/agents)
+- [agents](https://github.sydney.edu.au/CS33-1/CS33-1/tree/main/agents)
   Contains `manager`, `data_cleaning`, `feature_engineering`, `model_selection`, `supervisor`, and `business_translator`.
-- [core](/d:/CS33-1/core)
+- [core](https://github.sydney.edu.au/CS33-1/CS33-1/tree/main/core)
   Defines the workflow graph, shared state, and the common LLM access layer.
-- [tools](/d:/CS33-1/tools)
+- [tools](https://github.sydney.edu.au/CS33-1/CS33-1/tree/main/tools)
   Contains support utilities such as `arxiv_tool`, `python_repl`, and `file_reader`.
-- [workspace](/d:/CS33-1/workspace)
+- [workspace](https://github.sydney.edu.au/CS33-1/CS33-1/tree/main/workspace)
   Stores generated CSV outputs, feature importance files, and markdown reports.
-- [docs](/d:/CS33-1/docs)
+- [docs](https://github.sydney.edu.au/CS33-1/CS33-1/tree/main/docs)
   Stores repository documentation such as the GitHub commit guide.
 
 ## Implemented Functionalities
@@ -131,13 +131,13 @@ The repository currently supports the following implemented or scaffolded capabi
 - `python-dotenv`
 - `pydantic`
 
-See [requirements.txt](/d:/CS33-1/requirements.txt) for the current dependency list.
+See [requirements.txt](https://github.sydney.edu.au/CS33-1/CS33-1/blob/main/requirements.txt) for the current dependency list.
 
 ## Quick Start
 
 ### Prerequisites
 
-- Python 3.9 or above
+- Python 3.10 or above
 - An OpenAI-compatible API key
 - Optional: arXiv access for literature retrieval
 
@@ -181,7 +181,7 @@ python main.py ./test_data.csv "Predict customer churn and provide business insi
 
 ### 4. Check generated outputs
 
-Generated artifacts are written to [workspace](/d:/CS33-1/workspace), including:
+Generated artifacts are written to [workspace](https://github.sydney.edu.au/CS33-1/CS33-1/tree/main/workspace), including:
 
 - cleaned dataset outputs
 - feature engineering outputs
@@ -191,7 +191,7 @@ Generated artifacts are written to [workspace](/d:/CS33-1/workspace), including:
 
 ## Testing
 
-The repository now keeps test and debug scripts under [tests](/d:/CS33-1/tests).
+The repository now keeps test and debug scripts under [tests](https://github.sydney.edu.au/CS33-1/CS33-1/tree/main/tests).
 
 Current scripts:
 
