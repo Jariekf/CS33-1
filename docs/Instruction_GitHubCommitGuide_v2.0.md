@@ -139,7 +139,7 @@ Click Create pull request.
 
 After the PR is approved, you can click merge.
 
-## 8. Sync Your Branch Before Starting New Work
+## 7. Sync Your Branch Before Starting New Work
 
 Sync Your Development Branch ❗❗❗
 ### Very important thing!!!
@@ -155,7 +155,7 @@ git rebase origin/main
 git push origin develop-alice     # Update remote branch
 ```
 
-## 9. Common Authentication and Push Issues
+## 8. Common Authentication and Push Issues
 
 If Git asks for credentials when cloning or pushing:
 
@@ -164,7 +164,7 @@ If Git asks for credentials when cloning or pushing:
 
 If cloning or pushing still fails with errors such as `401` or `403`: please `@Liam` in the WeChat or Slack group chat
 
-## 10. Quick Command Reference
+## 9. Quick Command Reference
 
 ```bash
 git clone https://github.sydney.edu.au/CS33-1/CS33-1.git  # Clone the repository to your local machine
@@ -178,7 +178,7 @@ git push                                                  # Push your latest com
 
 Replace `name_develop` with your actual branch name.
 
-## 11. Important Notes
+## 10. Important Notes
 
 - Never push directly to `main`; always use a PR.
 - Always work on your own branch.
