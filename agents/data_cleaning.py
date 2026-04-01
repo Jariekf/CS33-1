@@ -1,13 +1,13 @@
 """
-Data Cleaning Agent (数据清洗智能体)
-职责：
-  根据 Manager 的全局计划中的 data_cleaning_plan，
-  生成 Python 清洗代码并在沙盒中执行（含内部自救机制）。
+Data Cleaning Agent
+Responsibilities:
+  Generate Python data-cleaning code from the Manager's `data_cleaning_plan`
+  and execute it in a sandbox, including an inner self-correction loop.
 
-设计参照 AutoKaggle Developer Agent 的核心模式：
-  - 结构化 Prompt (CONTEXT + PLAN + CONSTRAINTS + TASK)
-  - 代码提取 (regex ```python...```)
-  - 内部 Debug 自救循环
+Design references the AutoKaggle Developer Agent pattern:
+  - Structured prompt (CONTEXT + PLAN + CONSTRAINTS + TASK)
+  - Code extraction (regex ```python ... ```)
+  - Inner debugging self-heal loop
 """
 from __future__ import annotations
 
@@ -23,34 +23,41 @@ logger = logging.getLogger(__name__)
 
 
 def data_cleaning_node(state: GraphState) -> dict:
-    """Data Cleaning 的 LangGraph 节点函数。"""
+    """LangGraph node function for Data Cleaning."""
 
     plan = state["global_plan"].get("data_cleaning_plan", {})
     data_path = state["current_data_path"]
     feedback = state.get("current_error", "")
 
     # ------------------------------------------------------------------
-    # Step 1: 调用 LLM 生成清洗代码
+    # Step 1: Generate cleaning code via LLM
     # ------------------------------------------------------------------
     code = _generate_cleaning_code(plan, data_path, feedback)
 
     # ------------------------------------------------------------------
-    # Step 2: 内部语法自救循环 (Inner Self-Correction)
+    # Step 2: Inner self-correction loop
     # ------------------------------------------------------------------
+    output_path = _get_output_path()
     stdout, stderr = "", ""
     for attempt in range(MAX_INNER_RETRY):
+        previous_signature = _get_file_signature(output_path)
         stdout, stderr = execute_code(code)
         if not stderr:
-            break
-        # 自救：将报错信息喂回 LLM 重新生成代码
-        logger.info("内部自救第 %d 次: %s", attempt + 1, stderr[:200])
+            validation_error = _validate_cleaning_output(
+                output_path, previous_signature=previous_signature
+            )
+            if not validation_error:
+                break
+            stderr = f"[PostValidationFailed] {validation_error}"
+        # Self-heal: feed the error back to the LLM and regenerate code
+        logger.info("Inner self-heal attempt %d: %s", attempt + 1, stderr[:200])
         code = _fix_code(code, stderr)
 
     # ------------------------------------------------------------------
-    # Step 3: 返回状态更新
+    # Step 3: Return state updates
     # ------------------------------------------------------------------
     if stderr:
-        # 内部自救失败，仍然将最后一次的错误传给 Supervisor
+        # Inner retry exhausted: still pass the latest error to Supervisor
         return {
             "current_phase": "data_cleaning",
             "current_code": code,
@@ -63,15 +70,15 @@ def data_cleaning_node(state: GraphState) -> dict:
         "current_code": code,
         "current_execution_log": stdout,
         "current_error": "",
-        "current_data_path": _get_output_path(),
+        "current_data_path": output_path,
     }
 
 
 # ======================================================================
-# 私有辅助函数
+# Private helper functions
 # ======================================================================
 
-# ---------- Prompt 模板 (参照 AutoKaggle PROMPT_DEVELOPER 结构) ----------
+# ---------- Prompt templates (patterned after AutoKaggle PROMPT_DEVELOPER) ----------
 
 _SYSTEM_PROMPT_GENERATE = """\
 You are an expert Data Cleaning developer. \
@@ -119,10 +126,8 @@ Provide the complete corrected code in a single ```python ... ``` code block.
 
 def _generate_cleaning_code(plan: dict, data_path: str, feedback: str) -> str:
     """
-    调用 LLM 生成清洗代码。
-    参照 AutoKaggle Developer._execute 的多轮 Prompt 构建逻辑，
-    此处简化为单轮结构化 Prompt。
-    若 LLM 调用失败则降级返回桩代码模板。
+    Call the LLM to generate data-cleaning code.
+    If the LLM call fails, fall back to a template implementation.
     """
     feedback_section = ""
     if feedback:
@@ -141,16 +146,15 @@ def _generate_cleaning_code(plan: dict, data_path: str, feedback: str) -> str:
         if code:
             return code
 
-    # 降级：返回桩代码模板
-    logger.warning("LLM 调用失败或未返回代码，使用桩代码模板。")
+    # Fallback: return template code
+    logger.warning("LLM call failed or returned no code; using fallback code template.")
     return _fallback_cleaning_code(plan, data_path)
 
 
 def _fix_code(code: str, error: str) -> str:
     """
-    调用 LLM 根据报错修复代码。
-    参照 AutoKaggle PROMPT_DEVELOPER_DEBUG_FIX 的简化版。
-    若 LLM 不可用则返回原代码。
+    Call the LLM to fix code based on execution errors.
+    Return original code if the LLM fix call fails.
     """
     user_prompt = _USER_PROMPT_FIX.format(code=code, error=error)
     reply = call_llm(_SYSTEM_PROMPT_FIX, user_prompt)
@@ -160,27 +164,73 @@ def _fix_code(code: str, error: str) -> str:
         if fixed_code:
             return fixed_code
 
-    # 降级：返回原代码
-    logger.warning("LLM 修复调用失败，返回原代码。")
+    # Fallback: return original code
+    logger.warning("LLM fix call failed; returning original code.")
     return code
 
 
 def _get_output_path() -> str:
-    """返回清洗后数据的标准输出路径。"""
+    """Return the standard output path for cleaned data."""
     return "./workspace/cleaned_data.csv"
 
 
+def _get_file_signature(file_path: str) -> tuple[int, int] | None:
+    """Return file signature (mtime_ns, size), or None if file does not exist."""
+    import os
+
+    if not os.path.exists(file_path):
+        return None
+
+    stat = os.stat(file_path)
+    return stat.st_mtime_ns, stat.st_size
+
+
+def _validate_cleaning_output(
+    output_path: str, previous_signature: tuple[int, int] | None = None
+) -> str:
+    """
+    Perform minimal hard checks on the cleaning output:
+    1. Output file exists
+    2. Output path is a file, not a directory
+    3. Output file size is greater than 0
+    4. File signature changed in this run (avoid reusing stale output)
+
+    Returns an empty string when valid, otherwise returns the failure reason.
+    """
+    import os
+
+    if not os.path.exists(output_path):
+        return f"cleaned output not found: {output_path}"
+
+    if not os.path.isfile(output_path):
+        return f"cleaned output is not a file: {output_path}"
+
+    current_signature = _get_file_signature(output_path)
+    if current_signature is None:
+        return f"failed to stat cleaned output: {output_path}"
+
+    _, file_size = current_signature
+    if file_size <= 0:
+        return "cleaned output file is empty"
+
+    if previous_signature is not None:
+        if current_signature == previous_signature:
+            return "cleaned output file was not updated in current run"
+
+    return ""
+
+
 def _fallback_cleaning_code(plan: dict, data_path: str) -> str:
-    """LLM 不可用时的降级桩代码模板。"""
+    """Fallback template code when LLM is unavailable."""
     return f"""\
 import pandas as pd
 
 df = pd.read_csv("{data_path}")
-# 基于计划执行清洗: {plan.get('objectives', [])}
+# Run cleaning steps based on plan objectives: {plan.get('objectives', [])}
 df = df.drop_duplicates()
 df = df.dropna(thresh=len(df.columns) * 0.5)
 
 output_path = "./workspace/cleaned_data.csv"
 df.to_csv(output_path, index=False)
-print(f"清洗完成，剩余 {{len(df)}} 行，已保存至 {{output_path}}")
+print(f"Cleaning complete. Remaining rows: {{len(df)}}. Saved to {{output_path}}")
 """
