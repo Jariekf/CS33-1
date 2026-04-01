@@ -1,31 +1,38 @@
+<div align="center">
+
 # Multi-Agent AutoDS Workflow System
 
-![python](https://img.shields.io/badge/python-3.10%2B-blue?logo=python&logoColor=white)
-![LangGraph](https://img.shields.io/badge/LangGraph-workflow-green)
-![llm](https://img.shields.io/badge/llm-openai%20compatible-black)
-![status](https://img.shields.io/badge/status-prototype-orange)
+<hr>
 
-One-stop prototype for automated data science workflows with multi-agent collaboration, stage-by-stage verification, and business-oriented report generation.
+A prototype platform for automated data science workflows with multi-agent collaboration, staged verification, and business-oriented reporting.
 
-[Quick Start](#quick-start) | [Project Overview](#project-overview) | [Repository Structure](#repository-structure) | [Testing](#testing)
+<p>
+  <img alt="python" src="https://img.shields.io/badge/python-3.10%2B-blue?logo=python&logoColor=white">
+  <img alt="LangGraph" src="./docs/assets/langgraph_badge.svg">
+  <img alt="llm" src="https://img.shields.io/badge/llm-openai%20compatible-orange?logo=openai&logoColor=white">
+</p>
+
+<p>
+  <a href="#project-overview">Project Overview</a> |
+  <a href="#repository-structure">Repository Structure</a> |
+  <a href="#tech-stack">Tech Stack</a> |
+  <a href="#current-capabilities">Current Capabilities</a> |
+  <a href="#quick-start">Quick Start</a>
+</p>
+
+</div>
 
 ## Project Overview
 
 ### Real-world Problem
 
-Many organisations can train machine learning models, but still struggle to turn technical outputs into business decisions. In practice, a full data science workflow usually requires:
+Many organisations can build machine learning models, but still struggle to operationalise an end-to-end workflow and turn technical outputs into business decisions. In practice, useful data science work typically connects business goal understanding, data preparation, feature engineering, model selection and validation, and business-facing interpretation.
 
-- understanding a business goal
-- cleaning and preparing raw data
-- performing feature engineering
-- selecting and validating models
-- interpreting results in a business-friendly way
-
-Traditional AutoML systems reduce modelling effort, but often stop at technical outputs. This project focuses on a broader AutoDS workflow: connecting raw data, model reasoning, workflow traceability, and final business recommendations in one multi-agent pipeline.
+Traditional AutoML systems reduce modelling effort, but they often stop at technical outputs. This repository focuses on a broader AutoDS workflow: coordinating specialised agents across the main analytical stages and producing actionable business recommendations with traceable intermediate outputs.
 
 ### Project Goal
 
-This repository implements a prototype **multi-agent Automated Data Science (AutoDS) system** inspired by reference frameworks such as AutoML-Agent and AutoKaggle. The current implementation uses **LangGraph** to orchestrate specialised agents and **OpenAI-compatible LLM APIs** to support planning, code generation, review, and business insight generation.
+This repository implements a prototype **multi-agent Automated Data Science (AutoDS) system** inspired by reference frameworks such as AutoML-Agent and AutoKaggle. The project scope targets **text and tabular datasets**. The implementation uses **LangGraph** to orchestrate specialised agents and **OpenAI-compatible LLM APIs** to support planning, code generation, review, and business insight generation.
 
 The system is designed to:
 
@@ -40,7 +47,7 @@ The system is designed to:
 The current pipeline is organised as the following sequence:
 
 1. `Manager Agent`
-   Interprets the user goal, previews the dataset, retrieves related papers from arXiv, and produces a structured global plan.
+   Serves as the main user-facing entry point: interprets the user goal, previews the dataset, retrieves related papers from arXiv, produces a structured global plan, initializes shared workflow state, and integrates the final report for delivery.
 2. `Data Cleaning Agent`
    Generates and executes cleaning code for the input dataset.
 3. `Supervisor Agent`
@@ -99,20 +106,7 @@ CS33-1/
 - [docs](https://github.sydney.edu.au/CS33-1/CS33-1/tree/main/docs)
   Stores repository documentation such as the GitHub commit guide.
 
-## Implemented Functionalities
-
-The repository currently supports the following implemented or scaffolded capabilities:
-
-- dataset preview and initial goal-aware planning
-- academic retrieval through arXiv search
-- LLM-assisted cleaning code generation
-- LLM-assisted feature engineering code generation
-- LLM-assisted model selection and feature-importance export
-- supervisor review and retry routing
-- business report generation in markdown
-- local artifact persistence in `workspace/`
-
-## Used Libraries
+## Tech Stack
 
 ### Core Frameworks
 
@@ -131,7 +125,25 @@ The repository currently supports the following implemented or scaffolded capabi
 - `python-dotenv`
 - `pydantic`
 
-See [requirements.txt](https://github.sydney.edu.au/CS33-1/CS33-1/blob/main/requirements.txt) for the current dependency list.
+## Current Capabilities
+
+The current repository exposes the following prototype capabilities:
+
+- dataset preview and initial goal-aware planning
+- LLM- and arXiv-integrated workflow stages, with stub/fallback paths for local development and failure recovery
+- LLM-assisted cleaning code generation
+- LLM-assisted feature engineering code generation
+- LLM-assisted model selection and feature-importance export
+- supervisor review and retry routing
+- business report generation in markdown
+- local artifact persistence in `workspace/`
+
+
+## What's Next
+
+- add stronger observability with structured per-stage logs for plan, generated code, execution output, review result, retry count, and artifact paths
+- make the supervisor gate stricter and more inspectable, especially around fail-close review behaviour and explicit pass/fail criteria
+- refine worker-agent prompts and execution constraints so stage outputs more reliably match the intended plan rather than only producing runnable code
 
 ## Quick Start
 
@@ -140,25 +152,41 @@ For setup and first run, see [Quick Start](docs/quick-start.md).
 ## Testing
 
 For validation scripts and testing notes, see [Testing Guide](docs/testing.md).
-## Team Roles
-
-The implementation direction of this repository follows the project proposal's multi-agent role design:
-
-| Role | Main Responsibility |
-|------|----------------------|
-| Project Manager / Manager Agent Developer | project coordination, planning logic, integration oversight |
-| Data Cleaning Agent Developer | cleaning workflow design and validation |
-| Feature Engineering Agent Developer | feature transformation workflow design |
-| Model Agent Developer | model training, evaluation, and feature importance |
-| Supervisor Agent Developer | review checkpoints, quality assurance, retry control |
-| Business Action Translator Developer / System Architect | business interpretation, RAG integration, end-to-end architecture |
 
 ## Expected Outputs
 
-Based on the current codebase and the project proposal, this repository is intended to produce:
+Following the project proposal, the intended outputs of this project are:
 
-- a working prototype for multi-agent AutoDS workflows
-- stage-specific intermediate reports and execution artifacts
-- feature-importance outputs for interpretation
-- a final business insight report in markdown
-- reproducible project assets for demonstration and evaluation
+- **Multi-agent AutoDS prototype** covering coordinated planning, data processing, modelling, verification, and business-oriented reporting
+- **Experimental benchmarking results** comparing the proposed system with representative baseline workflows
+- **Workflow reports and review records** including stage-specific execution artifacts, supervisor feedback, and interpretable modelling outputs such as feature importance
+- **Final report and reproducible project assets** including source code, configuration, testing records, and supporting materials for demonstration and evaluation
+
+The current repository mainly exposes the prototype workflow and its generated artifacts, while the broader project deliverables also include benchmarking and final evaluation outputs.
+
+---
+
+## License
+
+This repository is for Group-Based Capstone Project COMP5703 only and not intended for open-source distribution.
+
+---
+
+## Acknowledgements
+
+- [LangGraph](https://github.com/langchain-ai/langgraph) for workflow orchestration
+- [AutoML-Agent](https://github.com/deepauto-ai/automl-agent) and [AutoKaggle](https://github.com/multimodal-art-projection/AutoKaggle) as reference frameworks
+- [arXiv](https://arxiv.org/) for literature retrieval support in RAP/RAG-style stages
+- OpenAI-compatible LLM APIs for planning, code generation, review, and report synthesis
+
+---
+
+<div align="center">
+
+**Built for the CS33-1 Capstone Project**
+
+Multi-agent AutoDS prototype for planning, staged execution, and business-oriented reporting.
+
+[Back to Top](#multi-agent-autods-workflow-system)
+
+</div>
