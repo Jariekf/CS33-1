@@ -2,7 +2,7 @@
 
 Update: Yiting Liu Author: Liam (Zijian Xue), 2026; based on the "github-clone-and-push.pdf"
 
-This guide explains how to set up Git, clone the course repository, create your own development branch, commit changes, push to GitHub, and submit a pull request (PR) correctly for the team project.
+This guide explains how to set up Git, clone the course repository, create your own development branch, commit changes, push to GitHub, resolve merge conflicts, and submit a pull request (PR) correctly for the team project.
 
 ---
 
@@ -93,34 +93,32 @@ git push -u origin jerry_develop
 
 Make all your changes on your own branch.
 
-Use clear commit messages in this format:
-
-[Module/Task] Short description
+Use **one** commit message style everywhere: **`<type>: <brief description>`** (Conventional Commits). Keep the description short and in the imperative mood (e.g. “add”, “fix”, “update”).
 
 Example:
 
 ```bash
 git add .
-git commit -m "[Login] Implement Manager agent"
+git commit -m "feat: add Manager agent"
 git push
 ```
 
- All commit messages are recommended to follow this format:
+**Types:**
 
-```text
-- Recomnebded format: <type>: <brief description>.
+- `feat`: A new feature
+- `fix`: A bug fix
+- `docs`: Documentation changes
+- `style`: Code style changes (non-functional)
+- `refactor`: Code refactoring (neither adding features nor fixing bugs)
+- `test`: Adding tests
+- `chore`: Changes to the build process or auxiliary tools
 
-- Types:
+More examples:
 
-feat: A new feature
-fix: A bug fix
-docs: Documentation changes
-style: Code style changes (non-functional)
-refactor: Code refactoring (neither adding features nor fixing bugs)
-test: Adding tests
-chore: Changes to the build process or auxiliary tools
-```
-Examples: feat: Add Manager Agent | fix: Fix Supervisor Agent reporting issues
+- `feat: add user login flow`
+- `fix: correct Supervisor agent reporting`
+
+For details, see [Conventional Commits](https://www.conventionalcommits.org/).
 
 
 ## 6. Submit a Pull Request (PR) --> Merge PR into `main`
@@ -155,7 +153,58 @@ git rebase origin/main
 git push origin jerry_develop     # Update remote branch
 ```
 
-## 8. Common Authentication and Push Issues
+## 8. Resolving Merge Conflicts
+
+Conflicts usually appear when you **merge** or **pull** and Git cannot combine changes automatically—for example after `git merge origin/main`, `git pull`, or finishing a merge from another branch. Resolve them on your machine before you push or open a PR.
+
+### 8.1 See which files conflict
+
+After Git stops with a conflict message, check status:
+
+```bash
+git status
+```
+
+Look for files under **Unmerged paths** or described as both modified; those need manual edits.
+
+### 8.2 Edit away conflict markers
+
+Open each conflicting file. You will see blocks like:
+
+```text
+<<<<<<< HEAD
+Your version (current branch)
+=======
+The other side (e.g. from main or the branch you merged)
+>>>>>>> branch_name
+```
+
+Decide what the file should contain, delete the `<<<<<<<`, `=======`, and `>>>>>>>` lines, and keep the correct code (sometimes you need a mix of both sides). Save the file.
+
+### 8.3 Stage, commit, and push
+
+Mark each resolved file as staged:
+
+```bash
+git add path/to/conflicted_file
+```
+
+When all conflicts are fixed and staged, complete the merge with a commit:
+
+```bash
+git commit -m "chore: resolve merge conflict"
+```
+
+Use a more specific message if it helps reviewers (for example which module or file).
+
+- If you were **merging** `origin/main` into your branch, this commit finishes that merge; then run `git push` (or `git push origin your_branch_name`).
+- If Git had you in the middle of another operation, finish that flow the same way: resolve → `git add` → `git commit`, then push when appropriate.
+
+### 8.4 Verify before you share
+
+Run the project or your tests after resolving conflicts so you do not push or merge broken code.
+
+## 9. Common Authentication and Push Issues
 
 If Git asks for credentials when cloning or pushing:
 
@@ -164,7 +213,7 @@ If Git asks for credentials when cloning or pushing:
 
 If cloning or pushing still fails with errors such as `401` or `403`: please `@Liam` in the WeChat or Slack group chat
 
-## 9. Quick Command Reference
+## 10. Quick Command Reference
 
 ```bash
 git clone https://github.sydney.edu.au/CS33-1/CS33-1.git  # Clone the repository to your local machine
@@ -178,7 +227,7 @@ git push                                                  # Push your latest com
 
 Replace `name_develop` with your actual branch name.
 
-## 10. Important Notes
+## 11. Important Notes
 
 - Never push directly to `main`; always use a PR.
 - Always work on your own branch.
