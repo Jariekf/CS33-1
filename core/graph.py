@@ -4,6 +4,7 @@ LangGraph 工作流图构建
 """
 from langgraph.graph import StateGraph, END
 
+from core.logger import get_agent_logger
 from core.state import GraphState
 from agents.manager import manager_node
 from agents.data_cleaning import data_cleaning_node
@@ -13,6 +14,7 @@ from agents.supervisor import supervisor_node, supervisor_router
 from agents.business_translator import business_translator_node
 from config import MAX_OUTER_RETRY
 
+sys_logger = get_agent_logger("sys")
 
 def _make_supervisor_routing(next_phase: str | None):
     """
@@ -23,12 +25,14 @@ def _make_supervisor_routing(next_phase: str | None):
     """
     def _router(state: GraphState) -> str:
         result = supervisor_router(state)
+        sys_logger.info(f"Routing logic executed for phase transition to {next_phase}, result: {result}")
         return result
     return _router
 
 
 def build_graph() -> StateGraph:
     """构建并返回编译后的 LangGraph 工作流图。"""
+    sys_logger.info("Building LangGraph workflow...")
 
     workflow = StateGraph(GraphState)
 
