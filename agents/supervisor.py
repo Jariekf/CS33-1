@@ -162,7 +162,7 @@ def _llm_review(
     
     try:
         import re
-        reply = call_llm(system_prompt, user_prompt)
+        reply = call_llm(system_prompt, user_prompt, agent_name="supervisor")
         if reply:
             match = re.search(r'\{.*\}', reply, re.DOTALL)
             if match:

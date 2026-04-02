@@ -82,7 +82,7 @@ Please generate 2 to 3 precise English search queries for an academic database t
 Return ONLY a JSON array of strings, e.g.:
 ["query 1", "query 2"]
 """
-    reply = call_llm(sys_prompt, user_prompt)
+    reply = call_llm(sys_prompt, user_prompt, agent_name="business_translator")
     if reply:
         try:
             match = re.search(r'\[.*\]', reply, re.DOTALL)
@@ -138,7 +138,7 @@ Requirements:
 4. Actionable Business Recommendations (Highly specific, practical intervention strategies the business can apply).
 Please output professional, structured Markdown. PREVENT REPETITION: Do NOT say the same thing more than once.
 """
-    reply = call_llm(sys_prompt, user_prompt)
+    reply = call_llm(sys_prompt, user_prompt, agent_name="business_translator")
     if reply:
         return reply
 

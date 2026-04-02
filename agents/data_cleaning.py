@@ -139,7 +139,7 @@ def _generate_cleaning_code(plan: dict, data_path: str, feedback: str) -> str:
         feedback_section=feedback_section,
     )
 
-    reply = call_llm(_SYSTEM_PROMPT_GENERATE, user_prompt)
+    reply = call_llm(_SYSTEM_PROMPT_GENERATE, user_prompt, agent_name="data_cleaning")
 
     if reply:
         code = extract_code(reply)
@@ -157,7 +157,7 @@ def _fix_code(code: str, error: str) -> str:
     Return original code if the LLM fix call fails.
     """
     user_prompt = _USER_PROMPT_FIX.format(code=code, error=error)
-    reply = call_llm(_SYSTEM_PROMPT_FIX, user_prompt)
+    reply = call_llm(_SYSTEM_PROMPT_FIX, user_prompt, agent_name="data_cleaning")
 
     if reply:
         fixed_code = extract_code(reply)

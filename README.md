@@ -148,6 +148,7 @@ The current repository exposes the following prototype capabilities:
 ## Quick Start
 
 For setup and first run, see [Quick Start](docs/quick-start.md).
+For model setup and agent-to-LLM mapping, see [LLM Model Configuration Guide](docs/llm-model-config-guide.md).
 
 ## Testing
 

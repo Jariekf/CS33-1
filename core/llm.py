@@ -6,46 +6,95 @@
 from __future__ import annotations
 
 import logging
+import os
 import re
+from typing import Any
 
-from langchain_openai import ChatOpenAI
 from langchain_core.messages import SystemMessage, HumanMessage
 
-from config import LLM_CONFIG
+from core.my_llm import (
+    llm_deepseek,
+    llm_openai,
+    llm_zhipu,
+    llm_gemini,
+    llm_qwen,
+    llm_minimax,
+    llm_kimi,
+)
 
 logger = logging.getLogger(__name__)
 
 
-# ======================================================================
-# LLM 实例工厂
-# ======================================================================
+# Inject LLMs
 
-import os
+PROFILE_LLM_MAP: dict[str, Any] = {
+    "deepseek": llm_deepseek,
+    "openai": llm_openai,
+    "zhipu": llm_zhipu,
+    "gemini": llm_gemini,
+    "qwen": llm_qwen,
+    "minimax": llm_minimax,
+    "kimi": llm_kimi,
+}
+# PROFILE_LLM_MAP: dict[str, Any] = {
+#     "deepseek": llm_deepseek,
+#     "openai": llm_deepseek,
+#     "zhipu": llm_deepseek,
+#     "gemini": llm_deepseek,
+#     "qwen": llm_deepseek,
+#     "minimax": llm_deepseek,
+#     "kimi": llm_deepseek,
+# }
 
-def get_llm() -> ChatOpenAI:
-    """
-    根据 config.LLM_CONFIG 返回 ChatOpenAI 实例。
-    若 API Key 缺失则记录警告。
-    """
+DEFAULT_PROFILE = "deepseek"
+
+"""
+LLM configuration mapping table.
+Here you can define the llm models corresponding to different agents
+"""
+AGENT_PROFILE_MAP: dict[str, str] = {
+    "manager": "deepseek", # Simply change the model name to the one you require
+    "data_cleaning": "qwen",
+    "feature_engineering": "deepseek",
+    "model_selection": "openai",
+    "business_translator": "gemini",
+    "supervisor": "openai",
+}
+
+
+def _resolve_profile(agent_name: str | None = None) -> str:
+    """Resolve profile with priority: agent map > default."""
+    if agent_name:
+        return AGENT_PROFILE_MAP.get(agent_name.strip().lower(), DEFAULT_PROFILE)
+    return DEFAULT_PROFILE
+
+
+def get_llm(agent_name: str | None = None):
+    """Return LLM instance by agent mapping."""
     if os.getenv("STUB_MODE", "false").lower() == "true":
         raise Exception("STUB_MODE 开启，强制生成带异常的 LLM 对象触发降级")
 
-    if not LLM_CONFIG.get("api_key"):
-        logger.warning("OPENAI_API_KEY 未设置，LLM 调用将会失败并降级为桩逻辑。")
-
-    return ChatOpenAI(
-        model=LLM_CONFIG["model"],
-        api_key=LLM_CONFIG["api_key"],
-        base_url=LLM_CONFIG["base_url"],
-        temperature=LLM_CONFIG.get("temperature", 0.2),
-    )
+    resolved_profile = _resolve_profile(agent_name=agent_name)
+    llm = PROFILE_LLM_MAP.get(resolved_profile)
+    if llm is None:
+        logger.warning(
+            "未识别的 profile '%s'，自动回退到默认 profile '%s'。",
+            resolved_profile,
+            DEFAULT_PROFILE,
+        )
+        return PROFILE_LLM_MAP[DEFAULT_PROFILE]
+    return llm
 
 
 # ======================================================================
 # 便捷调用函数
 # ======================================================================
 
-def call_llm(system_prompt: str, user_prompt: str) -> str | None:
+def call_llm(
+    system_prompt: str,
+    user_prompt: str,
+    agent_name: str | None = None,
+) -> str | None:
     """
     发起一次 LLM 调用。
     """
@@ -54,7 +103,7 @@ def call_llm(system_prompt: str, user_prompt: str) -> str | None:
         return None
 
     try:
-        llm = get_llm()
+        llm = get_llm(agent_name=agent_name)
         messages = [
             SystemMessage(content=system_prompt),
             HumanMessage(content=user_prompt),

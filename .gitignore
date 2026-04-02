@@ -4,5 +4,4 @@ __pycache__/
 .gemini/
 
 .env
-.rules
 docs/rules.md

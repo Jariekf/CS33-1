@@ -146,7 +146,7 @@ def _generate_fe_code(
         feedback_section=feedback_section,
     )
 
-    reply = call_llm(_SYSTEM_PROMPT_GENERATE, user_prompt)
+    reply = call_llm(_SYSTEM_PROMPT_GENERATE, user_prompt, agent_name="feature_engineering")
 
     if reply:
         code = extract_code(reply)
@@ -165,7 +165,7 @@ def _fix_code(code: str, error: str) -> str:
     若 LLM 不可用则返回原代码。
     """
     user_prompt = _USER_PROMPT_FIX.format(code=code, error=error)
-    reply = call_llm(_SYSTEM_PROMPT_FIX, user_prompt)
+    reply = call_llm(_SYSTEM_PROMPT_FIX, user_prompt, agent_name="feature_engineering")
 
     if reply:
         fixed_code = extract_code(reply)

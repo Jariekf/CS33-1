@@ -129,7 +129,7 @@ def _generate_model_code(plan: dict, data_path: str, feedback: str) -> str:
         feedback_section=feedback_section,
     )
 
-    reply = call_llm(_SYSTEM_PROMPT_GENERATE, user_prompt)
+    reply = call_llm(_SYSTEM_PROMPT_GENERATE, user_prompt, agent_name="model_selection")
     if reply:
         code = extract_code(reply)
         if code:
@@ -142,7 +142,7 @@ def _generate_model_code(plan: dict, data_path: str, feedback: str) -> str:
 def _fix_code(code: str, error: str) -> str:
     """调用 LLM 修复代码。若失败则原样返回。"""
     user_prompt = _USER_PROMPT_FIX.format(code=code, error=error)
-    reply = call_llm(_SYSTEM_PROMPT_FIX, user_prompt)
+    reply = call_llm(_SYSTEM_PROMPT_FIX, user_prompt, agent_name="model_selection")
     if reply:
         fixed_code = extract_code(reply)
         if fixed_code:
