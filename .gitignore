@@ -6,3 +6,4 @@ logs/
 
 .env
 docs/rules.md
+.vscode/
