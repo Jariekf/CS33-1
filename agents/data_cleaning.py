@@ -12,19 +12,20 @@ Design references the AutoKaggle Developer Agent pattern:
 from __future__ import annotations
 
 import json
-import logging
+from core.logger import get_agent_logger
 
 from core.state import GraphState
 from core.llm import call_llm, extract_code
 from tools.python_repl import execute_code
 from config import MAX_INNER_RETRY
 
-logger = logging.getLogger(__name__)
+logger = get_agent_logger("data_cleaning")
 
 
 def data_cleaning_node(state: GraphState) -> dict:
     """LangGraph node function for Data Cleaning."""
 
+    logger.info("Data Cleaning node started.")
     plan = state["global_plan"].get("data_cleaning_plan", {})
     data_path = state["current_data_path"]
     feedback = state.get("current_error", "")
@@ -33,6 +34,7 @@ def data_cleaning_node(state: GraphState) -> dict:
     # Step 1: Generate cleaning code via LLM
     # ------------------------------------------------------------------
     code = _generate_cleaning_code(plan, data_path, feedback)
+    logger.info("Data cleaning code generation completed.")
 
     # ------------------------------------------------------------------
     # Step 2: Inner self-correction loop
@@ -47,6 +49,7 @@ def data_cleaning_node(state: GraphState) -> dict:
                 output_path, previous_signature=previous_signature
             )
             if not validation_error:
+                logger.info("Data cleaning code executed and validated successfully.")
                 break
             stderr = f"[PostValidationFailed] {validation_error}"
         # Self-heal: feed the error back to the LLM and regenerate code
@@ -57,6 +60,7 @@ def data_cleaning_node(state: GraphState) -> dict:
     # Step 3: Return state updates
     # ------------------------------------------------------------------
     if stderr:
+        logger.error(f"Data cleaning failed after {MAX_INNER_RETRY} attempts: {stderr}")
         # Inner retry exhausted: still pass the latest error to Supervisor
         return {
             "current_phase": "data_cleaning",

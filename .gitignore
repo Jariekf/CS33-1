@@ -2,6 +2,7 @@
 __pycache__/
 *.pyc
 .gemini/
+logs/
 
 .env
 docs/rules.md

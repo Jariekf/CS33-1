@@ -12,19 +12,20 @@ Feature Engineering Agent (特征工程智能体)
 from __future__ import annotations
 
 import json
-import logging
+from core.logger import get_agent_logger
 
 from core.state import GraphState
 from core.llm import call_llm, extract_code
 from tools.python_repl import execute_code
 from config import MAX_INNER_RETRY
 
-logger = logging.getLogger(__name__)
+logger = get_agent_logger("feature_engineering")
 
 
 def feature_engineering_node(state: GraphState) -> dict:
     """Feature Engineering 的 LangGraph 节点函数。"""
 
+    logger.info("Feature Engineering node started.")
     # 【边界控制】只抽取属于自己的子计划
     plan = state["global_plan"].get("feature_engineering_plan", {})
     data_path = state["current_data_path"]
@@ -36,6 +37,7 @@ def feature_engineering_node(state: GraphState) -> dict:
     # Step 1: 生成特征工程代码
     # ------------------------------------------------------------------
     code = _generate_fe_code(plan, data_path, previous_summary, feedback)
+    logger.info("Feature engineering code generation completed.")
 
     # ------------------------------------------------------------------
     # Step 2: 内部语法自救循环
@@ -44,6 +46,7 @@ def feature_engineering_node(state: GraphState) -> dict:
     for attempt in range(MAX_INNER_RETRY):
         stdout, stderr = execute_code(code)
         if not stderr:
+            logger.info("Feature engineering code executed successfully.")
             break
         logger.info("内部自救第 %d 次: %s", attempt + 1, stderr[:200])
         code = _fix_code(code, stderr)
@@ -52,6 +55,7 @@ def feature_engineering_node(state: GraphState) -> dict:
     # Step 3: 返回状态更新
     # ------------------------------------------------------------------
     if stderr:
+        logger.error(f"Feature engineering failed after {MAX_INNER_RETRY} attempts: {stderr}")
         return {
             "current_phase": "feature_engineering",
             "current_code": code,

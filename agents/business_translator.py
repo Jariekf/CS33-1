@@ -16,6 +16,9 @@ from core.llm import call_llm
 from tools.arxiv_tool import search_arxiv
 from tools.file_reader import read_file
 from config import WORKSPACE_DIR
+from core.logger import get_agent_logger
+
+logger = get_agent_logger("business_translator")
 
 
 def business_translator_node(state: GraphState) -> dict:
@@ -23,6 +26,7 @@ def business_translator_node(state: GraphState) -> dict:
 
     user_goal = state["user_goal"]
     memory = state.get("memory", [])
+    logger.info("Business Translator node started.")
 
     # ------------------------------------------------------------------
     # Step 1: 提取模型核心结论 (从落盘文件中按需读取)
@@ -30,12 +34,14 @@ def business_translator_node(state: GraphState) -> dict:
     fi_path = os.path.join(WORKSPACE_DIR, "feature_importance.json")
     feature_importance = _load_feature_importance(fi_path)
     model_summary = memory[-1] if memory else "无模型阶段摘要"
+    logger.info(f"Loaded feature importance for {len(feature_importance)} features.")
 
     # ------------------------------------------------------------------
     # Step 2: 构造 RAG 检索查询词
     # ------------------------------------------------------------------
     top_features = list(feature_importance.keys())[:5] if feature_importance else []
     search_queries = _build_rag_queries(user_goal, top_features)
+    logger.info(f"Generated {len(search_queries)} RAG queries for external strategy literature.")
 
     # ------------------------------------------------------------------
     # Step 3: 调用 arxiv 检索外部文献
@@ -43,6 +49,7 @@ def business_translator_node(state: GraphState) -> dict:
     retrieved_docs = []
     for q in search_queries:
         retrieved_docs.extend(search_arxiv(q))
+    logger.info(f"Arxiv search complete. Retrieved {len(retrieved_docs)} strategy documents.")
 
     # ------------------------------------------------------------------
     # Step 4: 调用 LLM 生成商业分析报告 (TODO: 接入LLM)
@@ -50,6 +57,7 @@ def business_translator_node(state: GraphState) -> dict:
     report = _generate_business_report(
         user_goal, model_summary, feature_importance, top_features, retrieved_docs
     )
+    logger.info("Business report generation complete.")
 
     return {"final_business_report": report}
 
