@@ -9,7 +9,7 @@ from __future__ import annotations
 
 import os
 import json
-import logging
+from core.logger import get_agent_logger
 from pydantic import BaseModel, Field
 from langchain_core.messages import SystemMessage, HumanMessage
 
@@ -17,7 +17,7 @@ from core.state import GraphState
 from core.llm import call_llm
 from config import SUPERVISOR_PASS_THRESHOLD, MAX_OUTER_RETRY, WORKSPACE_DIR
 
-logger = logging.getLogger(__name__)
+logger = get_agent_logger("supervisor")
 
 # ======================================================================
 # 结构化审查报告定义
@@ -88,12 +88,14 @@ def supervisor_node(state: GraphState) -> dict:
     phase = state["current_phase"]
     code = state.get("current_code", "")
     execution_log = state.get("current_execution_log", "")
+    logger.info(f"Supervisor node started for phase: {phase}.")
     plan = state.get("global_plan", {}).get(f"{phase}_plan", {})
 
     # ------------------------------------------------------------------
     # 调用 LLM 进行结构化审查
     # ------------------------------------------------------------------
     review = _llm_review(phase, plan, code, execution_log)
+    logger.info(f"LLM review completed. Score: {review.score}, Passed: {review.passed}")
 
     # ------------------------------------------------------------------
     # 根据审查结果，构造状态更新
@@ -101,6 +103,7 @@ def supervisor_node(state: GraphState) -> dict:
     updates: dict = {"current_review": review.model_dump()}
 
     if review.passed:
+        logger.info(f"Review passed for phase: {phase}. Writing report to output log.")
         # ---- 通过：落盘详情 + 摘要入 Memory ----
         report_path = os.path.join(WORKSPACE_DIR, f"{phase}_report.md")
         os.makedirs(WORKSPACE_DIR, exist_ok=True)
@@ -112,6 +115,7 @@ def supervisor_node(state: GraphState) -> dict:
         updates["current_error"] = ""
         updates["retry_count"] = 0
     else:
+        logger.warning(f"Review failed for phase: {phase}. Feedback: {review.feedback_for_retry}")
         # ---- 不通过：附带反馈信息，累加重试计数 ----
         updates["current_error"] = review.feedback_for_retry
         updates["retry_count"] = state.get("retry_count", 0) + 1

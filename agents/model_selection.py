@@ -8,14 +8,14 @@ Model Selection Agent (模型选择与构建智能体)
 from __future__ import annotations
 
 import json
-import logging
+from core.logger import get_agent_logger
 
 from core.state import GraphState
 from core.llm import call_llm, extract_code
 from tools.python_repl import execute_code
 from config import MAX_INNER_RETRY
 
-logger = logging.getLogger(__name__)
+logger = get_agent_logger("model_selection")
 
 # ======================================================================
 # Prompt 模板
@@ -70,6 +70,7 @@ Provide the complete corrected code in a single ```python ... ``` code block.
 def model_selection_node(state: GraphState) -> dict:
     """Model Selection 的 LangGraph 节点函数。"""
 
+    logger.info("Model Selection node started.")
     # 【边界控制】只抽取属于自己的子计划
     plan = state["global_plan"].get("model_selection_plan", {})
     data_path = state["current_data_path"]
@@ -79,6 +80,7 @@ def model_selection_node(state: GraphState) -> dict:
     # Step 1: 生成模型训练 + 调参 + 评估代码
     # ------------------------------------------------------------------
     code = _generate_model_code(plan, data_path, feedback)
+    logger.info("Model selection code generation completed.")
 
     # ------------------------------------------------------------------
     # Step 2: 内部语法自救循环
@@ -87,6 +89,7 @@ def model_selection_node(state: GraphState) -> dict:
     for attempt in range(MAX_INNER_RETRY):
         stdout, stderr = execute_code(code)
         if not stderr:
+            logger.info("Model selection code executed successfully.")
             break
         logger.info("内部自救第 %d 次: %s", attempt + 1, stderr[:200])
         code = _fix_code(code, stderr)
@@ -95,6 +98,7 @@ def model_selection_node(state: GraphState) -> dict:
     # Step 3: 返回状态
     # ------------------------------------------------------------------
     if stderr:
+        logger.error(f"Model selection failed after {MAX_INNER_RETRY} attempts: {stderr}")
         return {
             "current_phase": "model_selection",
             "current_code": code,

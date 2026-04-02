@@ -17,6 +17,9 @@ from core.state import GraphState
 from core.llm import call_llm
 from tools.arxiv_tool import search_arxiv
 from config import WORKSPACE_DIR
+from core.logger import get_agent_logger
+
+logger = get_agent_logger("manager")
 
 
 def manager_node(state: GraphState) -> dict:
@@ -29,15 +32,19 @@ def manager_node(state: GraphState) -> dict:
     user_goal = state["user_goal"]
     data_path = state["data_path"]
 
+    logger.info(f"Starting manager_node with user_goal: '{user_goal}' and data_path: '{data_path}'")
+
     # ------------------------------------------------------------------
     # Step 1: 提取数据元信息 (列名、行数等)，让 LLM 感知数据轮廓
     # ------------------------------------------------------------------
     df_preview = _get_data_preview(data_path)
+    logger.info("Data preview generated.")
 
     # ------------------------------------------------------------------
     # Step 2: 利用 LLM 将用户目标转化为学术检索查询词
     # ------------------------------------------------------------------
     search_queries = _generate_search_queries(user_goal, df_preview)
+    logger.info(f"Generated {len(search_queries)} search queries for RAP: {search_queries}")
 
     # ------------------------------------------------------------------
     # Step 3: RAP — 调用 arxiv 工具检索相关文献
@@ -46,11 +53,13 @@ def manager_node(state: GraphState) -> dict:
     for query in search_queries:
         docs = search_arxiv(query)
         retrieved_docs.extend(docs)
+    logger.info(f"RAP search complete. Gathered {len(retrieved_docs)} documents.")
 
     # ------------------------------------------------------------------
     # Step 4: 结合用户目标 + 文献先验 + 数据概览，生成结构化执行计划
     # ------------------------------------------------------------------
     global_plan = _generate_global_plan(user_goal, df_preview, retrieved_docs)
+    logger.info("Global structured plan generated successfully.")
 
     # ------------------------------------------------------------------
     # Step 5: 初始化运行时状态并返回

@@ -28,9 +28,10 @@ MAX_OUTER_RETRY = 3
 SUPERVISOR_PASS_THRESHOLD = 3
 
 # ============================================================
-# 工作空间路径
+# 工作空间与日志路径
 # ============================================================
 WORKSPACE_DIR = os.path.join(os.path.dirname(__file__), "workspace")
+LOG_DIR = os.path.join(os.path.dirname(__file__), "logs")
 
 # ============================================================
 # Arxiv 检索配置

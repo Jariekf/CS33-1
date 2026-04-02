@@ -4,6 +4,9 @@
 """
 from core.graph import build_graph
 from core.state import GraphState
+from core.logger import get_agent_logger
+
+sys_logger = get_agent_logger("sys")
 
 
 def run(data_path: str, user_goal: str) -> str:
@@ -18,6 +21,7 @@ def run(data_path: str, user_goal: str) -> str:
         最终的商业洞察分析报告文本
     """
     # 构建 LangGraph 工作流
+    sys_logger.info(f"Main execution started with data_path: '{data_path}', goal: '{user_goal}'")
     app = build_graph()
 
     # 初始化输入状态
@@ -37,7 +41,9 @@ def run(data_path: str, user_goal: str) -> str:
     }
 
     # 执行工作流
+    sys_logger.info("Starting graph invocation...")
     final_state = app.invoke(initial_state)
+    sys_logger.info("Graph invocation finished successfully.")
 
     return final_state.get("final_business_report", "未生成报告")
 
