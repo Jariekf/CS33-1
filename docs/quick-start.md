@@ -30,6 +30,8 @@ STUB_MODE=false
 
 If `STUB_MODE=true`, parts of the workflow fall back to stub logic instead of live LLM or arXiv behaviour.
 
+For detailed multi-provider model setup (API keys, model version, temperature, and agent-to-LLM mapping), see [LLM Model Configuration Guide](./llm-model-config-guide.md).
+
 ## 3. Run the pipeline
 
 Example:

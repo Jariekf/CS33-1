@@ -110,7 +110,7 @@ Data Preview:
 Based on the goal and data structure, generate 1 to 2 English search queries for an academic database (like Arxiv) to discover machine learning methodologies or feature engineering techniques relevant to this dataset and objective.
 Return ONLY a JSON array of strings, e.g., ["query 1", "query 2"]
 """
-    reply = call_llm(sys_prompt, user_prompt)
+    reply = call_llm(sys_prompt, user_prompt, agent_name="manager")
     if reply:
         try:
             match = re.search(r'\[.*\]', reply, re.DOTALL)
@@ -159,7 +159,7 @@ You must output ONLY a valid JSON object with EXACTLY the following structure (n
     }}
 }}
 """
-    reply = call_llm(sys_prompt, user_prompt)
+    reply = call_llm(sys_prompt, user_prompt, agent_name="manager")
     if reply:
         try:
             match = re.search(r'\{.*\}', reply, re.DOTALL)
