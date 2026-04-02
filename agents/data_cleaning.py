@@ -194,7 +194,7 @@ def _validate_cleaning_output(
 ) -> str:
     """
     Perform minimal hard checks on the cleaning output:
-    1. Output file exists
+    1. Output file exists.
     2. Output path is a file, not a directory
     3. Output file size is greater than 0
     4. File signature changed in this run (avoid reusing stale output)
