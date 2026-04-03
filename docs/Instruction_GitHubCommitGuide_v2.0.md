@@ -1,6 +1,6 @@
 # GitHub Commit Guide v2.0
 
-Update: Yiting Liu Author: Liam (Zijian Xue), 2026; based on the "github-clone-and-push.pdf"
+Update: Yiting Liu, Yuxin Liao Author: Liam (Zijian Xue), 2026; based on the "github-clone-and-push.pdf"
 
 This guide explains how to set up Git, clone the course repository, create your own development branch, commit changes, push to GitHub, resolve merge conflicts, and submit a pull request (PR) correctly for the team project.
 
