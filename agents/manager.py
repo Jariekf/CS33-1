@@ -128,7 +128,20 @@ Return ONLY a JSON array of strings, e.g., ["query 1", "query 2"]
 def _generate_global_plan(
     user_goal: str, df_preview: str, retrieved_docs: list[dict]
 ) -> dict:
-    """调用 LLM 生成结构化执行计划 (JSON)。"""
+    """调用 LLM 生成结构化执行计划 (JSON)。
+
+    `data_cleaning_plan.cleaning_contract` — Minimal general mode (keys are optional; default or `{}` indicates no validation):
+
+    - `max_row_drop_ratio`: A floating-point number from 0 to 1, representing the maximum percentage of rows allowed to be deleted/dropped relative to the number of rows in the input CSV.
+
+    Column retention is not enforced: cleaning may drop or rename columns per objectives.
+
+    Differences from `rules`:
+
+    - `rules`: Plans which cleaning steps (processes) to perform, for subsequent rule-based execution or suggestions.
+
+    - `cleaning_contract`: Task-level safety boundaries (results), hard-validated by the Data Cleaning node after data is written to disk.
+    """
     docs_context = "\n".join(
         [f"- {d.get('title', 'N/A')}: {d.get('summary', '')[:200]}" for d in retrieved_docs]
     ) if retrieved_docs else "无检索结果"
@@ -147,7 +160,9 @@ You must output ONLY a valid JSON object with EXACTLY the following structure (n
 {{
     "data_cleaning_plan": {{
         "objectives": ["obj1", "obj2"],
-        "constraints": "string constraint"
+        "constraints": "string constraint",
+        "rules": [],
+        "cleaning_contract": {{}}
     }},
     "feature_engineering_plan": {{
         "objectives": ["obj1"],
@@ -158,6 +173,11 @@ You must output ONLY a valid JSON object with EXACTLY the following structure (n
         "evaluation_metric": "e.g., f1, accuracy"
     }}
 }}
+
+Notes for data_cleaning_plan:
+- "rules": procedural steps to perform (what to run). Optional list of objects like {{"rule": "drop_duplicates", "params": {{}}}}. Use [] if none. Not validated as bounds.
+- "cleaning_contract": post-execution guardrails. Prefer {{}} or only "max_row_drop_ratio". Do not list "protected_columns" or imply all columns must survive cleaning — dropping columns is allowed.
+    * "max_row_drop_ratio" (number 0..1, optional): only enforced key; max allowed fraction of input rows removed, i.e. (rows_in - rows_out) / rows_in.
 """
     reply = call_llm(sys_prompt, user_prompt, agent_name="manager")
     if reply:
@@ -166,16 +186,19 @@ You must output ONLY a valid JSON object with EXACTLY the following structure (n
             if match:
                 plan = json.loads(match.group(0))
                 if isinstance(plan, dict) and "data_cleaning_plan" in plan:
+                    _normalize_data_cleaning_plan(plan)
                     plan["_rap_context"] = docs_context
                     return plan
         except Exception:
             pass
 
     # Fallback
-    return {
+    fallback_plan = {
         "data_cleaning_plan": {
             "objectives": ["检查并处理缺失值", "移除重复行", "修正数据类型"],
             "constraints": "删除行数不超过总数据 5%",
+            "rules": [],
+            "cleaning_contract": {},
         },
         "feature_engineering_plan": {
             "objectives": ["基于 RAP 文献构造关键衍生特征", "类别编码", "特征缩放"],
@@ -187,3 +210,24 @@ You must output ONLY a valid JSON object with EXACTLY the following structure (n
         },
         "_rap_context": docs_context,
     }
+    _normalize_data_cleaning_plan(fallback_plan)
+    return fallback_plan
+
+
+def _normalize_data_cleaning_plan(plan: dict) -> None:
+    """Ensure data_cleaning_plan has rules + cleaning_contract with safe defaults."""
+    dcp = plan.get("data_cleaning_plan")
+    if not isinstance(dcp, dict):
+        plan["data_cleaning_plan"] = {
+            "objectives": [],
+            "constraints": "",
+            "rules": [],
+            "cleaning_contract": {},
+        }
+        return
+    if not isinstance(dcp.get("rules"), list):
+        dcp["rules"] = []
+    if not isinstance(dcp.get("cleaning_contract"), dict):
+        dcp["cleaning_contract"] = {}
+    # Drop legacy / LLM-hallucinated key: we do not enforce "must keep these columns".
+    dcp["cleaning_contract"].pop("protected_columns", None)
