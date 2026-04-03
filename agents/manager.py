@@ -4,7 +4,7 @@ Manager Agent (统筹与规划智能体)
   1. 解析用户目标，生成 arxiv 检索查询词
   2. 通过 RAP (Retrieval-Augmented Planning) 检索文献获取先验知识
   3. 结合用户目标与学术背景，生成结构化的全局执行计划 (Global Execution Plan)
-  4. 初始化全局 State 并启动流水线xixi
+  4. 初始化全局 State 并启动流水线
 """
 from __future__ import annotations
 
