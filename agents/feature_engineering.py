@@ -8,6 +8,10 @@ Feature Engineering Agent (特征工程智能体)
   - 结构化 Prompt (CONTEXT + PLAN + CONSTRAINTS + TASK)
   - 上一阶段摘要注入上下文 (previous_summary)
   - 代码提取 (regex ```python...```)
+
+The column names in the output CSV should be readable by the downstream "Feature Importance / Business Report": retain the business column names, and use meaningful names for new features;
+
+It is forbidden to change them to anonymous column names such as x0, x1, feature_0, etc. without justification (enforced by the agent's Prompt constraints).
 """
 from __future__ import annotations
 
@@ -81,7 +85,10 @@ def feature_engineering_node(state: GraphState) -> dict:
 _SYSTEM_PROMPT_GENERATE = """\
 You are an expert Feature Engineering developer. \
 You write Python code according to the provided plan and constraints. \
-Your code must be complete, self-contained, and directly runnable."""
+Your code must be complete, self-contained, and directly runnable. \
+Column names in the saved CSV must stay human-interpretable for downstream model reports: \
+keep original names where columns are retained; name new features descriptively (snake_case). \
+Never bulk-rename features to generic x0, x1, x2, or feature_0 unless the prompt explicitly requires it."""
 
 _USER_PROMPT_GENERATE = """\
 # CONTEXT #
@@ -105,6 +112,11 @@ Current phase: Feature Engineering
    - Category encoding (Label Encoding, One-Hot, Target Encoding)
    - Feature scaling (StandardScaler, MinMaxScaler)
    - Handling of datetime features (extraction of year/month/day/hour etc.)
+8. Column names for `./workspace/fe_output.csv` must remain meaningful for business-facing reports:
+   - Keep original input column names when those columns still exist (do not rename to x0/x1/...).
+   - New or transformed columns: use descriptive snake_case names, e.g. `units_sold_log`, `gross_sales_sqrt`, `country_Germany` (one-hot suffix), `order_date_year`.
+   - Do NOT replace all column names with sequential generics (`x0`, `x1`, `feature_0`, `col_0`, etc.).
+9. If you drop columns, that is fine; if you one-hot or encode, use clear prefixes/suffixes so names trace back to the source column.
 
 {feedback_section}
 
@@ -115,7 +127,8 @@ Provide your complete solution in a single ```python ... ``` code block.
 _SYSTEM_PROMPT_FIX = """\
 You are an expert Python debugger. \
 Analyze the error and fix the code. \
-Output the complete corrected code."""
+Output the complete corrected code. \
+Preserve the same column-naming rules as feature engineering: descriptive names, no generic x0/x1 renames."""
 
 _USER_PROMPT_FIX = """\
 # CODE CONTAINS ERROR #
