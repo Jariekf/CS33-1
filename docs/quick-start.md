@@ -6,13 +6,25 @@
 - An OpenAI-compatible API key
 - Optional: arXiv access for literature retrieval
 
-## 1. Install dependencies
+## 1. Create and activate a virtual environment
+
+```bash
+python -m venv .venv
+```
+
+Activate it:
+
+- **macOS / Linux**: `source .venv/bin/activate`
+- **Windows (cmd)**: `.venv\Scripts\activate.bat`
+- **Windows (PowerShell)**: `.venv\Scripts\Activate.ps1`
+
+## 2. Install dependencies
 
 ```bash
 pip install -r requirements.txt
 ```
 
-## 2. Configure environment variables
+## 3. Configure environment variables
 
 Create a local `.env` file in the project root with values similar to:
 
@@ -32,7 +44,7 @@ If `STUB_MODE=true`, parts of the workflow fall back to stub logic instead of li
 
 For detailed multi-provider model setup (API keys, model version, temperature, and agent-to-LLM mapping), see [LLM Model Configuration Guide](./llm-model-config-guide.md).
 
-## 3. Run the pipeline
+## 4. Run the pipeline
 
 Example:
 
@@ -46,7 +58,7 @@ You can also test with the small sample file:
 python main.py ./data/test_data.csv "Predict customer churn and provide business insights"
 ```
 
-## 4. Check generated outputs
+## 5. Check generated outputs
 
 Generated artifacts are written to [workspace](https://github.sydney.edu.au/CS33-1/CS33-1/tree/main/workspace), including:
 
