@@ -5,7 +5,8 @@ Manager RAP 轻量级检索层（对标 AutoML retrieve_knowledge 的形态，�
 - 多源仅收集摘要级文本：arXiv abstract、DuckDuckGo 网页摘要、本地 PapersWithCode JSON、Kaggle kernel 列表元数据。
 - 单次 LLM：融合各源为一段 plan 可用的知识文本。
 
-依赖：arxiv 已有；可选 `duckduckgo-search`、`kaggle` 及 Kaggle API 凭证；PWC 需本地 data/paperswithcode/*.json。
+依赖：arxiv 已有；可选 `duckduckgo-search`、`kaggle` 及 Kaggle API 凭证。
+PWC：仅当 `config.PWC_DATA_DIR` 下存在 `datasets.json` 与 `evaluation-tables.json` 才参与检索；未充实该库前目录可空（或仅 .gitkeep），逻辑上等同关闭该源。
 
 --------------------------------------------------------------------
 数据流（与 manager.py 的衔接）
@@ -166,6 +167,7 @@ def _retrieve_web_light(user_requirement_summary: str) -> str:
 
 
 def _retrieve_pwc_light(slots: dict[str, str], user_requirement_summary: str, top_k: int = 8) -> str:
+    """本地 PWC 数据可选：目录未同步或缺 JSON 时返回空串，不视为错误。"""
     if not RAP_PWC_ENABLED:
         return ""
     base = Path(PWC_DATA_DIR)

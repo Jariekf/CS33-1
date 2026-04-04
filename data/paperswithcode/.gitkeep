@@ -1,0 +1,5 @@
+# 占位：本目录用于可选 PapersWithCode 本地快照（无 API）。
+# 若开启 RAP_PWC（.env 中 RAP_PWC=true），请将以下两个文件置于本目录：
+#   - datasets.json
+#   - evaluation-tables.json
+# 未放入前可为空；manager_retrieval._retrieve_pwc_light 会静默跳过，不影响流水线。

@@ -41,7 +41,7 @@ ARXIV_MAX_RESULTS = 5
 # ============================================================
 # Manager RAP 多源轻量检索（可选依赖见 requirements.txt）
 # Web：一般无需 API Key（duckduckgo-search）；Kaggle：~/.kaggle/kaggle.json；
-# PWC：无 API，仅本地 JSON（见 PWC_DATA_DIR）；arXiv：无 Key，由 ARXIV_MAX_RESULTS 控制条数。
+# PWC：无 API；需自备本地快照 JSON（见下方 PWC_DATA_DIR）。未放入文件前目录可空或仅 .gitkeep，不影响运行。
 # ============================================================
 # 默认关闭 optional 源；需要时在 .env 中设 RAP_WEB=true 等开启
 RAP_WEB_ENABLED = os.getenv("RAP_WEB", "false").lower() in ("1", "true", "yes")
@@ -49,4 +49,5 @@ RAP_PWC_ENABLED = os.getenv("RAP_PWC", "false").lower() in ("1", "true", "yes")
 RAP_KAGGLE_ENABLED = os.getenv("RAP_KAGGLE", "false").lower() in ("1", "true", "yes")
 WEB_MAX_RESULTS = int(os.getenv("RAP_WEB_MAX_RESULTS", "5"))
 RAP_FUSE_MAX_CHARS = int(os.getenv("RAP_FUSE_MAX_CHARS", "3500"))
+# 需存在 datasets.json 与 evaluation-tables.json（PapersWithCode 导出结构）；缺任一则检索逻辑静默跳过。
 PWC_DATA_DIR = os.path.join(os.path.dirname(__file__), "data", "paperswithcode")
