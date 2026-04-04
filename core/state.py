@@ -15,6 +15,8 @@ class GraphState(TypedDict):
     # ---- 用户输入 ----
     data_path: str                  # 用户上传数据集的路径
     user_goal: str                  # 用户的自然语言业务目标
+    # Manager 检索/规划前可选：队友或用户提供的清洗规则、contract 等文字，会并入 user_requirement_summary
+    manager_cleaning_hints: str
 
     # ---- Manager 产出 ----
     global_plan: dict               # Manager 通过 RAP 生成的结构化执行计划

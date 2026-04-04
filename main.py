@@ -9,13 +9,14 @@ from core.logger import get_agent_logger
 sys_logger = get_agent_logger("sys")
 
 
-def run(data_path: str, user_goal: str) -> str:
+def run(data_path: str, user_goal: str, manager_cleaning_hints: str = "") -> str:
     """
     启动多智能体分析流水线。
 
     Args:
         data_path: 数据集文件路径
         user_goal: 用户的自然语言业务目标
+        manager_cleaning_hints: 可选；清洗规则/contract 等文字，写入检索摘要并与规划对齐
 
     Returns:
         最终的商业洞察分析报告文本
@@ -28,6 +29,7 @@ def run(data_path: str, user_goal: str) -> str:
     initial_state: GraphState = {
         "data_path": data_path,
         "user_goal": user_goal,
+        "manager_cleaning_hints": manager_cleaning_hints,
         "global_plan": {},
         "current_phase": "",
         "current_data_path": data_path,
