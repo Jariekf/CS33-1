@@ -13,6 +13,9 @@ from core.env_utils import (
     GEMINI_API_KEY,
     GEMINI_BASEURL,
     GEMINI_MODEL,
+    GEMINI_FLASH_API_KEY,
+    GEMINI_FLASH_BASEURL,
+    GEMINI_FLASH_MODEL,
     QWEN_API_KEY,
     QWEN_BASEURL,
     QWEN_MODEL,
@@ -50,6 +53,13 @@ llm_gemini = ChatOpenAI(
     temperature=0.7,
     api_key=GEMINI_API_KEY,
     base_url=GEMINI_BASEURL,
+)
+
+llm_gemini_flash = ChatOpenAI(
+    model=GEMINI_FLASH_MODEL or GEMINI_MODEL or "gemini-2.0-flash",
+    temperature=0.7,
+    api_key=GEMINI_FLASH_API_KEY,
+    base_url=GEMINI_FLASH_BASEURL,
 )
 
 llm_qwen = ChatOpenAI(
