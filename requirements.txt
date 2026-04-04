@@ -11,6 +11,9 @@ scikit-learn>=1.3.0
 
 # ---- 文献检索 ----
 arxiv>=2.1.0
+duckduckgo-search>=6.0.0
+# 可选：Kaggle kernel 元数据检索（需 ~/.kaggle/kaggle.json）
+kaggle>=1.6.0
 
 # ---- 环境变量 ----
 python-dotenv>=1.0.0
