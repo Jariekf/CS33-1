@@ -28,7 +28,15 @@ def test_manager():
             "summary": "A comprehensive study on predicting customer churn using gradient boosting methods.",
         }
     ]
-    plan = _generate_global_plan(user_goal, df_preview, docs)
+    rap_context = "\n".join(
+        f"- {d.get('title', 'N/A')}: {(d.get('summary') or '')[:200]}" for d in docs
+    )
+    plan = _generate_global_plan(
+        user_goal,
+        df_preview,
+        rap_context,
+        user_requirement_summary="Predict churn from tabular customer data.",
+    )
     print(f"Generated Global Plan: {plan}")
 
 
