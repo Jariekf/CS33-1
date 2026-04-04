@@ -319,6 +319,18 @@ def retrieve_and_fuse_rap_context(
     if not rap_context.strip():
         rap_context = arxiv_raw or "无外部检索结果；仅基于用户目标与数据预览进行规划。"
 
+    logger.info(
+        "RAP gather | raw_chars: arxiv=%d web=%d pwc=%d kaggle=%d | flags: WEB=%s PWC=%s KAGGLE=%s | fused_chars=%d",
+        len(arxiv_raw),
+        len(web_raw),
+        len(pwc_raw),
+        len(kaggle_raw),
+        RAP_WEB_ENABLED,
+        RAP_PWC_ENABLED,
+        RAP_KAGGLE_ENABLED,
+        len(rap_context),
+    )
+
     return rap_context
 
 
@@ -329,7 +341,7 @@ def build_rap_context(
     cleaning_hints: str = "",
 ) -> tuple[str, str]:
     """
-    便捷封装：顺序执行 1b（摘要+槽位）与 Phase 2（检索+融合）。
+    便捷封装：顺序执行 Step 1b（摘要+槽位）与 Step 2（检索+融合）。
 
     Returns:
         user_requirement_summary: 供日志、后续节点或再检索复用。
