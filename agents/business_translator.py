@@ -165,6 +165,6 @@ Please output professional, structured Markdown. PREVENT REPETITION: Do NOT say 
 {docs_text}
 
 ## 4. 可执行商业建议
-(由于平台限制未生成详细内容，请参考以上特征进行业务干预)
+（本节依赖 LLM 生成；本次调用未返回有效正文，故仅保留模板。请检查 `business_translator` 所用 API、配额或 `STUB_MODE`，并参考上文特征与文献做业务决策。）
 """
     return report
