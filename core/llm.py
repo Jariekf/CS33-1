@@ -17,6 +17,7 @@ from core.my_llm import (
     llm_openai,
     llm_zhipu,
     llm_gemini,
+    llm_gemini_flash,
     llm_qwen,
     llm_minimax,
     llm_kimi,
@@ -32,6 +33,7 @@ PROFILE_LLM_MAP: dict[str, Any] = {
     "openai": llm_openai,
     "zhipu": llm_zhipu,
     "gemini": llm_gemini,
+    "gemini_flash": llm_gemini_flash,
     "qwen": llm_qwen,
     "minimax": llm_minimax,
     "kimi": llm_kimi,
@@ -52,6 +54,7 @@ DEFAULT_PROFILE = "deepseek"
 LLM configuration mapping table.
 Here you can define the llm models corresponding to different agents
 """
+
 AGENT_PROFILE_MAP: dict[str, str] = {
     "manager": "deepseek", # Simply change the model name to the one you require
     "data_cleaning": "qwen",
@@ -60,6 +63,15 @@ AGENT_PROFILE_MAP: dict[str, str] = {
     "business_translator": "gemini",
     "supervisor": "openai",
 }
+
+# AGENT_PROFILE_MAP = {
+#     "manager": "gemini_flash",
+#     "data_cleaning": "gemini_flash",
+#     "feature_engineering": "gemini_flash",
+#     "model_selection": "gemini_flash",
+#     "business_translator": "gemini_flash",
+#     "supervisor": "gemini_flash",
+# }
 
 
 def _resolve_profile(agent_name: str | None = None) -> str:
