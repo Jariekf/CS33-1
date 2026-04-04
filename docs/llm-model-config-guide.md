@@ -43,10 +43,39 @@ AGENT_PROFILE_MAP = {
 Meaning: the left side is the agent name, and the right side is the profile name.  
 That profile name is resolved in `PROFILE_LLM_MAP` to a concrete `llm_xxx` instance.
 
+### Manager sub-stage routing
+
+The manager agent now supports separate profiles for its 3 internal LLM calls:
+
+- `manager_summary`: requirement summary + retrieval-slot extraction
+- `manager_fusion`: multi-source RAP context fusion
+- `manager_plan`: global plan generation
+
+You do not need to edit Python for this. Set these optional environment variables in `.env`:
+
+```env
+MANAGER_SUMMARY_PROFILE=openai
+MANAGER_FUSION_PROFILE=kimi
+MANAGER_PLAN_PROFILE=qwen
+```
+
+Valid values are the profile names in `PROFILE_LLM_MAP`, for example:
+
+- `openai`
+- `qwen`
+- `kimi`
+- `deepseek`
+- `gemini`
+- `zhipu`
+- `minimax`
+
+If these variables are not set, manager sub-stages fall back to the normal `AGENT_PROFILE_MAP` defaults.
+
 ## 4) After making changes
 
 - Save the files and rerun the pipeline.
 - If a call fails, first check:
   - whether the corresponding `API_KEY` is set in `.env`
   - whether `BASE_URL` and `MODEL` match the selected provider
+  - for manager combinations, whether `MANAGER_SUMMARY_PROFILE`, `MANAGER_FUSION_PROFILE`, and `MANAGER_PLAN_PROFILE` are set to valid profile names
   - whether each value in `AGENT_PROFILE_MAP` exists in `PROFILE_LLM_MAP`

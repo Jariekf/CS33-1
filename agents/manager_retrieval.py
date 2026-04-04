@@ -76,7 +76,7 @@ Return a single JSON object with exactly these string fields:
 
 Example: {{"user_requirement_summary":"...","downstream_task":"churn prediction","application_domain":"telecom","area":"tabular supervised learning"}}
 """
-    reply = call_llm(sys_prompt, user_prompt, agent_name="manager")
+    reply = call_llm(sys_prompt, user_prompt, agent_name="manager_summary")
     default_slots = {
         "downstream_task": user_goal[:120],
         "application_domain": "general",
@@ -142,7 +142,7 @@ def _retrieve_web_light(user_requirement_summary: str) -> str:
     query_reply = call_llm(
         "You generate short web search queries for ML engineering. Reply with a single line, at most 12 words, no quotes.",
         f"Problem summary:\n{user_requirement_summary}\n\nGive one English search query.",
-        agent_name="manager",
+        agent_name="manager_summary",
     )
     search_query = (query_reply or user_requirement_summary)[:200].strip()
     try:
@@ -287,7 +287,7 @@ Sources:
 
 Produce a bullet list of key insights (5–12 bullets) the planning agent can use.
 """
-    fused = call_llm(sys_prompt, user_prompt, agent_name="manager")
+    fused = call_llm(sys_prompt, user_prompt, agent_name="manager_fusion")
     if fused and fused.strip():
         return fused.strip()
     return bundle[:6000]
