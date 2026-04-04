@@ -195,10 +195,11 @@ def _fix_code(code: str, error: str) -> str:
 
 def _fallback_fe_code(plan: dict, data_path: str, previous_summary: str) -> str:
     """LLM 不可用时的降级桩代码模板。"""
+    path_lit = json.dumps(data_path)
     return f"""\
 import pandas as pd
 
-df = pd.read_csv("{data_path}")
+df = pd.read_csv({path_lit})
 # 特征工程计划: {plan.get('objectives', [])}
 # 上一阶段摘要: {previous_summary}
 
