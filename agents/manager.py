@@ -198,7 +198,7 @@ Notes for data_cleaning_plan:
 - "cleaning_contract": post-execution guardrails. Prefer {{}} or only "max_row_drop_ratio". Do not list "protected_columns" or imply all columns must survive cleaning — dropping columns is allowed.
     * "max_row_drop_ratio" (number 0..1, optional): only enforced key; max allowed fraction of input rows removed, i.e. (rows_in - rows_out) / rows_in.
 """
-    reply = call_llm(sys_prompt, user_prompt, agent_name="manager")
+    reply = call_llm(sys_prompt, user_prompt, agent_name="manager_plan")
     if reply:
         try:
             match = re.search(r'\{.*\}', reply, re.DOTALL)

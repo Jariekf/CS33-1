@@ -57,6 +57,9 @@ Here you can define the llm models corresponding to different agents
 
 AGENT_PROFILE_MAP: dict[str, str] = {
     "manager": "deepseek", # Simply change the model name to the one you require
+    "manager_summary": "deepseek",
+    "manager_fusion": "deepseek",
+    "manager_plan": "deepseek",
     "data_cleaning": "qwen",
     "feature_engineering": "deepseek",
     "model_selection": "openai",
@@ -77,7 +80,17 @@ AGENT_PROFILE_MAP: dict[str, str] = {
 def _resolve_profile(agent_name: str | None = None) -> str:
     """Resolve profile with priority: agent map > default."""
     if agent_name:
-        return AGENT_PROFILE_MAP.get(agent_name.strip().lower(), DEFAULT_PROFILE)
+        normalized = agent_name.strip().lower()
+        # Allow manager's 3 internal LLM calls to be configured independently via env.
+        # Example:
+        #   MANAGER_SUMMARY_PROFILE=qwen
+        #   MANAGER_FUSION_PROFILE=kimi
+        #   MANAGER_PLAN_PROFILE=openai
+        env_key = f"{normalized.upper()}_PROFILE"
+        env_profile = os.getenv(env_key, "").strip().lower()
+        if env_profile:
+            return env_profile
+        return AGENT_PROFILE_MAP.get(normalized, DEFAULT_PROFILE)
     return DEFAULT_PROFILE
 
 
