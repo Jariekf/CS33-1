@@ -172,14 +172,15 @@ X = df.iloc[:, :-1].select_dtypes(include='number').fillna(0)
 y = df.iloc[:, -1]
 
 model = RandomForestClassifier(n_estimators=100, random_state=42)
-scores = cross_val_score(model, X, y, cv=5, scoring='{metric}')
+metric_name = "{metric}"
+scores = cross_val_score(model, X, y, cv=5, scoring=metric_name)
 model.fit(X, y)
 
 fi = dict(zip(X.columns, model.feature_importances_))
 fi_sorted = dict(sorted(fi.items(), key=lambda x: x[1], reverse=True))
 
 print(f"Best Model: RandomForest")
-print(f"CV {'{metric}'} Mean: {{scores.mean():.4f}} (+/- {{scores.std():.4f}})")
+print(f"CV {{metric_name}} Mean: {{scores.mean():.4f}} (+/- {{scores.std():.4f}})")
 print(f"Top 5 Feature Importance: {{dict(list(fi_sorted.items())[:5])}}")
 
 # 保存特征重要性
