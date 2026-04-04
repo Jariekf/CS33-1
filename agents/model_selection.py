@@ -159,6 +159,7 @@ def _fix_code(code: str, error: str) -> str:
 def _fallback_model_code(plan: dict, data_path: str) -> str:
     """失败时的桩代码模板。"""
     metric = plan.get("evaluation_metric", "f1")
+    path_lit = json.dumps(data_path)
     return f"""\
 import pandas as pd
 from sklearn.model_selection import cross_val_score
@@ -166,7 +167,7 @@ from sklearn.ensemble import RandomForestClassifier
 import json
 import os
 
-df = pd.read_csv("{data_path}")
+df = pd.read_csv({path_lit})
 # 假设最后一列是目标变量
 X = df.iloc[:, :-1].select_dtypes(include='number').fillna(0)
 y = df.iloc[:, -1]

@@ -338,10 +338,11 @@ def _validate_cleaning_contract(
 
 def _fallback_cleaning_code(plan: dict, data_path: str) -> str:
     """Fallback template code when LLM is unavailable."""
+    path_lit = json.dumps(data_path)
     return f"""\
 import pandas as pd
 
-df = pd.read_csv("{data_path}")
+df = pd.read_csv({path_lit})
 # Run cleaning steps based on plan objectives: {plan.get('objectives', [])}
 df = df.drop_duplicates()
 df = df.dropna(thresh=len(df.columns) * 0.5)
