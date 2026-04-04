@@ -1,10 +1,17 @@
 """
 Manager Agent (统筹与规划智能体)
 职责：
-  1. 解析用户目标，生成 arxiv 检索查询词
-  2. 通过 RAP (Retrieval-Augmented Planning) 检索文献获取先验知识
-  3. 结合用户目标与学术背景，生成结构化的全局执行计划 (Global Execution Plan)
+  1. 解析用户目标与可选 cleaning hints，生成 user_requirement_summary（LLM）
+  2. 通过 RAP 多源轻量检索并融合为 rap_context
+  3. 结合摘要、RAP 与数据概览，生成结构化 global_plan
   4. 初始化全局 State 并启动流水线
+
+补充（manager_node 内执行顺序）：
+  Step 1a — 数据轮廓：读 CSV 元信息（列、dtype、样例行），无 LLM。
+  Step 1b — 需求理解：LLM 产出 user_requirement_summary + 检索槽位（manager_retrieval.summarize_and_extract_slots）。
+  Step 2 — RAP：多源轻量检索并融合（manager_retrieval.retrieve_and_fuse_rap_context）。
+  Step 3 — 规划：LLM 产出 global_plan；另附只读元数据 _rap_context、_user_requirement_summary。
+  Step 4 — 初始化工作区与运行时状态并返回。
 """
 from __future__ import annotations
 
@@ -15,9 +22,14 @@ import pandas as pd
 
 from core.state import GraphState
 from core.llm import call_llm
-from tools.arxiv_tool import search_arxiv
 from config import WORKSPACE_DIR
 from core.logger import get_agent_logger
+
+from agents.manager_retrieval import (
+    generate_arxiv_search_queries,
+    retrieve_and_fuse_rap_context,
+    summarize_and_extract_slots,
+)
 
 logger = get_agent_logger("manager")
 
@@ -31,38 +43,48 @@ def manager_node(state: GraphState) -> dict:
 
     user_goal = state["user_goal"]
     data_path = state["data_path"]
+    cleaning_hints = (state["manager_cleaning_hints"] or "").strip()
 
     logger.info(f"Starting manager_node with user_goal: '{user_goal}' and data_path: '{data_path}'")
 
     # ------------------------------------------------------------------
-    # Step 1: 提取数据元信息 (列名、行数等)，让 LLM 感知数据轮廓
+    # Step 1a — 数据轮廓（非 LLM）
+    # 从 CSV 读取列名、dtype、shape、前几行样例；不是「关键词提取」，而是结构化表头/类型事实，供 1b 与规划 LLM 使用。
     # ------------------------------------------------------------------
     df_preview = _get_data_preview(data_path)
     logger.info("Data preview generated.")
 
     # ------------------------------------------------------------------
-    # Step 2: 利用 LLM 将用户目标转化为学术检索查询词
+    # Step 1b — 需求摘要与检索槽位（LLM）
+    # manager_cleaning_hints：可选「输入便签」——用户/队友给的清洗约定草稿等，只参与本段摘要 prompt；
+    # 产出物是 user_requirement_summary（叙述）+ 槽位；不等于 global_plan 里的 rules/cleaning_contract（那些由 Step 3 单独生成）。
     # ------------------------------------------------------------------
-    search_queries = _generate_search_queries(user_goal, df_preview)
-    logger.info(f"Generated {len(search_queries)} search queries for RAP: {search_queries}")
+    req_summary, slots = summarize_and_extract_slots(
+        user_goal,
+        df_preview,
+        cleaning_hints,
+    )
+    logger.info("User requirement summary and retrieval slots ready.")
 
     # ------------------------------------------------------------------
-    # Step 3: RAP — 调用 arxiv 工具检索相关文献
+    # Step 2 — RAP：检索 + 融合（与 1b 分离，便于理解与测试）
     # ------------------------------------------------------------------
-    retrieved_docs = []
-    for query in search_queries:
-        docs = search_arxiv(query)
-        retrieved_docs.extend(docs)
-    logger.info(f"RAP search complete. Gathered {len(retrieved_docs)} documents.")
+    rap_context = retrieve_and_fuse_rap_context(req_summary, slots, user_goal)
+    logger.info("RAP context built (arXiv + optional web/PWC/Kaggle).")
 
     # ------------------------------------------------------------------
-    # Step 4: 结合用户目标 + 文献先验 + 数据概览，生成结构化执行计划
+    # Step 3 — 结构化 global_plan（LLM）
     # ------------------------------------------------------------------
-    global_plan = _generate_global_plan(user_goal, df_preview, retrieved_docs)
+    global_plan = _generate_global_plan(
+        user_goal,
+        df_preview,
+        rap_context,
+        user_requirement_summary=req_summary,
+    )
     logger.info("Global structured plan generated successfully.")
 
     # ------------------------------------------------------------------
-    # Step 5: 初始化运行时状态并返回
+    # Step 4 — 初始化运行时状态并返回
     # ------------------------------------------------------------------
     os.makedirs(WORKSPACE_DIR, exist_ok=True)
 
@@ -85,7 +107,10 @@ def manager_node(state: GraphState) -> dict:
 # ======================================================================
 
 def _get_data_preview(data_path: str) -> str:
-    """读取数据集的基础元信息，返回文本摘要。"""
+    """
+    读取 CSV 的结构化轮廓（列名、 dtypes、shape、前几行），拼成一段纯文本。
+    不调用 LLM、不做关键词抽取；仅为后续 LLM（Step 1b 摘要、Step 3 规划）提供可引用的数据事实。
+    """
     try:
         df = pd.read_csv(data_path, nrows=5)
         info = (
@@ -100,35 +125,27 @@ def _get_data_preview(data_path: str) -> str:
 
 
 def _generate_search_queries(user_goal: str, df_preview: str) -> list[str]:
-    """调用 LLM 将用户目标与数据概览转化为 arxiv 检索查询词。"""
-    sys_prompt = "You are a senior Data Science Manager. Generate precise academic search queries."
-    user_prompt = f"""
-User Goal: {user_goal}
-Data Preview:
-{df_preview}
-
-Based on the goal and data structure, generate 1 to 2 English search queries for an academic database (like Arxiv) to discover machine learning methodologies or feature engineering techniques relevant to this dataset and objective.
-Return ONLY a JSON array of strings, e.g., ["query 1", "query 2"]
-"""
-    reply = call_llm(sys_prompt, user_prompt, agent_name="manager")
-    if reply:
-        try:
-            match = re.search(r'\[.*\]', reply, re.DOTALL)
-            if match:
-                queries = json.loads(match.group(0))
-                if isinstance(queries, list) and queries:
-                    return queries
-        except Exception:
-            pass
-            
-    # Fallback
-    return [f"{user_goal} machine learning methodology"]
+    """兼容测试与外部调用：基于摘要+槽位生成 arXiv 检索词。"""
+    return generate_arxiv_search_queries(user_goal, df_preview)
 
 
 def _generate_global_plan(
-    user_goal: str, df_preview: str, retrieved_docs: list[dict]
+    user_goal: str,
+    df_preview: str,
+    rap_context: str,
+    *,
+    user_requirement_summary: str = "",
 ) -> dict:
     """调用 LLM 生成结构化执行计划 (JSON)。
+
+    与旧版参数 `retrieved_docs: list[dict]` 的对应关系：
+    - 旧：在函数内把多篇 {title, summary} 拼成一段「文献上下文」字符串。
+    - 现：由 `retrieve_and_fuse_rap_context` 预先产出 `rap_context`（已含多源融合后的叙述），本函数只消费字符串。
+    - `plan["_rap_context"]` 存的是注入规划 prompt 的那份 RAP 文本，便于审计与复现。
+
+    `user_requirement_summary` 与 `manager_cleaning_hints`：
+    - hints 仅在 Step 1b 写入摘要 prompt；本参数收到的是已生成的摘要（可已内含 hints 的语义）。
+    - 规划阶段同时看到 `user_goal`、摘要块、`df_preview` 与 `rap_context`，四者角色不同，勿混同。
 
     `data_cleaning_plan.cleaning_contract` — Minimal general mode (keys are optional; default or `{}` indicates no validation):
 
@@ -142,17 +159,19 @@ def _generate_global_plan(
 
     - `cleaning_contract`: Task-level safety boundaries (results), hard-validated by the Data Cleaning node after data is written to disk.
     """
-    docs_context = "\n".join(
-        [f"- {d.get('title', 'N/A')}: {d.get('summary', '')[:200]}" for d in retrieved_docs]
-    ) if retrieved_docs else "无检索结果"
+    summary_block = user_requirement_summary.strip() or user_goal
+    docs_context = rap_context.strip() if rap_context.strip() else "无检索结果"
 
     sys_prompt = "You are a Data Science Engineering Director generating an execution plan."
     user_prompt = f"""
 User Goal: {user_goal}
+User requirement summary (for alignment):
+{summary_block}
+
 Data Preview:
 {df_preview}
 
-Literature Context (RAP):
+Literature / external knowledge (RAP):
 {docs_context}
 
 Please formulate a high-level Data Science global execution plan tailored to the objective. 
@@ -188,6 +207,7 @@ Notes for data_cleaning_plan:
                 if isinstance(plan, dict) and "data_cleaning_plan" in plan:
                     _normalize_data_cleaning_plan(plan)
                     plan["_rap_context"] = docs_context
+                    plan["_user_requirement_summary"] = summary_block
                     return plan
         except Exception:
             pass
@@ -209,6 +229,7 @@ Notes for data_cleaning_plan:
             "evaluation_metric": "f1",
         },
         "_rap_context": docs_context,
+        "_user_requirement_summary": summary_block,
     }
     _normalize_data_cleaning_plan(fallback_plan)
     return fallback_plan
