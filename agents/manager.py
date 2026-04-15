@@ -18,6 +18,7 @@ from __future__ import annotations
 import os
 import json
 import re
+import hashlib
 import pandas as pd
 
 from core.state import GraphState
@@ -32,6 +33,12 @@ from agents.manager_retrieval import (
 )
 
 logger = get_agent_logger("manager")
+
+_MANAGER_PLAN_ALLOWED_TOP_LEVEL_KEYS = {
+    "data_cleaning_plan",
+    "feature_engineering_plan",
+    "model_selection_plan",
+}
 
 
 def manager_node(state: GraphState) -> dict:
@@ -136,6 +143,22 @@ def _generate_global_plan(
     *,
     user_requirement_summary: str = "",
 ) -> dict:
+    plan, _ = _generate_global_plan_with_meta(
+        user_goal,
+        df_preview,
+        rap_context,
+        user_requirement_summary=user_requirement_summary,
+    )
+    return plan
+
+
+def _build_global_plan_prompts(
+    user_goal: str,
+    df_preview: str,
+    rap_context: str,
+    *,
+    user_requirement_summary: str = "",
+) -> tuple[str, str, str, str]:
     """调用 LLM 生成结构化执行计划 (JSON)。
 
     与旧版参数 `retrieved_docs: list[dict]` 的对应关系：
@@ -198,17 +221,48 @@ Notes for data_cleaning_plan:
 - "cleaning_contract": post-execution guardrails. Prefer {{}} or only "max_row_drop_ratio". Do not list "protected_columns" or imply all columns must survive cleaning — dropping columns is allowed.
     * "max_row_drop_ratio" (number 0..1, optional): only enforced key; max allowed fraction of input rows removed, i.e. (rows_in - rows_out) / rows_in.
 """
+    return sys_prompt, user_prompt, summary_block, docs_context
+
+
+def _generate_global_plan_with_meta(
+    user_goal: str,
+    df_preview: str,
+    rap_context: str,
+    *,
+    user_requirement_summary: str = "",
+) -> tuple[dict, dict]:
+    sys_prompt, user_prompt, summary_block, docs_context = _build_global_plan_prompts(
+        user_goal,
+        df_preview,
+        rap_context,
+        user_requirement_summary=user_requirement_summary,
+    )
     reply = call_llm(sys_prompt, user_prompt, agent_name="manager_plan")
+    parsed_obj: dict | None = None
+    json_parse_ok = False
+
     if reply:
         try:
             match = re.search(r'\{.*\}', reply, re.DOTALL)
             if match:
                 plan = json.loads(match.group(0))
-                if isinstance(plan, dict) and "data_cleaning_plan" in plan:
-                    _normalize_data_cleaning_plan(plan)
-                    plan["_rap_context"] = docs_context
-                    plan["_user_requirement_summary"] = summary_block
-                    return plan
+                if isinstance(plan, dict):
+                    parsed_obj = plan
+                    json_parse_ok = True
+                    if "data_cleaning_plan" in plan:
+                        _normalize_data_cleaning_plan(plan)
+                        plan["_rap_context"] = docs_context
+                        plan["_user_requirement_summary"] = summary_block
+                        meta = _build_manager_plan_eval_meta(
+                            system_prompt=sys_prompt,
+                            user_prompt=user_prompt,
+                            raw_reply=reply,
+                            parsed_obj=parsed_obj,
+                            json_parse_ok=json_parse_ok,
+                            used_fallback=False,
+                        )
+                        plan["_manager_plan_eval"] = meta
+                        return plan, meta
         except Exception:
             pass
 
@@ -232,7 +286,124 @@ Notes for data_cleaning_plan:
         "_user_requirement_summary": summary_block,
     }
     _normalize_data_cleaning_plan(fallback_plan)
-    return fallback_plan
+    meta = _build_manager_plan_eval_meta(
+        system_prompt=sys_prompt,
+        user_prompt=user_prompt,
+        raw_reply=reply or "",
+        parsed_obj=parsed_obj,
+        json_parse_ok=json_parse_ok,
+        used_fallback=True,
+    )
+    fallback_plan["_manager_plan_eval"] = meta
+    return fallback_plan, meta
+
+
+def _build_manager_plan_eval_meta(
+    *,
+    system_prompt: str,
+    user_prompt: str,
+    raw_reply: str,
+    parsed_obj: dict | None,
+    json_parse_ok: bool,
+    used_fallback: bool,
+) -> dict:
+    schema = _evaluate_plan_schema(parsed_obj)
+    prompt_hash = hashlib.sha256(system_prompt.encode("utf-8")).hexdigest()[:12]
+    return {
+        "prompt_hash": prompt_hash,
+        "system_prompt": system_prompt,
+        "user_prompt_preview": user_prompt[:1200],
+        "raw_reply_preview": raw_reply[:1500],
+        "json_parse_ok": json_parse_ok,
+        "schema_ok": schema["schema_ok"],
+        "used_fallback": used_fallback,
+    }
+
+
+def _evaluate_plan_schema(plan: dict | None) -> dict:
+    if not isinstance(plan, dict):
+        return {
+            "schema_ok": False,
+        }
+
+    keys = set(plan.keys())
+    missing_required_keys = sorted(_MANAGER_PLAN_ALLOWED_TOP_LEVEL_KEYS - keys)
+
+    data_cleaning_plan = plan.get("data_cleaning_plan")
+    feature_engineering_plan = plan.get("feature_engineering_plan")
+    model_selection_plan = plan.get("model_selection_plan")
+
+    rules_type_ok = isinstance(
+        data_cleaning_plan.get("rules"),
+        list,
+    ) if isinstance(data_cleaning_plan, dict) else False
+    cleaning_contract_type_ok = isinstance(
+        data_cleaning_plan.get("cleaning_contract"),
+        dict,
+    ) if isinstance(data_cleaning_plan, dict) else False
+    cleaning_contract_allowed_keys_only = False
+    if cleaning_contract_type_ok:
+        allowed_contract_keys = {"max_row_drop_ratio"}
+        cleaning_contract_allowed_keys_only = set(
+            data_cleaning_plan.get("cleaning_contract", {}).keys()
+        ).issubset(allowed_contract_keys)
+
+    stage_boundary_ok = _stage_boundary_ok(
+        data_cleaning_plan=data_cleaning_plan,
+        feature_engineering_plan=feature_engineering_plan,
+        model_selection_plan=model_selection_plan,
+    )
+
+    schema_ok = (
+        not missing_required_keys
+        and isinstance(data_cleaning_plan, dict)
+        and isinstance(feature_engineering_plan, dict)
+        and isinstance(model_selection_plan, dict)
+        and rules_type_ok
+        and cleaning_contract_type_ok
+    )
+
+    return {"schema_ok": schema_ok}
+
+
+def _stage_boundary_ok(
+    *,
+    data_cleaning_plan: dict | None,
+    feature_engineering_plan: dict | None,
+    model_selection_plan: dict | None,
+) -> bool:
+    if not all(
+        isinstance(section, dict)
+        for section in (data_cleaning_plan, feature_engineering_plan, model_selection_plan)
+    ):
+        return False
+
+    dc_text = json.dumps(data_cleaning_plan, ensure_ascii=False).lower()
+    fe_text = json.dumps(feature_engineering_plan, ensure_ascii=False).lower()
+    ms_text = json.dumps(model_selection_plan, ensure_ascii=False).lower()
+
+    model_keywords = (
+        "cross-validation",
+        "cross validation",
+        "hyperparameter",
+        "randomforest",
+        "xgboost",
+        "lightgbm",
+        "logistic regression",
+    )
+    cleaning_keywords = (
+        "duplicate",
+        "missing value",
+        "dtype",
+        "data type",
+        "dropna",
+    )
+
+    dc_has_model_leakage = any(keyword in dc_text for keyword in model_keywords)
+    fe_has_model_leakage = any(keyword in fe_text for keyword in model_keywords)
+    ms_has_cleaning_leakage = any(keyword in ms_text for keyword in cleaning_keywords)
+
+    return not (dc_has_model_leakage or fe_has_model_leakage or ms_has_cleaning_leakage)
 
 
 def _normalize_data_cleaning_plan(plan: dict) -> None:

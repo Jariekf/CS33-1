@@ -2,7 +2,10 @@
 多智能体数据分析系统 - 主入口
 基于 LangGraph 构建的全流水线自动化数据分析与商业洞察系统。
 """
+from datetime import datetime
+
 from core.graph import build_graph
+from core.manager_prompt_eval import write_manager_prompt_eval_report
 from core.state import GraphState
 from core.logger import get_agent_logger
 
@@ -21,6 +24,7 @@ def run(data_path: str, user_goal: str, manager_cleaning_hints: str = "") -> str
     Returns:
         最终的商业洞察分析报告文本
     """
+    run_started_at = datetime.now()
     # 构建 LangGraph 工作流
     sys_logger.info(f"Main execution started with data_path: '{data_path}', goal: '{user_goal}'")
     app = build_graph()
@@ -38,6 +42,7 @@ def run(data_path: str, user_goal: str, manager_cleaning_hints: str = "") -> str
         "current_error": "",
         "retry_count": 0,
         "current_review": None,
+        "outer_retry_total": 0,
         "memory": [],
         "final_business_report": "",
     }
@@ -46,6 +51,15 @@ def run(data_path: str, user_goal: str, manager_cleaning_hints: str = "") -> str
     sys_logger.info("Starting graph invocation...")
     final_state = app.invoke(initial_state)
     sys_logger.info("Graph invocation finished successfully.")
+
+    try:
+        write_manager_prompt_eval_report(
+            initial_state=initial_state,
+            final_state=final_state,
+            run_started_at=run_started_at,
+        )
+    except Exception as e:
+        sys_logger.warning("Manager prompt eval report generation skipped due to error: %s", e)
 
     return final_state.get("final_business_report", "未生成报告")
 
@@ -75,5 +89,3 @@ if __name__ == "__main__":
         print(report)
     except UnicodeEncodeError:
         print("[!] 报告包含终端无法显示的特殊字符，请直接打开 workspace 里的文件查看！")
-
-

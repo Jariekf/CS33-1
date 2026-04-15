@@ -43,6 +43,7 @@ ARXIV_MAX_RESULTS = 5
 # Web：一般无需 API Key（duckduckgo-search）；Kaggle：~/.kaggle/kaggle.json；
 # PWC：无 API；需自备本地快照 JSON（见下方 PWC_DATA_DIR）。未放入文件前目录可空或仅 .gitkeep，不影响运行。
 # ============================================================
+RAP_ENABLED = os.getenv("RAP_ENABLED", "false").lower() in ("1", "true", "yes")
 # 默认关闭 optional 源；需要时在 .env 中设 RAP_WEB=true 等开启
 RAP_WEB_ENABLED = os.getenv("RAP_WEB", "false").lower() in ("1", "true", "yes")
 RAP_PWC_ENABLED = os.getenv("RAP_PWC", "false").lower() in ("1", "true", "yes")
