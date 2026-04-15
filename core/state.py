@@ -38,6 +38,9 @@ class GraphState(TypedDict):
     # ---- Supervisor 审查产出 ----
     current_review: dict | None     # Supervisor 最新一次的结构化审查报告 (ReviewReport)
 
+    # ---- 运行评测指标 ----
+    outer_retry_total: int          # Supervisor 打回导致的累计外部重试次数
+
     # ---- 全局记忆 (Append-Only) ----
     memory: Annotated[list[str], operator.add]
     #   每一项是一段精简摘要 + 落盘文件路径指针，如:

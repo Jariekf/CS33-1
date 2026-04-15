@@ -25,7 +25,7 @@ import random
 import re
 from pathlib import Path
 
-from config import ARXIV_MAX_RESULTS, PWC_DATA_DIR, RAP_FUSE_MAX_CHARS, RAP_KAGGLE_ENABLED, RAP_PWC_ENABLED, RAP_WEB_ENABLED, WEB_MAX_RESULTS
+from config import ARXIV_MAX_RESULTS, PWC_DATA_DIR, RAP_ENABLED, RAP_FUSE_MAX_CHARS, RAP_KAGGLE_ENABLED, RAP_PWC_ENABLED, RAP_WEB_ENABLED, WEB_MAX_RESULTS
 from core.llm import call_llm
 from core.logger import get_agent_logger
 from tools.arxiv_tool import search_arxiv
@@ -302,6 +302,10 @@ def retrieve_and_fuse_rap_context(
     Step 2（RAP）：基于 Step 1b 产出的摘要与槽位做多源检索并融合为一段文本。
     与「需求理解」解耦，便于单独测试或替换检索策略。
     """
+    if not RAP_ENABLED:
+        logger.info("RAP is disabled by RAP_ENABLED=false. Skipping external retrieval.")
+        return "无外部检索结果；RAP 已关闭，仅基于用户目标与数据预览进行规划。"
+
     queries = _queries_from_slots(slots, user_goal)
 
     arxiv_raw = _format_arxiv_context(queries, ARXIV_MAX_RESULTS)
