@@ -2,14 +2,45 @@
 多智能体数据分析系统 - 主入口
 基于 LangGraph 构建的全流水线自动化数据分析与商业洞察系统。
 """
+import json
+import os
 from datetime import datetime
 
+from config import WORKSPACE_DIR
 from core.graph import build_graph
 from core.manager_prompt_eval import write_manager_prompt_eval_report
 from core.state import GraphState
 from core.logger import get_agent_logger
 
 sys_logger = get_agent_logger("sys")
+
+
+def _write_data_cleaning_plan_snapshot(
+    final_state: dict, run_started_at: datetime
+) -> None:
+    """
+    Persist Manager's data_cleaning_plan after a full run (for reuse with
+    scripts/run_data_cleaning_only.py --plan-json workspace/data_cleaning_plan_latest.json).
+    """
+    gp = final_state.get("global_plan") or {}
+    raw = gp.get("data_cleaning_plan") if isinstance(gp, dict) else None
+    plan: dict = raw if isinstance(raw, dict) else {}
+
+    os.makedirs(WORKSPACE_DIR, exist_ok=True)
+    latest_path = os.path.join(WORKSPACE_DIR, "data_cleaning_plan_latest.json")
+    with open(latest_path, "w", encoding="utf-8") as f:
+        json.dump(plan, f, ensure_ascii=False, indent=2)
+
+    stamp = run_started_at.strftime("%Y%m%d_%H%M%S")
+    hist_path = os.path.join(WORKSPACE_DIR, f"data_cleaning_plan_{stamp}.json")
+    with open(hist_path, "w", encoding="utf-8") as f:
+        json.dump(plan, f, ensure_ascii=False, indent=2)
+
+    sys_logger.info(
+        "Saved data_cleaning_plan snapshots: %s and %s",
+        latest_path,
+        hist_path,
+    )
 
 
 def run(data_path: str, user_goal: str, manager_cleaning_hints: str = "") -> str:
@@ -51,6 +82,11 @@ def run(data_path: str, user_goal: str, manager_cleaning_hints: str = "") -> str
     sys_logger.info("Starting graph invocation...")
     final_state = app.invoke(initial_state)
     sys_logger.info("Graph invocation finished successfully.")
+
+    try:
+        _write_data_cleaning_plan_snapshot(final_state, run_started_at)
+    except Exception as e:
+        sys_logger.warning("data_cleaning_plan snapshot skipped: %s", e)
 
     try:
         write_manager_prompt_eval_report(
