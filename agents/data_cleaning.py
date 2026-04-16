@@ -4,6 +4,13 @@ Responsibilities:
   Generate Python data-cleaning code from the Manager's `data_cleaning_plan`
   and execute it in a sandbox, including an inner self-correction loop.
 
+cleaning_contract (minimal portable schema, all keys optional):
+  - max_row_drop_ratio: float in [0, 1]. Caps (input_rows - output_rows) / input_rows.
+  Column dropping/renaming is allowed; we do not enforce "all columns must remain".
+
+  vs. rules: "rules" describe procedural steps to run; cleaning_contract describes
+  bounds checked on the saved output (safety net). Unknown contract keys are ignored.
+
 Design references the AutoKaggle Developer Agent pattern:
   - Structured prompt (CONTEXT + PLAN + CONSTRAINTS + TASK)
   - Code extraction (regex ```python ... ```)
@@ -26,7 +33,9 @@ def data_cleaning_node(state: GraphState) -> dict:
     """LangGraph node function for Data Cleaning."""
 
     logger.info("Data Cleaning node started.")
-    plan = state["global_plan"].get("data_cleaning_plan", {})
+    _gp = state.get("global_plan") or {}
+    _dcp = _gp.get("data_cleaning_plan") if isinstance(_gp, dict) else None
+    plan: dict = _dcp if isinstance(_dcp, dict) else {}
     data_path = state["current_data_path"]
     feedback = state.get("current_error", "")
 
@@ -48,6 +57,10 @@ def data_cleaning_node(state: GraphState) -> dict:
             validation_error = _validate_cleaning_output(
                 output_path, previous_signature=previous_signature
             )
+            if not validation_error:
+                validation_error = _validate_cleaning_contract(
+                    plan, data_path, output_path
+                )
             if not validation_error:
                 logger.info("Data cleaning code executed and validated successfully.")
                 break
@@ -86,8 +99,10 @@ def data_cleaning_node(state: GraphState) -> dict:
 
 _SYSTEM_PROMPT_GENERATE = """\
 You are an expert Data Cleaning developer. \
-You write Python code according to the provided plan and constraints. \
-Your code must be complete, self-contained, and directly runnable."""
+You write Python code according to the provided plan, constraints, and any CLEANING CONTRACT guardrails. \
+Your code must be complete, self-contained, and directly runnable. \
+Avoid redundant date columns: if you parse a datetime into parts, do not keep duplicate semantics under different names/casing (e.g. both Year and year). \
+Before saving, remove columns with no observed values (all-NaN / all-empty) so downstream models do not receive useless features."""
 
 _USER_PROMPT_GENERATE = """\
 # CONTEXT #
@@ -96,12 +111,17 @@ Current phase: Data Cleaning
 # PLAN #
 {plan}
 
+# CLEANING CONTRACT #
+{cleaning_contract_body}
+
 # CONSTRAINTS #
 1. Load data from: `{data_path}` using `pd.read_csv`.
 2. Save cleaned data to: `./workspace/cleaned_data.csv` using `df.to_csv(..., index=False)`.
 3. Always work on a copy of the DataFrame, not the original.
 4. Use `print()` to output a summary of what was done (rows before/after, columns modified, etc.).
 5. Import all necessary libraries at the top of the code.
+6. Column naming consistency: if the data already has calendar fields (e.g. `Year`, `Month_Name`) and you also derive parts from a `Date` column, keep a single coherent scheme — drop or merge duplicates (do not leave both `Year` and `year`, or redundant month columns). Prefer one convention (e.g. snake_case `year`, `month`) and document drops in the print summary.
+7. Before `to_csv`, drop columns that have no usable values (e.g. `df.dropna(axis=1, how="all")`, or drop columns where non-null count is 0). Do not leave placeholder columns that are entirely empty — they confuse downstream imputers.
 
 {feedback_section}
 
@@ -112,7 +132,8 @@ Provide your complete solution in a single ```python ... ``` code block.
 _SYSTEM_PROMPT_FIX = """\
 You are an expert Python debugger. \
 Analyze the error and fix the code. \
-Output the complete corrected code."""
+Output the complete corrected code. \
+Keep the cleaning output policy: no all-empty columns in the saved CSV."""
 
 _USER_PROMPT_FIX = """\
 # CODE CONTAINS ERROR #
@@ -128,6 +149,29 @@ Provide the complete corrected code in a single ```python ... ``` code block.
 """
 
 
+def _cleaning_contract_prompt_body(plan: dict) -> str:
+    """Human-readable cleaning_contract slice for the LLM (empty dict → explicit none)."""
+    if not isinstance(plan, dict):
+        return "(none specified; follow # PLAN # and # CONSTRAINTS # only.)"
+    raw = plan.get("cleaning_contract", {})
+    contract: dict = raw if isinstance(raw, dict) else {}
+    if not contract:
+        return "(none specified; follow # PLAN # and # CONSTRAINTS # only.)"
+    return (
+        json.dumps(contract, ensure_ascii=False, indent=2)
+        + "\n\nHard-enforced keys (if present): max_row_drop_ratio (0..1) only. "
+        "You may drop or rename columns if the plan calls for it; other contract keys are hints only."
+    )
+
+
+def _plan_json_for_prompt(plan: dict) -> str:
+    """Full cleaning plan JSON except cleaning_contract (shown in its own section)."""
+    if not isinstance(plan, dict):
+        return "{}"
+    body = {k: v for k, v in plan.items() if k != "cleaning_contract"}
+    return json.dumps(body, ensure_ascii=False, indent=2)
+
+
 def _generate_cleaning_code(plan: dict, data_path: str, feedback: str) -> str:
     """
     Call the LLM to generate data-cleaning code.
@@ -138,12 +182,13 @@ def _generate_cleaning_code(plan: dict, data_path: str, feedback: str) -> str:
         feedback_section = f"# SUPERVISOR FEEDBACK #\nPrevious attempt was rejected. Fix based on:\n{feedback}"
 
     user_prompt = _USER_PROMPT_GENERATE.format(
-        plan=json.dumps(plan, ensure_ascii=False, indent=2),
+        plan=_plan_json_for_prompt(plan),
+        cleaning_contract_body=_cleaning_contract_prompt_body(plan),
         data_path=data_path,
         feedback_section=feedback_section,
     )
 
-    reply = call_llm(_SYSTEM_PROMPT_GENERATE, user_prompt)
+    reply = call_llm(_SYSTEM_PROMPT_GENERATE, user_prompt, agent_name="data_cleaning")
 
     if reply:
         code = extract_code(reply)
@@ -161,7 +206,7 @@ def _fix_code(code: str, error: str) -> str:
     Return original code if the LLM fix call fails.
     """
     user_prompt = _USER_PROMPT_FIX.format(code=code, error=error)
-    reply = call_llm(_SYSTEM_PROMPT_FIX, user_prompt)
+    reply = call_llm(_SYSTEM_PROMPT_FIX, user_prompt, agent_name="data_cleaning")
 
     if reply:
         fixed_code = extract_code(reply)
@@ -194,7 +239,7 @@ def _validate_cleaning_output(
 ) -> str:
     """
     Perform minimal hard checks on the cleaning output:
-    1. Output file exists
+    1. Output file exists.
     2. Output path is a file, not a directory
     3. Output file size is greater than 0
     4. File signature changed in this run (avoid reusing stale output)
@@ -224,12 +269,80 @@ def _validate_cleaning_output(
     return ""
 
 
+def _validate_cleaning_contract(
+    plan: dict, input_csv_path: str, output_csv_path: str
+) -> str:
+    """
+    Hard-check cleaned CSV against data_cleaning_plan["cleaning_contract"].
+
+    Empty/missing contract → pass (no-op). Only max_row_drop_ratio is enforced; extras ignored.
+
+    - max_row_drop_ratio: if set and valid in [0, 1], require
+      (n_in - n_out) / n_in <= ratio when n_in > 0.
+
+    Invalid types for known keys are skipped with a warning (do not fail the run).
+    If the contract only contains unknown keys, no CSV is read (forward-compatible).
+    """
+    if not isinstance(plan, dict):
+        return ""
+
+    raw = plan.get("cleaning_contract", {})
+    if not isinstance(raw, dict) or not raw:
+        return ""
+
+    # Decide what to enforce before loading CSVs (unknown keys → no I/O).
+    check_row_ratio = False
+    max_ratio: float | None = None
+    if "max_row_drop_ratio" in raw:
+        val = raw["max_row_drop_ratio"]
+        try:
+            mr = float(val)
+        except (TypeError, ValueError):
+            logger.warning(
+                "cleaning_contract.max_row_drop_ratio invalid type/value, skipping: %r",
+                val,
+            )
+        else:
+            if mr < 0 or mr > 1:
+                logger.warning(
+                    "cleaning_contract.max_row_drop_ratio out of [0,1], skipping: %s",
+                    mr,
+                )
+            else:
+                max_ratio = mr
+                check_row_ratio = True
+
+    if not check_row_ratio:
+        return ""
+
+    import pandas as pd
+
+    try:
+        df_in = pd.read_csv(input_csv_path)
+        df_out = pd.read_csv(output_csv_path)
+    except Exception as e:
+        return f"cleaning_contract check could not read CSV: {e}"
+
+    if max_ratio is not None:
+        n_in, n_out = len(df_in), len(df_out)
+        if n_in > 0:
+            dropped_ratio = (n_in - n_out) / n_in
+            if dropped_ratio > max_ratio + 1e-9:
+                return (
+                    f"cleaning_contract violated: row drop ratio {dropped_ratio:.4f} "
+                    f"exceeds max_row_drop_ratio {max_ratio} (rows in {n_in}, out {n_out})"
+                )
+
+    return ""
+
+
 def _fallback_cleaning_code(plan: dict, data_path: str) -> str:
     """Fallback template code when LLM is unavailable."""
+    path_lit = json.dumps(data_path)
     return f"""\
 import pandas as pd
 
-df = pd.read_csv("{data_path}")
+df = pd.read_csv({path_lit})
 # Run cleaning steps based on plan objectives: {plan.get('objectives', [])}
 df = df.drop_duplicates()
 df = df.dropna(thresh=len(df.columns) * 0.5)

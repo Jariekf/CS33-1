@@ -3,3 +3,8 @@ __pycache__/
 *.pyc
 .gemini/
 logs/
+
+.env
+.venv/
+docs/rules.md
+.vscode/

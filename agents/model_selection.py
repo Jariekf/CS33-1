@@ -133,7 +133,7 @@ def _generate_model_code(plan: dict, data_path: str, feedback: str) -> str:
         feedback_section=feedback_section,
     )
 
-    reply = call_llm(_SYSTEM_PROMPT_GENERATE, user_prompt)
+    reply = call_llm(_SYSTEM_PROMPT_GENERATE, user_prompt, agent_name="model_selection")
     if reply:
         code = extract_code(reply)
         if code:
@@ -146,7 +146,7 @@ def _generate_model_code(plan: dict, data_path: str, feedback: str) -> str:
 def _fix_code(code: str, error: str) -> str:
     """调用 LLM 修复代码。若失败则原样返回。"""
     user_prompt = _USER_PROMPT_FIX.format(code=code, error=error)
-    reply = call_llm(_SYSTEM_PROMPT_FIX, user_prompt)
+    reply = call_llm(_SYSTEM_PROMPT_FIX, user_prompt, agent_name="model_selection")
     if reply:
         fixed_code = extract_code(reply)
         if fixed_code:
@@ -159,6 +159,7 @@ def _fix_code(code: str, error: str) -> str:
 def _fallback_model_code(plan: dict, data_path: str) -> str:
     """失败时的桩代码模板。"""
     metric = plan.get("evaluation_metric", "f1")
+    path_lit = json.dumps(data_path)
     return f"""\
 import pandas as pd
 from sklearn.model_selection import cross_val_score
@@ -166,20 +167,21 @@ from sklearn.ensemble import RandomForestClassifier
 import json
 import os
 
-df = pd.read_csv("{data_path}")
+df = pd.read_csv({path_lit})
 # 假设最后一列是目标变量
 X = df.iloc[:, :-1].select_dtypes(include='number').fillna(0)
 y = df.iloc[:, -1]
 
 model = RandomForestClassifier(n_estimators=100, random_state=42)
-scores = cross_val_score(model, X, y, cv=5, scoring='{metric}')
+metric_name = "{metric}"
+scores = cross_val_score(model, X, y, cv=5, scoring=metric_name)
 model.fit(X, y)
 
 fi = dict(zip(X.columns, model.feature_importances_))
 fi_sorted = dict(sorted(fi.items(), key=lambda x: x[1], reverse=True))
 
 print(f"Best Model: RandomForest")
-print(f"CV {'{metric}'} Mean: {{scores.mean():.4f}} (+/- {{scores.std():.4f}})")
+print(f"CV {{metric_name}} Mean: {{scores.mean():.4f}} (+/- {{scores.std():.4f}})")
 print(f"Top 5 Feature Importance: {{dict(list(fi_sorted.items())[:5])}}")
 
 # 保存特征重要性

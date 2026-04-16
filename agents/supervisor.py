@@ -119,6 +119,7 @@ def supervisor_node(state: GraphState) -> dict:
         # ---- 不通过：附带反馈信息，累加重试计数 ----
         updates["current_error"] = review.feedback_for_retry
         updates["retry_count"] = state.get("retry_count", 0) + 1
+        updates["outer_retry_total"] = state.get("outer_retry_total", 0) + 1
 
     return updates
 
@@ -166,7 +167,7 @@ def _llm_review(
     
     try:
         import re
-        reply = call_llm(system_prompt, user_prompt)
+        reply = call_llm(system_prompt, user_prompt, agent_name="supervisor")
         if reply:
             match = re.search(r'\{.*\}', reply, re.DOTALL)
             if match:
@@ -183,4 +184,3 @@ def _llm_review(
         summary_for_memory=f"{phase} 阶段审查降级通过 (LLM 失败)。",
         detailed_report=f"# {phase} 审查报告\n\n(降级放行)\n\n## 执行日志\n```\n{execution_log}\n```",
     )
-

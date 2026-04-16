@@ -2,24 +2,29 @@
 多智能体数据分析系统 - 主入口
 基于 LangGraph 构建的全流水线自动化数据分析与商业洞察系统。
 """
+from datetime import datetime
+
 from core.graph import build_graph
+from core.manager_prompt_eval import write_manager_prompt_eval_report
 from core.state import GraphState
 from core.logger import get_agent_logger
 
 sys_logger = get_agent_logger("sys")
 
 
-def run(data_path: str, user_goal: str) -> str:
+def run(data_path: str, user_goal: str, manager_cleaning_hints: str = "") -> str:
     """
     启动多智能体分析流水线。
 
     Args:
         data_path: 数据集文件路径
         user_goal: 用户的自然语言业务目标
+        manager_cleaning_hints: 可选；清洗规则/contract 等文字，写入检索摘要并与规划对齐
 
     Returns:
         最终的商业洞察分析报告文本
     """
+    run_started_at = datetime.now()
     # 构建 LangGraph 工作流
     sys_logger.info(f"Main execution started with data_path: '{data_path}', goal: '{user_goal}'")
     app = build_graph()
@@ -28,6 +33,7 @@ def run(data_path: str, user_goal: str) -> str:
     initial_state: GraphState = {
         "data_path": data_path,
         "user_goal": user_goal,
+        "manager_cleaning_hints": manager_cleaning_hints,
         "global_plan": {},
         "current_phase": "",
         "current_data_path": data_path,
@@ -36,6 +42,7 @@ def run(data_path: str, user_goal: str) -> str:
         "current_error": "",
         "retry_count": 0,
         "current_review": None,
+        "outer_retry_total": 0,
         "memory": [],
         "final_business_report": "",
     }
@@ -44,6 +51,15 @@ def run(data_path: str, user_goal: str) -> str:
     sys_logger.info("Starting graph invocation...")
     final_state = app.invoke(initial_state)
     sys_logger.info("Graph invocation finished successfully.")
+
+    try:
+        write_manager_prompt_eval_report(
+            initial_state=initial_state,
+            final_state=final_state,
+            run_started_at=run_started_at,
+        )
+    except Exception as e:
+        sys_logger.warning("Manager prompt eval report generation skipped due to error: %s", e)
 
     return final_state.get("final_business_report", "未生成报告")
 
@@ -73,5 +89,3 @@ if __name__ == "__main__":
         print(report)
     except UnicodeEncodeError:
         print("[!] 报告包含终端无法显示的特殊字符，请直接打开 workspace 里的文件查看！")
-
-
