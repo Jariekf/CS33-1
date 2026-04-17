@@ -185,7 +185,7 @@ def _build_global_plan_prompts(
     summary_block = user_requirement_summary.strip() or user_goal
     docs_context = rap_context.strip() if rap_context.strip() else "无检索结果"
 
-    sys_prompt = "You are a Data Science Engineering Director generating an execution plan."
+    sys_prompt = """You are a Data Science Engineering Director generating an execution plan."""
     user_prompt = f"""
 User Goal: {user_goal}
 User requirement summary (for alignment):
@@ -220,6 +220,11 @@ Notes for data_cleaning_plan:
 - "rules": procedural steps to perform (what to run). Optional list of objects like {{"rule": "drop_duplicates", "params": {{}}}}. Use [] if none. Not validated as bounds.
 - "cleaning_contract": post-execution guardrails. Prefer {{}} or only "max_row_drop_ratio". Do not list "protected_columns" or imply all columns must survive cleaning — dropping columns is allowed.
     * "max_row_drop_ratio" (number 0..1, optional): only enforced key; max allowed fraction of input rows removed, i.e. (rows_in - rows_out) / rows_in.
+
+Notes for feature_engineering_plan:
+- Ground all objectives in columns that are visible in the Data Preview.
+- Do not mention invented fields such as `product_id`, `country`, `period`, `date`, or forecast targets unless the preview clearly supports them.
+- If time columns or grouping keys are unclear, prefer simple safe feature engineering over grouped time-series designs.
 """
     return sys_prompt, user_prompt, summary_block, docs_context
 

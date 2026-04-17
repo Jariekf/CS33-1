@@ -73,7 +73,7 @@ def data_cleaning_node(state: GraphState) -> dict:
             stderr = f"[PostValidationFailed] {validation_error}"
         # Self-heal: feed the error back to the LLM and regenerate code
         logger.info("Inner self-heal attempt %d: %s", attempt + 1, stderr[:200])
-        code = _fix_code(code, stderr)
+        code = _fix_code(code, stderr, plan)
 
     # ------------------------------------------------------------------
     # Step 3: Return state updates
@@ -142,6 +142,15 @@ Output the complete corrected code. \
 Keep the cleaning output policy: no all-empty columns in the saved CSV."""
 
 _USER_PROMPT_FIX = """\
+# CONTEXT #
+Current phase: Data Cleaning
+
+# PLAN #
+{plan}
+
+# CLEANING CONTRACT #
+{cleaning_contract_body}
+
 # CODE CONTAINS ERROR #
 ```python
 {code}
@@ -149,6 +158,12 @@ _USER_PROMPT_FIX = """\
 
 # ERROR MESSAGES #
 {error}
+
+# TASK REQUIREMENTS #
+1. Continue following the original Data Cleaning plan and constraints.
+2. Save the cleaned output to `./workspace/cleaned_data.csv`.
+3. Do not leave all-empty columns in the saved CSV.
+4. If the error came from post-validation, fix the cleaning logic instead of only silencing the error.
 
 # RESPONSE: CORRECTED CODE #
 Provide the complete corrected code in a single ```python ... ``` code block.
@@ -206,12 +221,17 @@ def _generate_cleaning_code(plan: dict, data_path: str, feedback: str) -> str:
     return _fallback_cleaning_code(plan, data_path)
 
 
-def _fix_code(code: str, error: str) -> str:
+def _fix_code(code: str, error: str, plan: dict) -> str:
     """
     Call the LLM to fix code based on execution errors.
     Return original code if the LLM fix call fails.
     """
-    user_prompt = _USER_PROMPT_FIX.format(code=code, error=error)
+    user_prompt = _USER_PROMPT_FIX.format(
+        code=code,
+        error=error,
+        plan=_plan_json_for_prompt(plan),
+        cleaning_contract_body=_cleaning_contract_prompt_body(plan),
+    )
     reply = call_llm(_SYSTEM_PROMPT_FIX, user_prompt, agent_name="data_cleaning")
 
     if reply:
