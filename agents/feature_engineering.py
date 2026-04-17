@@ -53,7 +53,7 @@ def feature_engineering_node(state: GraphState) -> dict:
             logger.info("Feature engineering code executed successfully.")
             break
         logger.info("内部自救第 %d 次: %s", attempt + 1, stderr[:200])
-        code = _fix_code(code, stderr)
+        code = _fix_code(code, stderr, plan, previous_summary)
 
     # ------------------------------------------------------------------
     # Step 3: 返回状态更新
@@ -86,6 +86,8 @@ _SYSTEM_PROMPT_GENERATE = """\
 You are an expert Feature Engineering developer. \
 You write Python code according to the provided plan and constraints. \
 Your code must be complete, self-contained, and directly runnable. \
+You must only use columns that actually exist in the loaded DataFrame. Never invent schema fields such as `product_id`, `country`, `period`, or target-like columns unless they are present in the data. \
+If a planned grouping key, datetime column, or source column is missing, degrade gracefully: skip that advanced feature family and continue with simpler valid features instead of failing. \
 Column names in the saved CSV must stay human-interpretable for downstream model reports: \
 keep original names where columns are retained; name new features descriptively (snake_case). \
 Never bulk-rename features to generic x0, x1, x2, or feature_0 unless the prompt explicitly requires it."""
@@ -117,6 +119,9 @@ Current phase: Feature Engineering
    - New or transformed columns: use descriptive snake_case names, e.g. `units_sold_log`, `gross_sales_sqrt`, `country_Germany` (one-hot suffix), `order_date_year`.
    - Do NOT replace all column names with sequential generics (`x0`, `x1`, `feature_0`, `col_0`, etc.).
 9. If you drop columns, that is fine; if you one-hot or encode, use clear prefixes/suffixes so names trace back to the source column.
+10. Before using any column in transformations, grouping, sorting, lagging, rolling, or encoding, validate that the column exists in `df.columns`.
+11. If the dataset does not contain reliable datetime or grouping columns, do not force time-series or hierarchical feature engineering. Fall back to safe row-level or column-level features that are supported by the actual schema.
+12. Do not raise an exception only because an expected column is missing. Skip unsupported feature families and still produce a valid `./workspace/fe_output.csv`.
 
 {feedback_section}
 
@@ -128,9 +133,19 @@ _SYSTEM_PROMPT_FIX = """\
 You are an expert Python debugger. \
 Analyze the error and fix the code. \
 Output the complete corrected code. \
+Only use columns that actually exist in the loaded DataFrame, and if expected columns are missing, degrade gracefully instead of failing. \
 Preserve the same column-naming rules as feature engineering: descriptive names, no generic x0/x1 renames."""
 
 _USER_PROMPT_FIX = """\
+# CONTEXT #
+Current phase: Feature Engineering
+
+# PREVIOUS PHASE SUMMARY #
+{previous_summary}
+
+# PLAN #
+{plan}
+
 # CODE CONTAINS ERROR #
 ```python
 {code}
@@ -138,6 +153,14 @@ _USER_PROMPT_FIX = """\
 
 # ERROR MESSAGES #
 {error}
+
+# TASK REQUIREMENTS #
+1. Continue following the original Feature Engineering plan and constraints.
+2. Save the feature-engineered output to `./workspace/fe_output.csv`.
+3. Preserve meaningful, human-interpretable column names.
+4. If the previous attempt was rejected, fix the implementation gap rather than only fixing syntax.
+5. Do not use or reference columns that are not present in the loaded dataframe.
+6. If sort/group/time columns are missing, skip those advanced features and continue with simpler valid transformations.
 
 # RESPONSE: CORRECTED CODE #
 Provide the complete corrected code in a single ```python ... ``` code block.
@@ -175,13 +198,23 @@ def _generate_fe_code(
     return _fallback_fe_code(plan, data_path, previous_summary)
 
 
-def _fix_code(code: str, error: str) -> str:
+def _fix_code(
+    code: str,
+    error: str,
+    plan: dict,
+    previous_summary: str,
+) -> str:
     """
     调用 LLM 根据报错修复代码。
     参照 AutoKaggle PROMPT_DEVELOPER_DEBUG_FIX 的简化版。
     若 LLM 不可用则返回原代码。
     """
-    user_prompt = _USER_PROMPT_FIX.format(code=code, error=error)
+    user_prompt = _USER_PROMPT_FIX.format(
+        code=code,
+        error=error,
+        plan=json.dumps(plan, ensure_ascii=False, indent=2),
+        previous_summary=previous_summary if previous_summary else "无上一阶段摘要",
+    )
     reply = call_llm(_SYSTEM_PROMPT_FIX, user_prompt, agent_name="feature_engineering")
 
     if reply:
@@ -198,12 +231,76 @@ def _fallback_fe_code(plan: dict, data_path: str, previous_summary: str) -> str:
     path_lit = json.dumps(data_path)
     return f"""\
 import pandas as pd
+import numpy as np
 
 df = pd.read_csv({path_lit})
 # 特征工程计划: {plan.get('objectives', [])}
 # 上一阶段摘要: {previous_summary}
 
+# Work on a copy to keep transformations explicit.
+df = df.copy()
+original_cols = list(df.columns)
+created_features = []
+
+# 1. Try to parse likely datetime columns and derive safe date parts when parsing succeeds.
+datetime_candidates = []
+for col in df.columns:
+    lc = str(col).lower()
+    if any(token in lc for token in ("date", "time", "timestamp", "period")):
+        datetime_candidates.append(col)
+
+for col in datetime_candidates:
+    parsed = pd.to_datetime(df[col], errors="coerce")
+    if parsed.notna().sum() > 0:
+        df[col] = parsed
+        df[f"{{col}}_year"] = parsed.dt.year
+        df[f"{{col}}_month"] = parsed.dt.month
+        df[f"{{col}}_day"] = parsed.dt.day
+        created_features.extend([f"{{col}}_year", f"{{col}}_month", f"{{col}}_day"])
+
+# 2. Safe numeric features: fill missing values and add log1p / sqrt transforms for non-negative columns.
+numeric_cols = df.select_dtypes(include=[np.number]).columns.tolist()
+for col in numeric_cols:
+    if df[col].isna().any():
+        df[col] = df[col].fillna(df[col].median())
+
+for col in numeric_cols:
+    series = pd.to_numeric(df[col], errors="coerce")
+    if series.notna().sum() == 0:
+        continue
+    min_val = series.min()
+    if pd.notna(min_val) and min_val >= 0:
+        log_col = f"{{col}}_log1p"
+        sqrt_col = f"{{col}}_sqrt"
+        df[log_col] = np.log1p(series)
+        df[sqrt_col] = np.sqrt(series)
+        created_features.extend([log_col, sqrt_col])
+
+# 3. Simple interaction features for the first few numeric columns.
+numeric_cols = df.select_dtypes(include=[np.number]).columns.tolist()
+base_numeric = [c for c in numeric_cols[:4] if c in df.columns]
+for i in range(len(base_numeric)):
+    for j in range(i + 1, min(len(base_numeric), i + 3)):
+        c1, c2 = base_numeric[i], base_numeric[j]
+        inter_col = f"{{c1}}_x_{{c2}}"
+        df[inter_col] = pd.to_numeric(df[c1], errors="coerce").fillna(0) * pd.to_numeric(df[c2], errors="coerce").fillna(0)
+        created_features.append(inter_col)
+
+# 4. Safe categorical encoding: one-hot only for low-cardinality object/category columns.
+categorical_cols = df.select_dtypes(include=["object", "category"]).columns.tolist()
+low_card_cols = []
+for col in categorical_cols:
+    nunique = df[col].nunique(dropna=True)
+    if 1 < nunique <= 10:
+        low_card_cols.append(col)
+
+if low_card_cols:
+    df = pd.get_dummies(df, columns=low_card_cols, dummy_na=False)
+    created_features.extend([c for c in df.columns if c not in original_cols and c not in created_features])
+
+# 5. Final cleanup: drop all-empty columns and save.
+df = df.dropna(axis=1, how="all")
 output_path = "./workspace/fe_output.csv"
 df.to_csv(output_path, index=False)
-print(f"特征工程完成，特征数: {{df.shape[1]}}，已保存至 {{output_path}}")
+print(f"Feature engineering complete. Original cols: {{len(original_cols)}}; final cols: {{df.shape[1]}}; created features: {{len(created_features)}}; saved to {{output_path}}")
 """

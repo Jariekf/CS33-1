@@ -54,6 +54,12 @@ Analyze the error and fix the machine learning code. \
 Output the complete corrected code."""
 
 _USER_PROMPT_FIX = """\
+# CONTEXT #
+Current phase: Model Selection
+
+# PLAN #
+{plan}
+
 # CODE CONTAINS ERROR #
 ```python
 {code}
@@ -61,6 +67,12 @@ _USER_PROMPT_FIX = """\
 
 # ERROR MESSAGES #
 {error}
+
+# TASK REQUIREMENTS #
+1. Continue following the original Model Selection plan and constraints.
+2. Save feature importance to `./workspace/feature_importance.json`.
+3. Keep model selection, hyperparameter tuning, and cross-validation aligned with the plan.
+4. If the previous attempt failed functionally, fix the implementation gap rather than only fixing syntax.
 
 # RESPONSE: CORRECTED CODE #
 Provide the complete corrected code in a single ```python ... ``` code block.
@@ -92,7 +104,7 @@ def model_selection_node(state: GraphState) -> dict:
             logger.info("Model selection code executed successfully.")
             break
         logger.info("内部自救第 %d 次: %s", attempt + 1, stderr[:200])
-        code = _fix_code(code, stderr)
+        code = _fix_code(code, stderr, plan)
 
     # ------------------------------------------------------------------
     # Step 3: 返回状态
@@ -143,9 +155,13 @@ def _generate_model_code(plan: dict, data_path: str, feedback: str) -> str:
     return _fallback_model_code(plan, data_path)
 
 
-def _fix_code(code: str, error: str) -> str:
+def _fix_code(code: str, error: str, plan: dict) -> str:
     """调用 LLM 修复代码。若失败则原样返回。"""
-    user_prompt = _USER_PROMPT_FIX.format(code=code, error=error)
+    user_prompt = _USER_PROMPT_FIX.format(
+        code=code,
+        error=error,
+        plan=json.dumps(plan, ensure_ascii=False, indent=2),
+    )
     reply = call_llm(_SYSTEM_PROMPT_FIX, user_prompt, agent_name="model_selection")
     if reply:
         fixed_code = extract_code(reply)
@@ -189,4 +205,3 @@ os.makedirs("./workspace", exist_ok=True)
 with open("./workspace/feature_importance.json", "w") as f:
     json.dump(fi_sorted, f, indent=2)
 """
-
