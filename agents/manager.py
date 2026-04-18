@@ -3,14 +3,14 @@ Manager Agent (统筹与规划智能体)
 职责：
   1. 解析用户目标（与可选 cleaning hints），生成 user_requirement_summary（LLM）
   2. 通过 RAP (Retrieval-Augmented Planning) 多源轻量检索并融合为 rap_context
-  3. 结合摘要、RAP 与数据概览，生成结构化的全局执行计划 global_plan
-  4. 初始化全局 State 并启动流水线
+  3. 结合摘要、RAP与数据概览，生成结构化的全局执行计划global_plan
+  4. 初始化全局State并启动流水线
 
-注（manager_node 内执行顺序）：
-  Step 1a — 数据轮廓：读 CSV 元信息（列、dtype、样例行），无 LLM。
-  Step 1b — 需求理解：LLM 产出 user_requirement_summary + 检索槽位（manager_retrieval.summarize_and_extract_slots）。
+注（manager_node内执行顺序）：
+  Step 1a — 数据轮廓：读CSV元信息（列、dtype、样例行），无 LLM。
+  Step 1b — 需求理解：LLM产出user_requirement_summary + 检索槽位（manager_retrieval.summarize_and_extract_slots）。
   Step 2 — RAP：多源轻量检索并融合（manager_retrieval.retrieve_and_fuse_rap_context）。
-  Step 3 — 规划：LLM 产出 global_plan；另附只读元数据 _rap_context、_user_requirement_summary。
+  Step 3 — 规划：LLM产出global_plan；另附只读元数据 _rap_context、_user_requirement_summary。
   Step 4 — 初始化工作区与运行时状态并返回。
 """
 from __future__ import annotations
