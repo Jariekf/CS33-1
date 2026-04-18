@@ -14,6 +14,10 @@ from datetime import datetime
 
 from config import WORKSPACE_DIR
 
+MANAGER_EVAL_DIR = os.path.join(WORKSPACE_DIR, "manager_eval")
+MANAGER_EVAL_LATEST_DIR = os.path.join(MANAGER_EVAL_DIR, "latest")
+MANAGER_EVAL_HISTORY_DIR = os.path.join(MANAGER_EVAL_DIR, "history")
+
 
 def write_manager_prompt_eval_report(
     initial_state: dict,
@@ -22,6 +26,8 @@ def write_manager_prompt_eval_report(
 ) -> None:
     """Write timestamped and latest manager prompt evaluation reports."""
     os.makedirs(WORKSPACE_DIR, exist_ok=True)
+    os.makedirs(MANAGER_EVAL_LATEST_DIR, exist_ok=True)
+    os.makedirs(MANAGER_EVAL_HISTORY_DIR, exist_ok=True)
 
     metrics = _collect_metrics(
         initial_state=initial_state,
@@ -31,18 +37,23 @@ def write_manager_prompt_eval_report(
     timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
     base_name = f"manager_prompt_eval_{timestamp}"
 
-    md_path = os.path.join(WORKSPACE_DIR, f"{base_name}.md")
-    csv_path = os.path.join(WORKSPACE_DIR, f"{base_name}.csv")
-    latest_md_path = os.path.join(WORKSPACE_DIR, "manager_prompt_eval_latest.md")
-    latest_csv_path = os.path.join(WORKSPACE_DIR, "manager_prompt_eval_latest.csv")
+    md_path = os.path.join(MANAGER_EVAL_HISTORY_DIR, f"{base_name}.md")
+    csv_path = os.path.join(MANAGER_EVAL_HISTORY_DIR, f"{base_name}.csv")
+    latest_md_path = os.path.join(MANAGER_EVAL_LATEST_DIR, "manager_prompt_eval_latest.md")
+    latest_csv_path = os.path.join(MANAGER_EVAL_LATEST_DIR, "manager_prompt_eval_latest.csv")
+    legacy_latest_md_path = os.path.join(WORKSPACE_DIR, "manager_prompt_eval_latest.md")
+    legacy_latest_csv_path = os.path.join(WORKSPACE_DIR, "manager_prompt_eval_latest.csv")
 
     markdown = _render_markdown_report(metrics)
     csv_row = _csv_row(metrics)
 
     _write_text(md_path, markdown)
     _write_text(latest_md_path, markdown)
+    # Backward-compatible mirror while downstream scripts migrate.
+    _write_text(legacy_latest_md_path, markdown)
     _write_csv(csv_path, csv_row)
     _write_csv(latest_csv_path, csv_row)
+    _write_csv(legacy_latest_csv_path, csv_row)
 
 
 def _collect_metrics(initial_state: dict, final_state: dict, run_started_at: datetime) -> dict:
@@ -310,6 +321,8 @@ def write_manager_midlayer_eval_report(
     )
 
     os.makedirs(WORKSPACE_DIR, exist_ok=True)
+    os.makedirs(MANAGER_EVAL_LATEST_DIR, exist_ok=True)
+    os.makedirs(MANAGER_EVAL_HISTORY_DIR, exist_ok=True)
     df_preview = _get_data_preview(data_path)
     summary, slots, summary_meta = summarize_and_extract_slots_with_meta(
         user_goal=user_goal,
@@ -338,16 +351,20 @@ def write_manager_midlayer_eval_report(
     }
     timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
     base_name = f"manager_midlayer_eval_{timestamp}"
-    md_path = os.path.join(WORKSPACE_DIR, f"{base_name}.md")
-    csv_path = os.path.join(WORKSPACE_DIR, f"{base_name}.csv")
-    latest_md_path = os.path.join(WORKSPACE_DIR, "manager_midlayer_eval_latest.md")
-    latest_csv_path = os.path.join(WORKSPACE_DIR, "manager_midlayer_eval_latest.csv")
+    md_path = os.path.join(MANAGER_EVAL_HISTORY_DIR, f"{base_name}.md")
+    csv_path = os.path.join(MANAGER_EVAL_HISTORY_DIR, f"{base_name}.csv")
+    latest_md_path = os.path.join(MANAGER_EVAL_LATEST_DIR, "manager_midlayer_eval_latest.md")
+    latest_csv_path = os.path.join(MANAGER_EVAL_LATEST_DIR, "manager_midlayer_eval_latest.csv")
+    legacy_latest_md_path = os.path.join(WORKSPACE_DIR, "manager_midlayer_eval_latest.md")
+    legacy_latest_csv_path = os.path.join(WORKSPACE_DIR, "manager_midlayer_eval_latest.csv")
     markdown = _render_midlayer_markdown_report(metrics)
     csv_row = _csv_row_midlayer(metrics)
     _write_text(md_path, markdown)
     _write_text(latest_md_path, markdown)
+    _write_text(legacy_latest_md_path, markdown)
     _write_csv(csv_path, csv_row)
     _write_csv(latest_csv_path, csv_row)
+    _write_csv(legacy_latest_csv_path, csv_row)
     return metrics
 
 
