@@ -10,3 +10,4 @@ docs/rules.md
 .vscode/
 workspace/
 !workspace/.gitkeep
+debug-*.log
