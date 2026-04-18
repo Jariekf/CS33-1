@@ -8,6 +8,8 @@ from __future__ import annotations
 import logging
 import os
 import re
+import json
+import time
 from typing import Any
 
 from langchain_core.messages import SystemMessage, HumanMessage
@@ -22,8 +24,37 @@ from core.my_llm import (
     llm_minimax,
     llm_kimi,
 )
+from core.env_utils import DEBUG_TRACE_LOG_PATH, DEBUG_TRACE_SESSION_ID
 
 logger = logging.getLogger(__name__)
+
+# Debug trace configuration:
+# - Disabled by default in shared environments.
+# - Enable by setting DEBUG_TRACE_LOG_PATH (required) and optional DEBUG_TRACE_SESSION_ID.
+_DEBUG_TRACE_LOG_PATH = DEBUG_TRACE_LOG_PATH
+_DEBUG_TRACE_SESSION_ID = DEBUG_TRACE_SESSION_ID
+
+
+def _write_debug_trace(*, run_id: str, hypothesis_id: str, location: str, message: str, data: dict) -> None:
+    """Append one NDJSON debug event for LLM-call diagnostics."""
+    if not _DEBUG_TRACE_LOG_PATH:
+        return
+    payload = {
+        "runId": run_id,
+        "hypothesisId": hypothesis_id,
+        "location": location,
+        "message": message,
+        "data": data,
+        "timestamp": int(time.time() * 1000),
+    }
+    if _DEBUG_TRACE_SESSION_ID:
+        payload["sessionId"] = _DEBUG_TRACE_SESSION_ID
+    try:
+        with open(_DEBUG_TRACE_LOG_PATH, "a", encoding="utf-8") as f:
+            f.write(json.dumps(payload, ensure_ascii=False) + "\n")
+    except Exception:
+        # Debug logging must never affect main flow.
+        pass
 
 
 # Inject LLMs
@@ -88,6 +119,21 @@ def _resolve_profile(agent_name: str | None = None) -> str:
         #   MANAGER_PLAN_PROFILE=openai
         env_key = f"{normalized.upper()}_PROFILE"
         env_profile = os.getenv(env_key, "").strip().lower()
+        # region agent log
+        _write_debug_trace(
+            run_id="pre-fix",
+            hypothesis_id="H5",
+            location="core/llm.py:_resolve_profile",
+            message="resolve_profile_env_override_check",
+            data={
+                "agent_name": normalized,
+                "env_key": env_key,
+                "has_env_profile": bool(env_profile),
+                "mapped_profile": AGENT_PROFILE_MAP.get(normalized, ""),
+                "default_profile": DEFAULT_PROFILE,
+            },
+        )
+        # endregion
         if env_profile:
             return env_profile
         return AGENT_PROFILE_MAP.get(normalized, DEFAULT_PROFILE)
@@ -97,10 +143,32 @@ def _resolve_profile(agent_name: str | None = None) -> str:
 def get_llm(agent_name: str | None = None):
     """Return LLM instance by agent mapping."""
     if os.getenv("STUB_MODE", "false").lower() == "true":
+        # region agent log
+        _write_debug_trace(
+            run_id="pre-fix",
+            hypothesis_id="H4",
+            location="core/llm.py:get_llm",
+            message="stub_mode_blocked_llm",
+            data={"agent_name": agent_name or "", "stub_mode": True},
+        )
+        # endregion
         raise Exception("STUB_MODE 开启，强制生成带异常的 LLM 对象触发降级")
 
     resolved_profile = _resolve_profile(agent_name=agent_name)
     llm = PROFILE_LLM_MAP.get(resolved_profile)
+    # region agent log
+    _write_debug_trace(
+        run_id="pre-fix",
+        hypothesis_id="H2",
+        location="core/llm.py:get_llm",
+        message="llm_profile_resolved",
+        data={
+            "agent_name": (agent_name or "").strip().lower(),
+            "resolved_profile": resolved_profile,
+            "profile_known": llm is not None,
+        },
+    )
+    # endregion
     if llm is None:
         logger.warning(
             "未识别的 profile '%s'，自动回退到默认 profile '%s'。",
@@ -125,10 +193,53 @@ def call_llm(
     """
     if os.getenv("STUB_MODE", "false").lower() == "true":
         logger.info("STUB_MODE 开启，跳过 LLM 调用，直接返回 None 触发降级。")
+        # region agent log
+        _write_debug_trace(
+            run_id="pre-fix",
+            hypothesis_id="H4",
+            location="core/llm.py:call_llm",
+            message="call_llm_skipped_due_to_stub_mode",
+            data={"agent_name": agent_name or "", "stub_mode": True},
+        )
+        # endregion
         return None
 
     try:
+        # region agent log
+        _write_debug_trace(
+            run_id="pre-fix",
+            hypothesis_id="H1",
+            location="core/llm.py:call_llm",
+            message="call_llm_enter",
+            data={
+                "agent_name": agent_name or "",
+                "system_prompt_len": len(system_prompt or ""),
+                "user_prompt_len": len(user_prompt or ""),
+            },
+        )
+        # endregion
         llm = get_llm(agent_name=agent_name)
+        llm_profile = _resolve_profile(agent_name=agent_name)
+        key_env_name = f"{llm_profile.upper()}_API_KEY"
+        base_env_name = f"{llm_profile.upper()}_BASE_URL"
+        has_key = bool(os.getenv(key_env_name, ""))
+        has_base = bool(os.getenv(base_env_name, ""))
+        # region agent log
+        _write_debug_trace(
+            run_id="pre-fix",
+            hypothesis_id="H1",
+            location="core/llm.py:call_llm",
+            message="llm_request_config_presence",
+            data={
+                "agent_name": agent_name or "",
+                "llm_profile": llm_profile,
+                "key_env_name": key_env_name,
+                "base_env_name": base_env_name,
+                "has_api_key": has_key,
+                "has_base_url": has_base,
+            },
+        )
+        # endregion
         messages = [
             SystemMessage(content=system_prompt),
             HumanMessage(content=user_prompt),
@@ -136,6 +247,19 @@ def call_llm(
         response = llm.invoke(messages)
         return response.content
     except Exception as e:
+        # region agent log
+        _write_debug_trace(
+            run_id="pre-fix",
+            hypothesis_id="H3",
+            location="core/llm.py:call_llm",
+            message="llm_invoke_exception",
+            data={
+                "agent_name": agent_name or "",
+                "error_type": type(e).__name__,
+                "error_msg_preview": str(e)[:300],
+            },
+        )
+        # endregion
         logger.error("LLM 调用失败: %s", e)
         return None
 

@@ -1,17 +1,17 @@
 """
-Manager RAP 轻量级检索层（对标 AutoML retrieve_knowledge 的形态，无 PDF/BM25）。
+Manager RAP轻量级检索层（对标AutoML retrieve_knowledge，无 PDF/BM25）。
 
-- 单次 LLM：生成 user_requirement_summary + 结构化槽位（任务/领域/area），可选并入 cleaning 队友提供的 hints。
+- 单次LLM：生成user_requirement_sum + 结构化槽位（任务/领域/area），可选并入cleaning hints。
 - 多源仅收集摘要级文本：arXiv abstract、DuckDuckGo 网页摘要、本地 PapersWithCode JSON、Kaggle kernel 列表元数据。
-- 单次 LLM：融合各源为一段 plan 可用的知识文本。
+- 单次LLM：融合各源为一段plan可用的知识文本。
 
-依赖：arxiv 已有；可选 `duckduckgo-search`、`kaggle` 及 Kaggle API 凭证。
+依赖：arxiv已有；可选 `duckduckgo-search`、`kaggle` 及 Kaggle API 凭证。
 PWC：仅当 `config.PWC_DATA_DIR` 下存在 `datasets.json` 与 `evaluation-tables.json` 才参与检索；未充实该库前目录可空（或仅 .gitkeep），逻辑上等同关闭该源。
 
 --------------------------------------------------------------------
-数据流（与 manager.py 的衔接）
+数据流（与manager.py的衔接）
   user_goal, df_preview, cleaning_hints
-      → summarize_and_extract_slots → (user_requirement_summary, slots)
+      → summarize_and_extract_slots → (user_requirement_sum, slots)
       → retrieve_and_fuse_rap_context(summary, slots, user_goal) → rap_context: str
       → manager._generate_global_plan(..., rap_context, user_requirement_summary=...)
       → global_plan（业务 JSON + 元数据 _rap_context / _user_requirement_summary）
@@ -34,12 +34,12 @@ logger = get_agent_logger("manager")
 
 """
 摘要 vs 槽位:
-- user_requirement_summary：一段自然语言，给人和后续 LLM 读（Web 检索 query 生成、_fuse_sources、规划 prompt 里的「需求摘要」块）。
-- slots：短结构化短语（downstream_task / application_domain / area），给「关键词型」检索用（arXiv 查询串、PWC 文本过滤、Kaggle kernel search）。
+- user_requirement_sum：一段自然语言，给人和后续LLM读（Web检索query生成、_fuse_sources、规划prompt里的「需求摘要」块）。
+- slots：短结构化短语（downstream_task/ application_domain/ area），给「关键词型」检索用（arXiv查询串、PWC文本过滤、Kaggle kernel search）。
 二者来自同一次 LLM JSON，分工是「叙述对齐」与「检索接口」分离；df_preview 只作为该 LLM 的输入上下文，不是槽位本身。
 """
 def generate_arxiv_search_queries(user_goal: str, df_preview: str) -> list[str]:
-    """根据目标与数据预览生成 arXiv 检索词（与 summarize 共用槽位，避免重复 LLM 时可改用 build_rap_context 内部结果）。"""
+    """根据目标与数据预览生成arXiv检索词（与summarize共用槽位，避免重复LLM时可改用build_rap_context内部结果）。"""
     _, slots = summarize_and_extract_slots(user_goal, df_preview, cleaning_hints="")
     return _queries_from_slots(slots, user_goal)
 
@@ -50,8 +50,7 @@ def summarize_and_extract_slots(
     cleaning_hints: str,
 ) -> tuple[str, dict[str, str]]:
     """
-    生成 user_requirement_summary，并抽取 downstream_task / application_domain / area。
-    cleaning_hints：队友或用户预先给出的 data_cleaning rules/contract 等文字，写入摘要供检索与规划对齐。
+    生成user_requirement_sum，并抽取downstream_task/ application_domain/ area。
     """
     hints_block = ""
     if cleaning_hints and cleaning_hints.strip():
@@ -299,7 +298,7 @@ def retrieve_and_fuse_rap_context(
     user_goal: str,
 ) -> str:
     """
-    Step 2（RAP）：基于 Step 1b 产出的摘要与槽位做多源检索并融合为一段文本。
+    Step 2（RAP）：基于Step 1b产出的摘要与槽位做多源检索并融合为一段文本。
     与「需求理解」解耦，便于单独测试或替换检索策略。
     """
     if not RAP_ENABLED:
@@ -345,7 +344,7 @@ def build_rap_context(
     cleaning_hints: str = "",
 ) -> tuple[str, str]:
     """
-    便捷封装：顺序执行 Step 1b（摘要+槽位）与 Step 2（检索+融合）。
+    便捷封装：顺序执行Step 1b（摘要+槽位）与Step 2（检索+融合）。
 
     Returns:
         user_requirement_summary: 供日志、后续节点或再检索复用。

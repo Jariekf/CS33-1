@@ -11,6 +11,10 @@ cleaning_contract (minimal portable schema, all keys optional):
   vs. rules: "rules" describe procedural steps to run; cleaning_contract describes
   bounds checked on the saved output (safety net). Unknown contract keys are ignored.
 
+  Additional post-validation on the saved CSV (see `_validate_cleaned_csv_quality`):
+  - No columns that are entirely unobserved (all NaN or all empty/whitespace strings).
+  - No pair of column labels that only differ by casing (e.g. `Year` and `year`).
+
 Design references the AutoKaggle Developer Agent pattern:
   - Structured prompt (CONTEXT + PLAN + CONSTRAINTS + TASK)
   - Code extraction (regex ```python ... ```)
@@ -58,6 +62,8 @@ def data_cleaning_node(state: GraphState) -> dict:
                 output_path, previous_signature=previous_signature
             )
             if not validation_error:
+                validation_error = _validate_cleaned_csv_quality(output_path)
+            if not validation_error:
                 validation_error = _validate_cleaning_contract(
                     plan, data_path, output_path
                 )
@@ -67,7 +73,7 @@ def data_cleaning_node(state: GraphState) -> dict:
             stderr = f"[PostValidationFailed] {validation_error}"
         # Self-heal: feed the error back to the LLM and regenerate code
         logger.info("Inner self-heal attempt %d: %s", attempt + 1, stderr[:200])
-        code = _fix_code(code, stderr)
+        code = _fix_code(code, stderr, plan)
 
     # ------------------------------------------------------------------
     # Step 3: Return state updates
@@ -136,6 +142,15 @@ Output the complete corrected code. \
 Keep the cleaning output policy: no all-empty columns in the saved CSV."""
 
 _USER_PROMPT_FIX = """\
+# CONTEXT #
+Current phase: Data Cleaning
+
+# PLAN #
+{plan}
+
+# CLEANING CONTRACT #
+{cleaning_contract_body}
+
 # CODE CONTAINS ERROR #
 ```python
 {code}
@@ -143,6 +158,12 @@ _USER_PROMPT_FIX = """\
 
 # ERROR MESSAGES #
 {error}
+
+# TASK REQUIREMENTS #
+1. Continue following the original Data Cleaning plan and constraints.
+2. Save the cleaned output to `./workspace/cleaned_data.csv`.
+3. Do not leave all-empty columns in the saved CSV.
+4. If the error came from post-validation, fix the cleaning logic instead of only silencing the error.
 
 # RESPONSE: CORRECTED CODE #
 Provide the complete corrected code in a single ```python ... ``` code block.
@@ -200,12 +221,17 @@ def _generate_cleaning_code(plan: dict, data_path: str, feedback: str) -> str:
     return _fallback_cleaning_code(plan, data_path)
 
 
-def _fix_code(code: str, error: str) -> str:
+def _fix_code(code: str, error: str, plan: dict) -> str:
     """
     Call the LLM to fix code based on execution errors.
     Return original code if the LLM fix call fails.
     """
-    user_prompt = _USER_PROMPT_FIX.format(code=code, error=error)
+    user_prompt = _USER_PROMPT_FIX.format(
+        code=code,
+        error=error,
+        plan=_plan_json_for_prompt(plan),
+        cleaning_contract_body=_cleaning_contract_prompt_body(plan),
+    )
     reply = call_llm(_SYSTEM_PROMPT_FIX, user_prompt, agent_name="data_cleaning")
 
     if reply:
@@ -265,6 +291,88 @@ def _validate_cleaning_output(
     if previous_signature is not None:
         if current_signature == previous_signature:
             return "cleaned output file was not updated in current run"
+
+    return ""
+
+
+def _series_has_observed_value(s) -> bool:
+    """
+    True if this column has at least one *observed* value for validation purposes.
+
+    - Numeric / bool / datetime / timedelta: any non-NaN counts as observed.
+    - Text-like (object, string, etc.): need at least one non-NaN cell whose string form,
+      after strip, is not the empty string (so a column of only ``""`` or spaces fails).
+    """
+    import pandas as pd
+
+    if s.empty:
+        return False
+    # Typed columns: presence means "at least one non-null".
+    if pd.api.types.is_numeric_dtype(s) or pd.api.types.is_bool_dtype(s):
+        return bool(s.notna().any())
+    if pd.api.types.is_datetime64_any_dtype(s) or pd.api.types.is_timedelta64_dtype(s):
+        return bool(s.notna().any())
+    # Object / string: ignore NaNs, then require at least one non-blank string.
+    mask = s.notna()
+    if not mask.any():
+        return False
+    text = s[mask].astype(str).str.strip()
+    return bool((text != "").any())
+
+
+def _validate_cleaned_csv_quality(output_csv_path: str) -> str:
+    """
+    Content checks on the written CSV (after file-level validation).
+
+    Flow (short-circuit on first failure):
+      1) Load the CSV into a DataFrame.
+      2) Reject if there are no column names at all.
+      3) Reject if two or more columns differ only by letter case (e.g. ``Year`` and ``year``),
+         because that breaks the "single naming scheme" rule and confuses downstream code.
+      4) Reject if any column has zero usable values (see ``_series_has_observed_value``).
+
+    Returns an empty string when valid, otherwise a failure reason string (shown to the LLM
+    in the self-heal loop as ``[PostValidationFailed] ...``).
+    """
+    import pandas as pd
+
+    # --- Load output (caller already ensured path exists and file is non-empty) ---
+    try:
+        df = pd.read_csv(output_csv_path)
+    except Exception as e:
+        return f"cleaned CSV quality check could not read file: {e}"
+
+    if df.columns.empty:
+        return "cleaned CSV has no columns"
+
+    # --- Check 1: case-insensitive duplicate *labels* ---
+    # Same logical name written twice with different casing (Year vs year) maps to the same
+    # "folded" key via casefold(), so we group originals under that key and flag groups
+    # with more than one distinct label.
+    from collections import defaultdict
+
+    fold_to_labels: dict[str, list[str]] = defaultdict(list)
+    for c in df.columns:
+        fold_to_labels[str(c).casefold()].append(str(c))
+    collisions = {k: v for k, v in fold_to_labels.items() if len(v) > 1}
+    if collisions:
+        # Build a short human-readable message; cap how many collision groups we list.
+        examples = []
+        for labels in list(collisions.values())[:5]:
+            examples.append(" / ".join(repr(x) for x in labels))
+        suffix = f" (+{len(collisions) - 5} more)" if len(collisions) > 5 else ""
+        return (
+            "cleaned CSV has case-insensitive duplicate column names: "
+            + "; ".join(examples)
+            + (suffix if suffix else "")
+        )
+
+    # --- Check 2: columns that contain no real data (all missing or only blank text) ---
+    empty_cols = [str(c) for c in df.columns if not _series_has_observed_value(df[c])] # Get all columns that have no observed values
+    if empty_cols:
+        shown = empty_cols[:12] # Display 12 more empty columns if there are more than 12
+        more = f" (+{len(empty_cols) - 12} more)" if len(empty_cols) > 12 else ""
+        return f"cleaned CSV has all-empty columns: {', '.join(repr(c) for c in shown)}{more}"
 
     return ""
 

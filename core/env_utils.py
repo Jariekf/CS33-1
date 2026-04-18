@@ -32,3 +32,7 @@ GEMINI_FLASH_MODEL = os.getenv("GEMINI_FLASH_MODEL")
 QWEN_MODEL = os.getenv("QWEN_MODEL")
 MINIMAX_MODEL = os.getenv("MINIMAX_MODEL")
 KIMI_MODEL = os.getenv("KIMI_MODEL")
+
+# debug trace (optional, local use)
+DEBUG_TRACE_LOG_PATH = os.getenv("DEBUG_TRACE_LOG_PATH", "").strip()
+DEBUG_TRACE_SESSION_ID = os.getenv("DEBUG_TRACE_SESSION_ID", "").strip()

@@ -36,7 +36,25 @@ def execute_code(code: str, timeout: int = 120) -> tuple[str, str]:
             cwd=os.path.dirname(os.path.dirname(__file__)),  # 项目根目录
         )
 
-        return result.stdout.strip(), result.stderr.strip()
+        stdout = result.stdout.strip()
+        stderr = result.stderr.strip()
+
+        # Treat non-zero exit status as execution failure.
+        if result.returncode != 0:
+            return stdout, stderr
+
+        # Successful execution may still emit warnings to stderr.
+        # Do not trigger self-heal for warnings; keep them in the execution log instead.
+        if stderr:
+            combined_stdout = stdout
+            warning_block = f"[stderr warnings]\n{stderr}"
+            if combined_stdout:
+                combined_stdout = f"{combined_stdout}\n\n{warning_block}"
+            else:
+                combined_stdout = warning_block
+            return combined_stdout, ""
+
+        return stdout, ""
 
     except subprocess.TimeoutExpired:
         return "", f"[TimeoutError] 代码执行超过 {timeout} 秒限制"

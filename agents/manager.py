@@ -3,14 +3,14 @@ Manager Agent (统筹与规划智能体)
 职责：
   1. 解析用户目标（与可选 cleaning hints），生成 user_requirement_summary（LLM）
   2. 通过 RAP (Retrieval-Augmented Planning) 多源轻量检索并融合为 rap_context
-  3. 结合摘要、RAP 与数据概览，生成结构化的全局执行计划 global_plan
-  4. 初始化全局 State 并启动流水线
+  3. 结合摘要、RAP与数据概览，生成结构化的全局执行计划global_plan
+  4. 初始化全局State并启动流水线
 
-注（manager_node 内执行顺序）：
-  Step 1a — 数据轮廓：读 CSV 元信息（列、dtype、样例行），无 LLM。
-  Step 1b — 需求理解：LLM 产出 user_requirement_summary + 检索槽位（manager_retrieval.summarize_and_extract_slots）。
+注（manager_node内执行顺序）：
+  Step 1a — 数据轮廓：读CSV元信息（列、dtype、样例行），无 LLM。
+  Step 1b — 需求理解：LLM产出user_requirement_summary + 检索槽位（manager_retrieval.summarize_and_extract_slots）。
   Step 2 — RAP：多源轻量检索并融合（manager_retrieval.retrieve_and_fuse_rap_context）。
-  Step 3 — 规划：LLM 产出 global_plan；另附只读元数据 _rap_context、_user_requirement_summary。
+  Step 3 — 规划：LLM产出global_plan；另附只读元数据_rap_context、_user_requirement_summary。
   Step 4 — 初始化工作区与运行时状态并返回。
 """
 from __future__ import annotations
@@ -55,16 +55,16 @@ def manager_node(state: GraphState) -> dict:
     logger.info(f"Starting manager_node with user_goal: '{user_goal}' and data_path: '{data_path}'")
 
     # ------------------------------------------------------------------
-    # Step 1a — 数据轮廓（非 LLM）
-    # 从 CSV 读取列名、dtype、shape、前几行样例；不是「关键词提取」，而是结构化表头/类型事实，供 1b 与规划 LLM 使用。
+    # Step 1a — 数据轮廓（非LLM）
+    # 从CSV读取列名、dtype、shape、前几行样例；不是「关键词提取」，而是结构化表头/类型事实，供1b与规划LLM使用。
     # ------------------------------------------------------------------
     df_preview = _get_data_preview(data_path)
     logger.info("Data preview generated.")
 
     # ------------------------------------------------------------------
     # Step 1b — 需求摘要与检索槽位（LLM）
-    # manager_cleaning_hints：可选「输入便签」——用户/队友给的清洗约定草稿等，只参与本段摘要 prompt；
-    # 产出物是 user_requirement_summary（叙述）+ 槽位；不等于 global_plan 里的 rules/cleaning_contract（那些由 Step 3 单独生成）。
+    # manager_cleaning_hints：可选「输入便签」——用户/队友给的清洗约定草稿等，只参与本段摘要prompt；
+    # 产出物是user_requirement_sum（叙述）+ 槽位；不等于 global_plan里的rules/cleaning_contract（那些由 Step 3单独生成）。
     # ------------------------------------------------------------------
     req_summary, slots = summarize_and_extract_slots(
         user_goal,
@@ -74,13 +74,13 @@ def manager_node(state: GraphState) -> dict:
     logger.info("User requirement summary and retrieval slots ready.")
 
     # ------------------------------------------------------------------
-    # Step 2 — RAP：检索 + 融合（与 1b 分离，便于理解与测试）
+    # Step 2 — RAP：检索 + 融合（与1b分离，便于理解与测试）
     # ------------------------------------------------------------------
     rap_context = retrieve_and_fuse_rap_context(req_summary, slots, user_goal)
     logger.info("RAP context built (arXiv + optional web/PWC/Kaggle).")
 
     # ------------------------------------------------------------------
-    # Step 3 — 结构化 global_plan（LLM）
+    # Step 3 — 结构化global_plan（LLM）
     # ------------------------------------------------------------------
     global_plan = _generate_global_plan(
         user_goal,
@@ -110,7 +110,7 @@ def manager_node(state: GraphState) -> dict:
 
 
 # ======================================================================
-# 私有辅助函数 (待接入真实 LLM 时替换桩逻辑)
+# 私有辅助函数 (待接入真实LLM时替换桩逻辑)
 # ======================================================================
 
 def _get_data_preview(data_path: str) -> str:
@@ -164,10 +164,10 @@ def _build_global_plan_prompts(
     与旧版参数 `retrieved_docs: list[dict]` 的对应关系：
     - 旧：在函数内把多篇 {title, summary} 拼成一段「文献上下文」字符串。
     - 现：由 `retrieve_and_fuse_rap_context` 预先产出 `rap_context`（已含多源融合后的叙述），本函数只消费字符串。
-    - `plan["_rap_context"]` 存的是注入规划 prompt 的那份 RAP 文本，便于审计与复现。
+    - `plan["_rap_context"]` 存的是注入规划prompt的那份RAP文本，便于审计与复现。
 
-    `user_requirement_summary` 与 `manager_cleaning_hints`：
-    - hints 仅在 Step 1b 写入摘要 prompt；本参数收到的是已生成的摘要（可已内含 hints 的语义）。
+    `user_requirement_sum` 与 `manager_cleaning_hints`：
+    - hints 仅在Step 1b写入摘要prompt；本参数收到的是已生成的摘要（可已内含hints的语义）。
     - 规划阶段同时看到 `user_goal`、摘要块、`df_preview` 与 `rap_context`，四者角色不同，勿混同。
 
     `data_cleaning_plan.cleaning_contract` — Minimal general mode (keys are optional; default or `{}` indicates no validation):
@@ -185,7 +185,7 @@ def _build_global_plan_prompts(
     summary_block = user_requirement_summary.strip() or user_goal
     docs_context = rap_context.strip() if rap_context.strip() else "无检索结果"
 
-    sys_prompt = "You are a Data Science Engineering Director generating an execution plan."
+    sys_prompt = """You are a Data Science Engineering Director generating an execution plan."""
     user_prompt = f"""
 User Goal: {user_goal}
 User requirement summary (for alignment):
@@ -220,6 +220,11 @@ Notes for data_cleaning_plan:
 - "rules": procedural steps to perform (what to run). Optional list of objects like {{"rule": "drop_duplicates", "params": {{}}}}. Use [] if none. Not validated as bounds.
 - "cleaning_contract": post-execution guardrails. Prefer {{}} or only "max_row_drop_ratio". Do not list "protected_columns" or imply all columns must survive cleaning — dropping columns is allowed.
     * "max_row_drop_ratio" (number 0..1, optional): only enforced key; max allowed fraction of input rows removed, i.e. (rows_in - rows_out) / rows_in.
+
+Notes for feature_engineering_plan:
+- Ground all objectives in columns that are visible in the Data Preview.
+- Do not mention invented fields such as `product_id`, `country`, `period`, `date`, or forecast targets unless the preview clearly supports them.
+- If time columns or grouping keys are unclear, prefer simple safe feature engineering over grouped time-series designs.
 """
     return sys_prompt, user_prompt, summary_block, docs_context
 
