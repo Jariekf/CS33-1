@@ -28,8 +28,8 @@ from core.logger import get_agent_logger
 
 from agents.manager_retrieval import (
     generate_arxiv_search_queries,
-    retrieve_and_fuse_rap_context,
-    summarize_and_extract_slots,
+    retrieve_and_fuse_rap_context_with_meta,
+    summarize_and_extract_slots_with_meta,
 )
 
 logger = get_agent_logger("manager")
@@ -66,7 +66,7 @@ def manager_node(state: GraphState) -> dict:
     # manager_cleaning_hints：可选「输入便签」——用户/队友给的清洗约定草稿等，只参与本段摘要prompt；
     # 产出物是user_requirement_sum（叙述）+ 槽位；不等于 global_plan里的rules/cleaning_contract（那些由 Step 3单独生成）。
     # ------------------------------------------------------------------
-    req_summary, slots = summarize_and_extract_slots(
+    req_summary, slots, summary_eval_meta = summarize_and_extract_slots_with_meta(
         user_goal,
         df_preview,
         cleaning_hints,
@@ -76,7 +76,7 @@ def manager_node(state: GraphState) -> dict:
     # ------------------------------------------------------------------
     # Step 2 — RAP：检索 + 融合（与1b分离，便于理解与测试）
     # ------------------------------------------------------------------
-    rap_context = retrieve_and_fuse_rap_context(req_summary, slots, user_goal)
+    rap_context, fusion_eval_meta = retrieve_and_fuse_rap_context_with_meta(req_summary, slots, user_goal)
     logger.info("RAP context built (arXiv + optional web/PWC/Kaggle).")
 
     # ------------------------------------------------------------------
@@ -88,6 +88,8 @@ def manager_node(state: GraphState) -> dict:
         rap_context,
         user_requirement_summary=req_summary,
     )
+    global_plan["_manager_summary_eval"] = summary_eval_meta
+    global_plan["_manager_fusion_eval"] = fusion_eval_meta
     logger.info("Global structured plan generated successfully.")
 
     # ------------------------------------------------------------------

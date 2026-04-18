@@ -20,6 +20,7 @@ PWC：仅当 `config.PWC_DATA_DIR` 下存在 `datasets.json` 与 `evaluation-tab
 """
 from __future__ import annotations
 
+import ast
 import json
 import random
 import re
@@ -31,6 +32,16 @@ from core.logger import get_agent_logger
 from tools.arxiv_tool import search_arxiv
 
 logger = get_agent_logger("manager")
+_SUMMARY_REQUIRED_FIELDS = (
+    "user_requirement_summary",
+    "downstream_task",
+    "application_domain",
+    "area",
+)
+_KEYWORD_STOPWORDS = {
+    "the", "and", "for", "with", "from", "that", "this", "into", "using",
+    "user", "goal", "data", "preview", "need", "model", "predict",
+}
 
 """
 摘要 vs 槽位:
@@ -52,6 +63,20 @@ def summarize_and_extract_slots(
     """
     生成user_requirement_sum，并抽取downstream_task/ application_domain/ area。
     """
+    summary, slots, _ = summarize_and_extract_slots_with_meta(
+        user_goal=user_goal,
+        df_preview=df_preview,
+        cleaning_hints=cleaning_hints,
+    )
+    return summary, slots
+
+
+def summarize_and_extract_slots_with_meta(
+    user_goal: str,
+    df_preview: str,
+    cleaning_hints: str,
+) -> tuple[str, dict[str, str], dict]:
+    """Generate summary/slots with lightweight health + faithfulness metrics."""
     hints_block = ""
     if cleaning_hints and cleaning_hints.strip():
         hints_block = f"""
@@ -76,33 +101,12 @@ Return a single JSON object with exactly these string fields:
 Example: {{"user_requirement_summary":"...","downstream_task":"churn prediction","application_domain":"telecom","area":"tabular supervised learning"}}
 """
     reply = call_llm(sys_prompt, user_prompt, agent_name="manager_summary")
-    default_slots = {
-        "downstream_task": user_goal[:120],
-        "application_domain": "general",
-        "area": "machine learning",
-    }
-    if not reply:
-        summary = user_goal if not cleaning_hints else f"{user_goal}\nConstraints: {cleaning_hints}"
-        return summary.strip(), default_slots
-
-    try:
-        match = re.search(r"\{[^{}]*\}", reply, re.DOTALL)
-        if not match:
-            match = re.search(r"\{.*\}", reply, re.DOTALL)
-        if match:
-            obj = json.loads(match.group(0))
-            summary = str(obj.get("user_requirement_summary", user_goal)).strip()
-            slots = {
-                "downstream_task": str(obj.get("downstream_task", default_slots["downstream_task"])).strip(),
-                "application_domain": str(obj.get("application_domain", default_slots["application_domain"])).strip(),
-                "area": str(obj.get("area", default_slots["area"])).strip(),
-            }
-            return summary or user_goal, slots
-    except (json.JSONDecodeError, TypeError):
-        pass
-
-    summary = user_goal if not cleaning_hints else f"{user_goal}\nConstraints: {cleaning_hints}"
-    return summary.strip(), default_slots
+    return _parse_summary_and_slots(
+        reply=reply,
+        user_goal=user_goal,
+        df_preview=df_preview,
+        cleaning_hints=cleaning_hints,
+    )
 
 
 def _queries_from_slots(slots: dict[str, str], user_goal: str) -> list[str]:
@@ -292,6 +296,14 @@ Produce a bullet list of key insights (5–12 bullets) the planning agent can us
     return bundle[:6000]
 
 
+def _fuse_sources_with_meta(
+    user_requirement_summary: str,
+    parts: dict[str, str],
+) -> tuple[str, dict]:
+    fused = _fuse_sources(user_requirement_summary, parts)
+    return fused, _build_fusion_eval_meta(fused)
+
+
 def retrieve_and_fuse_rap_context(
     user_requirement_summary: str,
     slots: dict[str, str],
@@ -301,9 +313,24 @@ def retrieve_and_fuse_rap_context(
     Step 2（RAP）：基于Step 1b产出的摘要与槽位做多源检索并融合为一段文本。
     与「需求理解」解耦，便于单独测试或替换检索策略。
     """
+    rap_context, _ = retrieve_and_fuse_rap_context_with_meta(
+        user_requirement_summary=user_requirement_summary,
+        slots=slots,
+        user_goal=user_goal,
+    )
+    return rap_context
+
+
+def retrieve_and_fuse_rap_context_with_meta(
+    user_requirement_summary: str,
+    slots: dict[str, str],
+    user_goal: str,
+) -> tuple[str, dict]:
+    """Step 2 RAP with lightweight health metrics for standalone evaluation."""
     if not RAP_ENABLED:
         logger.info("RAP is disabled by RAP_ENABLED=false. Skipping external retrieval.")
-        return "无外部检索结果；RAP 已关闭，仅基于用户目标与数据预览进行规划。"
+        rap_context = "无外部检索结果；RAP 已关闭，仅基于用户目标与数据预览进行规划。"
+        return rap_context, _build_fusion_eval_meta(rap_context)
 
     queries = _queries_from_slots(slots, user_goal)
 
@@ -318,9 +345,10 @@ def retrieve_and_fuse_rap_context(
         "PapersWithCode (local)": pwc_raw,
         "Kaggle kernels (titles)": kaggle_raw,
     }
-    rap_context = _fuse_sources(user_requirement_summary, parts)
+    rap_context, eval_meta = _fuse_sources_with_meta(user_requirement_summary, parts)
     if not rap_context.strip():
         rap_context = arxiv_raw or "无外部检索结果；仅基于用户目标与数据预览进行规划。"
+        eval_meta = _build_fusion_eval_meta(rap_context)
 
     logger.info(
         "RAP gather | raw_chars: arxiv=%d web=%d pwc=%d kaggle=%d | flags: WEB=%s PWC=%s KAGGLE=%s | fused_chars=%d",
@@ -334,7 +362,7 @@ def retrieve_and_fuse_rap_context(
         len(rap_context),
     )
 
-    return rap_context
+    return rap_context, eval_meta
 
 
 def build_rap_context(
@@ -353,3 +381,148 @@ def build_rap_context(
     summary, slots = summarize_and_extract_slots(user_goal, df_preview, cleaning_hints)
     rap_context = retrieve_and_fuse_rap_context(summary, slots, user_goal)
     return summary, rap_context
+
+
+def _parse_summary_and_slots(
+    *,
+    reply: str | None,
+    user_goal: str,
+    df_preview: str,
+    cleaning_hints: str,
+) -> tuple[str, dict[str, str], dict]:
+    default_slots = {
+        "downstream_task": user_goal[:120],
+        "application_domain": "general",
+        "area": "machine learning",
+    }
+    fallback_summary = user_goal if not cleaning_hints else f"{user_goal}\nConstraints: {cleaning_hints}"
+    parsed_obj: dict | None = None
+    json_parse_ok = False
+
+    if reply:
+        try:
+            match = re.search(r"\{[^{}]*\}", reply, re.DOTALL)
+            if not match:
+                match = re.search(r"\{.*\}", reply, re.DOTALL)
+            if match:
+                maybe_obj = json.loads(match.group(0))
+                if isinstance(maybe_obj, dict):
+                    parsed_obj = maybe_obj
+                    json_parse_ok = True
+        except (json.JSONDecodeError, TypeError):
+            parsed_obj = None
+
+    raw_fields = {}
+    for key in _SUMMARY_REQUIRED_FIELDS:
+        value = ""
+        if parsed_obj is not None:
+            value = str(parsed_obj.get(key, "")).strip()
+        raw_fields[key] = value
+    empty_count = sum(1 for v in raw_fields.values() if not v)
+    empty_rate = round(empty_count / float(len(_SUMMARY_REQUIRED_FIELDS)), 4)
+    required_fields_ok = empty_count == 0
+
+    summary = raw_fields["user_requirement_summary"] or fallback_summary
+    slots = {
+        "downstream_task": raw_fields["downstream_task"] or default_slots["downstream_task"],
+        "application_domain": raw_fields["application_domain"] or default_slots["application_domain"],
+        "area": raw_fields["area"] or default_slots["area"],
+    }
+
+    faithfulness = _build_faithfulness_warnings(
+        summary=summary,
+        user_goal=user_goal,
+        df_preview=df_preview,
+        cleaning_hints=cleaning_hints,
+    )
+    meta = {
+        "json_parse_ok": json_parse_ok,
+        "required_fields_ok": required_fields_ok,
+        "empty_rate": empty_rate,
+        "raw_reply_preview": (reply or "")[:1000],
+        **faithfulness,
+    }
+    return summary.strip(), slots, meta
+
+
+def _tokenize_keywords(text: str) -> set[str]:
+    tokens = {
+        token.lower()
+        for token in re.findall(r"[A-Za-z0-9_]+", text or "")
+        if len(token) >= 3
+    }
+    return {token for token in tokens if token not in _KEYWORD_STOPWORDS}
+
+
+def _extract_preview_columns(df_preview: str) -> set[str]:
+    match = re.search(r"Columns\s*\(\d+\):\s*(\[[^\]]*\])", df_preview or "")
+    if not match:
+        return set()
+    try:
+        cols = ast.literal_eval(match.group(1))
+    except (ValueError, SyntaxError):
+        return set()
+    if not isinstance(cols, list):
+        return set()
+    return {str(col).strip() for col in cols if str(col).strip()}
+
+
+def _build_faithfulness_warnings(
+    *,
+    summary: str,
+    user_goal: str,
+    df_preview: str,
+    cleaning_hints: str,
+) -> dict:
+    goal_keywords = _tokenize_keywords(user_goal)
+    summary_keywords = _tokenize_keywords(summary)
+    goal_keyword_hit = bool(goal_keywords.intersection(summary_keywords)) if goal_keywords else True
+
+    preview_columns = _extract_preview_columns(df_preview)
+    explicit_refs = re.findall(r"[`'\"]([A-Za-z_][A-Za-z0-9_]*)[`'\"]", summary or "")
+    unknown_refs = []
+    if preview_columns:
+        lowered = {col.lower() for col in preview_columns}
+        unknown_refs = [ref for ref in explicit_refs if ref.lower() not in lowered]
+    column_reference_ok = len(unknown_refs) == 0
+
+    hints_coverage_ok = True
+    if cleaning_hints.strip():
+        hints_keywords = _tokenize_keywords(cleaning_hints)
+        hints_coverage_ok = bool(hints_keywords.intersection(summary_keywords)) if hints_keywords else True
+
+    warning_count = sum(
+        1
+        for status in (goal_keyword_hit, column_reference_ok, hints_coverage_ok)
+        if not status
+    )
+    return {
+        "faithfulness_goal_keyword_hit": goal_keyword_hit,
+        "faithfulness_column_reference_ok": column_reference_ok,
+        "faithfulness_hints_coverage_ok": hints_coverage_ok,
+        "faithfulness_warning_count": warning_count,
+    }
+
+
+def _build_fusion_eval_meta(text: str) -> dict:
+    content = (text or "").strip()
+    if not content:
+        return {
+            "empty_rate": 1.0,
+            "repetition_rate": 0.0,
+            "code_leakage_flag": False,
+            "raw_reply_preview": "",
+        }
+
+    lines = [line.strip().lower() for line in content.splitlines() if line.strip()]
+    repetition_rate = 0.0
+    if lines:
+        repetition_rate = round((len(lines) - len(set(lines))) / float(len(lines)), 4)
+    leakage_pattern = re.compile(r"```|^\s*(import|from|def|class)\b", re.IGNORECASE | re.MULTILINE)
+    code_leakage_flag = bool(leakage_pattern.search(content))
+    return {
+        "empty_rate": 0.0,
+        "repetition_rate": repetition_rate,
+        "code_leakage_flag": code_leakage_flag,
+        "raw_reply_preview": content[:1000],
+    }
