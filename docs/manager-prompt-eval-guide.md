@@ -38,6 +38,10 @@ It does not yet generate dedicated evaluation records for:
 - `manager_summary`
 - `manager_fusion`
 
+The latest report now also includes lightweight health metrics for
+`manager_summary` and `manager_fusion` as daily warning signals.
+These signals are observational only and do not block pipeline flow.
+
 ## The 5 Core Metrics
 
 The current version keeps only 5 core metrics.
@@ -87,6 +91,39 @@ Why it matters:
 The markdown report also includes an artifact status section.
 
 This is not treated as a core prompt metric anymore. It is only a supporting reference so you can quickly see which output files were produced during the run.
+
+## Midlayer-Only Evaluation Entry (Summary/Fusion)
+
+When downstream agents are still being tuned, evaluate the manager midlayer
+independently:
+
+```bash
+python run_manager_midlayer_eval.py <data_path> "<user_goal>" "<optional_cleaning_hints>"
+```
+
+This writes:
+
+- `workspace/manager_midlayer_eval_latest.md`
+- `workspace/manager_midlayer_eval_latest.csv`
+- timestamped history files
+
+Use this mode to isolate summary/fusion quality from end-to-end pipeline noise.
+
+## Contract Boundary (Current, Not Tightened)
+
+Current boundaries remain intentionally lightweight:
+
+- `global_plan` keeps required top-level sections (`data_cleaning_plan`,
+  `feature_engineering_plan`, `model_selection_plan`).
+- `data_cleaning_plan.rules` remains list-typed; `cleaning_contract` remains dict-typed.
+- In execution, only `cleaning_contract.max_row_drop_ratio` is hard-enforced;
+  unknown contract keys are ignored.
+
+Non-goals for this phase:
+
+- no hard blocking based on summary/fusion warnings
+- no semantic hard constraints that reduce planning flexibility
+- no benchmark-grade judge system yet
 
 ## How To Compare Prompt Versions
 
