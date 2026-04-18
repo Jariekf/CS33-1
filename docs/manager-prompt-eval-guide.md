@@ -22,12 +22,14 @@ Example:
 python main.py ./data/test_data.csv "Predict the target variable and generate business insights"
 ```
 
-3. After the run finishes, check the generated files in `workspace/`:
+3. After the run finishes, check the generated files in `workspace/manager_eval/latest/`:
 
 - `manager_prompt_eval_latest.md`
 - `manager_prompt_eval_latest.csv`
 
-The system also saves timestamped history files for later comparison.
+Timestamped history files are saved under `workspace/manager_eval/history/`.
+
+For backward compatibility during migration, the same `*_latest` files are also mirrored to the `workspace/` root.
 
 ## Current Scope
 
@@ -103,9 +105,11 @@ python run_manager_midlayer_eval.py <data_path> "<user_goal>" "<optional_cleanin
 
 This writes:
 
-- `workspace/manager_midlayer_eval_latest.md`
-- `workspace/manager_midlayer_eval_latest.csv`
-- timestamped history files
+- `workspace/manager_eval/latest/manager_midlayer_eval_latest.md`
+- `workspace/manager_eval/latest/manager_midlayer_eval_latest.csv`
+- timestamped history files under `workspace/manager_eval/history/`
+
+For backward compatibility during migration, `manager_midlayer_eval_latest.*` are also mirrored to `workspace/`.
 
 Use this mode to isolate summary/fusion quality from end-to-end pipeline noise.
 
