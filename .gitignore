@@ -8,3 +8,5 @@ logs/
 .venv/
 docs/rules.md
 .vscode/
+workspace/
+!workspace/.gitkeep
