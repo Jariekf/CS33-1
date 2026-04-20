@@ -1,22 +1,28 @@
 """
-Manager RAP轻量级检索层（对标AutoML retrieve_knowledge，无 PDF/BM25）。
+Lightweight Manager RAP retrieval layer, aligned with AutoML-style retrieve_knowledge
+without PDF parsing or BM25.
 
-- 单次LLM：生成user_requirement_sum + 结构化槽位（任务/领域/area），可选并入cleaning hints。
-- 多源仅收集摘要级文本：arXiv abstract、DuckDuckGo 网页摘要、本地 PapersWithCode JSON、Kaggle kernel 列表元数据。
-- 单次LLM：融合各源为一段plan可用的知识文本。
+- One LLM call generates user_requirement_sum plus structured retrieval slots
+  such as task, domain, and area. Optional cleaning hints are included.
+- Multiple sources collect summary-level text only: arXiv abstracts,
+  DuckDuckGo snippets, local PapersWithCode JSON, and Kaggle kernel metadata.
+- One LLM call fuses the sources into planning-ready knowledge text.
 
-依赖：arxiv已有；可选 `duckduckgo-search`、`kaggle` 及 Kaggle API 凭证。
-PWC：仅当 `config.PWC_DATA_DIR` 下存在 `datasets.json` 与 `evaluation-tables.json` 才参与检索；未充实该库前目录可空（或仅 .gitkeep），逻辑上等同关闭该源。
+Dependencies: arxiv is available; `duckduckgo-search`, `kaggle`, and Kaggle API
+credentials are optional. PWC participates only when `datasets.json` and
+`evaluation-tables.json` exist under `config.PWC_DATA_DIR`; an empty directory
+is equivalent to disabling that source.
 
---------------------------------------------------------------------
-数据流（与manager.py的衔接）
+Data flow connected to manager.py:
   user_goal, df_preview, cleaning_hints
-      → summarize_and_extract_slots → (user_requirement_sum, slots)
-      → retrieve_and_fuse_rap_context(summary, slots, user_goal) → rap_context: str
-      → manager._generate_global_plan(..., rap_context, user_requirement_summary=...)
-      → global_plan（业务 JSON + 元数据 _rap_context / _user_requirement_summary）
+      -> summarize_and_extract_slots -> (user_requirement_sum, slots)
+      -> retrieve_and_fuse_rap_context(summary, slots, user_goal) -> rap_context: str
+      -> manager._generate_global_plan(..., rap_context, user_requirement_summary=...)
+      -> global_plan with business JSON and metadata _rap_context / _user_requirement_summary
 
-本模块不读、不写LangGraph的GraphState；仅由 manager_node 调用，返回值留在manager局部再写入global_plan。
+This module does not read or write LangGraph GraphState. It is called by
+manager_node, and the returned values remain local to manager before being
+written into global_plan.
 """
 from __future__ import annotations
 
@@ -44,13 +50,15 @@ _KEYWORD_STOPWORDS = {
 }
 
 """
-摘要 vs 槽位:
-- user_requirement_sum：一段自然语言，给人和后续LLM读（Web检索query生成、_fuse_sources、规划prompt里的「需求摘要」块）。
-- slots：短结构化短语（downstream_task/ application_domain/ area），给「关键词型」检索用（arXiv查询串、PWC文本过滤、Kaggle kernel search）。
-二者来自同一次 LLM JSON，分工是「叙述对齐」与「检索接口」分离；df_preview 只作为该 LLM 的输入上下文，不是槽位本身。
+Summary vs slots:
+- user_requirement_sum is natural language for humans and downstream LLMs.
+- slots are short structured phrases used by keyword-style retrieval
+  such as arXiv queries, PWC text filtering, and Kaggle kernel search.
+Both come from the same LLM JSON. The summary handles narrative alignment,
+while slots provide a retrieval interface. df_preview is input context, not a slot.
 """
 def generate_arxiv_search_queries(user_goal: str, df_preview: str) -> list[str]:
-    """根据目标与数据预览生成arXiv检索词（与summarize共用槽位，避免重复LLM时可改用build_rap_context内部结果）。"""
+    """Generate arXiv search queries from the goal and data preview."""
     _, slots = summarize_and_extract_slots(user_goal, df_preview, cleaning_hints="")
     return _queries_from_slots(slots, user_goal)
 
@@ -61,7 +69,7 @@ def summarize_and_extract_slots(
     cleaning_hints: str,
 ) -> tuple[str, dict[str, str]]:
     """
-    生成user_requirement_sum，并抽取downstream_task/ application_domain/ area。
+    Generate user_requirement_sum and extract downstream_task, application_domain, and area.
     """
     summary, slots, _ = summarize_and_extract_slots_with_meta(
         user_goal=user_goal,
@@ -150,7 +158,7 @@ def _retrieve_web_light(user_requirement_summary: str) -> str:
     search_query = (query_reply or user_requirement_summary)[:200].strip()
     try:
         from duckduckgo_search import DDGS
-        """- Web 检索选用 DuckDuckGo（duckduckgo-search）：通常无需 Google 官方 Search API Key，实现轻量；若需可替换为其它 search 后端。"""
+        """DuckDuckGo search usually works without an official Google Search API key."""
 
         rows: list[str] = []
         with DDGS() as ddgs:
@@ -162,22 +170,22 @@ def _retrieve_web_light(user_requirement_summary: str) -> str:
                     rows.append(f"- {title} | {body} | {href}")
         return "\n".join(rows)
     except ImportError:
-        logger.warning("duckduckgo-search 未安装，跳过网页检索。pip install duckduckgo-search")
+        logger.warning("duckduckgo-search is not installed; skipping web retrieval. pip install duckduckgo-search")
         return ""
     except Exception as e:
-        logger.warning("网页检索失败: %s", e)
+        logger.warning("Web retrieval failed: %s", e)
         return ""
 
 
 def _retrieve_pwc_light(slots: dict[str, str], user_requirement_summary: str, top_k: int = 8) -> str:
-    """本地 PWC 数据可选：目录未同步或缺 JSON 时返回空串，不视为错误。"""
+    """Use optional local PWC data; missing JSON files return an empty string without error."""
     if not RAP_PWC_ENABLED:
         return ""
     base = Path(PWC_DATA_DIR)
     ds_path = base / "datasets.json"
     tb_path = base / "evaluation-tables.json"
     if not ds_path.is_file() or not tb_path.is_file():
-        logger.info("PapersWithCode 本地数据不存在，跳过（路径: %s）", base)
+        logger.info("PapersWithCode local data is unavailable; skipping path: %s", base)
         return ""
 
     user_task = slots.get("downstream_task", "").lower().replace("-", " ").replace("_", " ")
@@ -224,7 +232,7 @@ def _retrieve_pwc_light(slots: dict[str, str], user_requirement_summary: str, to
         blob = "\n---\n".join(loaders + bench)
         return blob[: RAP_FUSE_MAX_CHARS]
     except Exception as e:
-        logger.warning("PWC 轻量检索失败: %s", e)
+        logger.warning("PWC lightweight retrieval failed: %s", e)
         return ""
 
 
@@ -234,7 +242,7 @@ def _retrieve_kaggle_light(slots: dict[str, str], top_k: int = 6) -> str:
     try:
         from kaggle.api.kaggle_api_extended import KaggleApi
     except ImportError:
-        logger.warning("kaggle 包未安装，跳过 Kaggle 检索。pip install kaggle")
+        logger.warning("kaggle package is not installed; skipping Kaggle retrieval. pip install kaggle")
         return ""
 
     task = slots.get("downstream_task", "").replace("-", " ").replace("_", " ").strip()
@@ -252,7 +260,7 @@ def _retrieve_kaggle_light(slots: dict[str, str], top_k: int = 6) -> str:
             lines.append(f"- {title} ({ref})")
         return "\n".join(lines)
     except Exception as e:
-        logger.warning("Kaggle 检索跳过（需 ~/.kaggle/kaggle.json 等配置）: %s", e)
+        logger.warning("Kaggle retrieval skipped; credentials such as ~/.kaggle/kaggle.json may be required: %s", e)
         return ""
 
 
@@ -260,7 +268,7 @@ def _fuse_sources(
     user_requirement_summary: str,
     parts: dict[str, str],
 ) -> str:
-    """将各源原始片段融合为一段规划可用的知识（单次 LLM）。"""
+    """Fuse raw source snippets into planning-ready knowledge with one LLM call."""
     non_empty = {k: v for k, v in parts.items() if v and v.strip()}
     if not non_empty:
         return ""
@@ -288,7 +296,7 @@ User requirement summary:
 Sources:
 {bundle}
 
-Produce a bullet list of key insights (5–12 bullets) the planning agent can use.
+Produce a bullet list of key insights (5-12 bullets) the planning agent can use.
 """
     fused = call_llm(sys_prompt, user_prompt, agent_name="manager_fusion")
     if fused and fused.strip():
@@ -310,8 +318,8 @@ def retrieve_and_fuse_rap_context(
     user_goal: str,
 ) -> str:
     """
-    Step 2（RAP）：基于Step 1b产出的摘要与槽位做多源检索并融合为一段文本。
-    与「需求理解」解耦，便于单独测试或替换检索策略。
+    Step 2 (RAP): use the Step 1b summary and slots for multi-source retrieval,
+    then fuse the results into one text block.
     """
     rap_context, _ = retrieve_and_fuse_rap_context_with_meta(
         user_requirement_summary=user_requirement_summary,
@@ -329,7 +337,7 @@ def retrieve_and_fuse_rap_context_with_meta(
     """Step 2 RAP with lightweight health metrics for standalone evaluation."""
     if not RAP_ENABLED:
         logger.info("RAP is disabled by RAP_ENABLED=false. Skipping external retrieval.")
-        rap_context = "无外部检索结果；RAP 已关闭，仅基于用户目标与数据预览进行规划。"
+        rap_context = "No external retrieval results; RAP is disabled, so planning uses only the user goal and data preview."
         return rap_context, _build_fusion_eval_meta(rap_context)
 
     queries = _queries_from_slots(slots, user_goal)
@@ -347,7 +355,7 @@ def retrieve_and_fuse_rap_context_with_meta(
     }
     rap_context, eval_meta = _fuse_sources_with_meta(user_requirement_summary, parts)
     if not rap_context.strip():
-        rap_context = arxiv_raw or "无外部检索结果；仅基于用户目标与数据预览进行规划。"
+        rap_context = arxiv_raw or "No external retrieval results; planning uses only the user goal and data preview."
         eval_meta = _build_fusion_eval_meta(rap_context)
 
     logger.info(
@@ -372,11 +380,11 @@ def build_rap_context(
     cleaning_hints: str = "",
 ) -> tuple[str, str]:
     """
-    便捷封装：顺序执行Step 1b（摘要+槽位）与Step 2（检索+融合）。
+    Convenience wrapper that runs Step 1b (summary + slots) and Step 2 (retrieval + fusion).
 
     Returns:
-        user_requirement_summary: 供日志、后续节点或再检索复用。
-        rap_context: 融合后的 RAP 文本，可直接注入 _generate_global_plan。
+        user_requirement_summary: reusable by logs, later nodes, or another retrieval pass.
+        rap_context: fused RAP text that can be injected directly into _generate_global_plan.
     """
     summary, slots = summarize_and_extract_slots(user_goal, df_preview, cleaning_hints)
     rap_context = retrieve_and_fuse_rap_context(summary, slots, user_goal)
