@@ -47,7 +47,7 @@ The system is designed to:
 The current pipeline is organised as the following sequence:
 
 1. `Manager Agent`
-   Serves as the main user-facing entry point: interprets the user goal, previews the dataset, retrieves related papers from arXiv, produces a structured global plan, initializes shared workflow state, and integrates the final report for delivery.
+   Serves as the main planning entry point: interprets the user goal, previews the dataset, generates a requirement summary and retrieval slots, optionally builds RAP context from external sources, produces a structured global plan, and initializes shared workflow state.
 2. `Data Cleaning Agent`
    Generates and executes cleaning code for the input dataset.
 3. `Supervisor Agent`
@@ -72,7 +72,7 @@ The current pipeline is organised as the following sequence:
 - **Supervisor quality gate**
   The supervisor reviews intermediate outputs before the next stage proceeds.
 - **RAP/RAG support**
-  arXiv retrieval is used both in planning and in business interpretation.
+  Manager-side RAP supports arXiv abstracts plus optional web search, PapersWithCode metadata, and Kaggle kernel metadata. The Business Action Translator uses arXiv-style retrieval to support business interpretation.
 - **Workspace-based artifact generation**
   Intermediate outputs and reports are stored under `workspace/`.
 
@@ -136,14 +136,21 @@ The current repository exposes the following prototype capabilities:
 - LLM-assisted model selection and feature-importance export
 - supervisor review and retry routing
 - business report generation in markdown
+- manager-side prompt and midlayer evaluation reports with health metrics, faithfulness warnings, failure attribution labels, and artifact status checks
+- structured workflow outputs that support traceability, including run logs, stage review records, manager evaluation artifacts, and workspace-level execution artifacts
+- an initial business-report generation chain that connects Manager outputs, model-stage artifacts, feature importance, and BAT-oriented reporting
+- early baseline-planning work, including identification of candidate comparison workflows and evaluation dimensions for later benchmarking
 - local artifact persistence in `workspace/`
 
 
 ## What's Next
 
-- add stronger observability with structured per-stage logs for plan, generated code, execution output, review result, retry count, and artifact paths
-- make the supervisor gate stricter and more inspectable, especially around fail-close review behaviour and explicit pass/fail criteria
-- refine worker-agent prompts and execution constraints so stage outputs more reliably match the intended plan rather than only producing runnable code
+- consolidate and strengthen existing observability/reporting across run logs, stage reports, manager evaluation artifacts, retry counts, and artifact paths
+- refine the Feature Engineering Agent and improve output consistency across datasets and input schemas
+- establish the postponed traditional baseline workflow and continue defining benchmark metrics for comparison against the multi-agent system
+- improve the Model Agent and Supervisor Agent with stronger checks for valid model outputs, generated evaluation metrics, and retry/revision decisions
+- refine the Business Action Translator so it more consistently translates model outputs, feature importance, and evaluation results into business-oriented recommendations
+- conduct incremental integration testing, result validation, and benchmark evaluation against baseline workflows before final documentation and demo preparation
 
 ## Quick Start
 
