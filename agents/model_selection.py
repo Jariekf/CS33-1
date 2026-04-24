@@ -14,7 +14,7 @@ from core.state import GraphState
 from core.llm import call_llm, extract_code
 from tools.python_repl import execute_code
 from config import MAX_INNER_RETRY
-from agents.feature_engineering import FE_OUTPUT_PATH
+from agents.feature_engineering import FE_OUTPUT_PATH, _MODERN_SKLEARN_API_GUIDE
 
 logger = get_agent_logger("model_selection")
 
@@ -26,7 +26,9 @@ _SYSTEM_PROMPT_GENERATE = """\
 You are an expert Data Scientist and Machine Learning Engineer. \
 You write Python code according to the provided plan and constraints. \
 Your code must be complete, self-contained, and directly runnable. \
-You must implement model building, hyperparameter tuning, and cross-validation."""
+You must implement model building, hyperparameter tuning, and cross-validation.
+
+""" + _MODERN_SKLEARN_API_GUIDE
 
 _USER_PROMPT_GENERATE = """\
 # CONTEXT #
@@ -55,7 +57,9 @@ Provide your complete solution in a single ```python ... ``` code block.
 _SYSTEM_PROMPT_FIX = """\
 You are an expert Python debugger. \
 Analyze the error and fix the machine learning code. \
-Output the complete corrected code."""
+Output the complete corrected code.
+
+""" + _MODERN_SKLEARN_API_GUIDE
 
 _USER_PROMPT_FIX = """\
 # CONTEXT #
@@ -114,7 +118,13 @@ def model_selection_node(state: GraphState) -> dict:
         if not stderr:
             logger.info("Model selection code executed successfully.")
             break
-        logger.info("内部自救第 %d 次: %s", attempt + 1, stderr[:200])
+        # Use tail slice: the exception type + message (most diagnostic line)
+        # is always at the BOTTOM of a Python traceback, not the top.
+        logger.info("内部自救第 %d 次: %s", attempt + 1, stderr[-500:])
+        # On the final iteration there is no next execute_code, so calling
+        # _fix_code would burn an LLM request whose output is never run.
+        if attempt == MAX_INNER_RETRY - 1:
+            break
         code = _fix_code(code, stderr, plan, dataset_description)
 
     # ------------------------------------------------------------------
@@ -149,6 +159,30 @@ def _dataset_description_block(desc: str) -> str:
     return "(not provided; infer cautiously from column names and sample rows)"
 
 
+def _compress_supervisor_feedback(feedback: str, max_chars: int = 1200) -> str:
+    """
+    Trim overly long supervisor feedback before injecting it into the generate
+    prompt.
+
+    Supervisor replies can run into several thousand characters when the
+    reviewer lists every sub-bullet it would like to see. Feeding that back
+    verbatim causes the next code-generation call to try to implement every
+    bullet at once, producing 600-800 line monolithic scripts that then blow
+    up during internal retries. We keep head + tail so the headline issue
+    and the "fix summary" are preserved, but elide the middle.
+    """
+    text = (feedback or "").strip()
+    if len(text) <= max_chars:
+        return text
+    head = (max_chars * 2) // 3
+    tail = max_chars - head
+    return (
+        text[:head].rstrip()
+        + "\n\n[...supervisor feedback truncated by pipeline: focus on the TOP 2-3 issues above; do NOT try to implement every sub-bullet in a single pass...]\n\n"
+        + text[-tail:].lstrip()
+    )
+
+
 def _generate_model_code(
     plan: dict, data_path: str, feedback: str, dataset_description: str = ""
 ) -> str:
@@ -158,7 +192,13 @@ def _generate_model_code(
     """
     feedback_section = ""
     if feedback:
-        feedback_section = f"# SUPERVISOR FEEDBACK #\nPrevious attempt was rejected. Fix based on:\n{feedback}"
+        compressed = _compress_supervisor_feedback(feedback)
+        feedback_section = (
+            "# SUPERVISOR FEEDBACK (compressed) #\n"
+            "Previous attempt was rejected. Focus on the TOP 2-3 issues; do NOT\n"
+            "try to implement every sub-bullet in a single pass:\n"
+            f"{compressed}"
+        )
 
     user_prompt = _USER_PROMPT_GENERATE.format(
         plan=json.dumps(plan, ensure_ascii=False, indent=2),

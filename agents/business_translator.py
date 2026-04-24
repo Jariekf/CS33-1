@@ -73,12 +73,68 @@ def business_translator_node(state: GraphState) -> dict:
 # ======================================================================
 
 def _load_feature_importance(path: str) -> dict:
-    """加载模型选择阶段落盘的特征重要性文件。"""
+    """
+    Load the feature-importance artifact produced by model_selection.
+
+    The contract is a flat JSON object ``{feature_name: importance}``, but in
+    practice the LLM-generated model-selection code drifts into two other
+    shapes from time to time:
+
+      1. List of pairs:        ``[["duration", 0.39], ["poutcome", 0.15], ...]``
+      2. List of dict entries: ``[{"feature": "duration", "importance": 0.39}, ...]``
+         (also seen: ``"name"``/``"column"`` instead of ``"feature"``,
+         ``"score"``/``"value"`` instead of ``"importance"``)
+
+    We accept all three, normalise into a dict, and sort descending by value
+    so ``list(...)[:5]`` in the caller still gets the top-K. Returning a
+    plain dict keeps the downstream ``.keys()`` / ``.items()`` call sites
+    unchanged.
+    """
     try:
         content = read_file(path)
-        return json.loads(content)
+        raw = json.loads(content)
     except Exception:
         return {}
+
+    normalised: dict[str, float] = {}
+
+    if isinstance(raw, dict):
+        for k, v in raw.items():
+            try:
+                normalised[str(k)] = float(v)
+            except (TypeError, ValueError):
+                continue
+    elif isinstance(raw, list):
+        for item in raw:
+            if isinstance(item, (list, tuple)) and len(item) >= 2:
+                name, score = item[0], item[1]
+            elif isinstance(item, dict):
+                name = (
+                    item.get("feature")
+                    or item.get("name")
+                    or item.get("column")
+                )
+                score = (
+                    item.get("importance")
+                    if "importance" in item
+                    else item.get("score", item.get("value"))
+                )
+            else:
+                continue
+            if name is None or score is None:
+                continue
+            try:
+                normalised[str(name)] = float(score)
+            except (TypeError, ValueError):
+                continue
+    else:
+        return {}
+
+    # Sort descending so list(d.keys())[:5] gives top-5 regardless of how the
+    # producer ordered the file.
+    return dict(
+        sorted(normalised.items(), key=lambda kv: kv[1], reverse=True)
+    )
 
 
 def _build_rag_queries(user_goal: str, top_features: list[str]) -> list[str]:

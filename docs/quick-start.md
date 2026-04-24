@@ -79,6 +79,10 @@ Download it yourself before running those examples:
    └── bank-names.txt     # data dictionary (used as --desc input below)
    ```
 
+```bash
+ python main.py ./data/bank-full.csv "Predict whether customers will subscribe to time deposits and provide a business report." --desc ./data/bank-names.txt
+```
+
 If you skip this download, the `bank-full.csv` examples below will fail with "file not found"; you can substitute `./data/Financials.csv` or `./data/test_data.csv` to preview the CLI without the dataset.
 
 ### 4.1 `--desc` — attach an authoritative dataset description (recommended)
