@@ -79,7 +79,13 @@ def data_cleaning_node(state: GraphState) -> dict:
                 break
             stderr = f"[PostValidationFailed] {validation_error}"
         # Self-heal: feed the error back to the LLM and regenerate code
-        logger.info("Inner self-heal attempt %d: %s", attempt + 1, stderr[:200])
+        # Use tail slice: the exception type + message (most diagnostic line)
+        # is always at the BOTTOM of a Python traceback, not the top.
+        logger.info("Inner self-heal attempt %d: %s", attempt + 1, stderr[-500:])
+        # On the final iteration there is no next execute_code, so calling
+        # _fix_code would burn an LLM request whose output is never run.
+        if attempt == MAX_INNER_RETRY - 1:
+            break
         code = _fix_code(code, stderr, plan, dataset_description)
 
     # ------------------------------------------------------------------

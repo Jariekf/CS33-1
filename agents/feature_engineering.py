@@ -63,7 +63,13 @@ def feature_engineering_node(state: GraphState) -> dict:
         if not stderr:
             logger.info("Feature engineering code executed successfully.")
             break
-        logger.info("内部自救第 %d 次: %s", attempt + 1, stderr[:200])
+        # Use tail slice: the exception type + message (most diagnostic line)
+        # is always at the BOTTOM of a Python traceback, not the top.
+        logger.info("内部自救第 %d 次: %s", attempt + 1, stderr[-500:])
+        # On the final iteration there is no next execute_code, so calling
+        # _fix_code would burn an LLM request whose output is never run.
+        if attempt == MAX_INNER_RETRY - 1:
+            break
         code = _fix_code(code, stderr, plan, previous_summary, dataset_description)
 
     # ------------------------------------------------------------------
@@ -96,6 +102,23 @@ def feature_engineering_node(state: GraphState) -> dict:
 
 # ---------- Prompt 模板 (参照 AutoKaggle PROMPT_DEVELOPER 结构) ----------
 
+_MODERN_SKLEARN_API_GUIDE = """\
+# TARGET LIBRARY VERSIONS (IMPORTANT) #
+Assume scikit-learn >= 1.4, pandas >= 2.0, numpy >= 1.24. \
+Do NOT use deprecated or removed APIs. In particular:
+  - `OneHotEncoder`: use `sparse_output=False` (NEVER `sparse=`; that kwarg is REMOVED in sklearn 1.4).
+  - `OrdinalEncoder`: use `handle_unknown="use_encoded_value"` with `unknown_value=...` when needed.
+  - `SGDClassifier` / `Ridge` / `Lasso` / `LinearRegression`: do NOT pass `normalize=`; it is REMOVED. Use a `StandardScaler` in a Pipeline instead.
+  - `LogisticRegression`: do NOT pass `multi_class=`; it is deprecated. Rely on defaults.
+  - `GridSearchCV` / `RandomizedSearchCV`: do NOT pass `iid=`; it is REMOVED.
+  - `mean_squared_error(..., squared=False)` is deprecated; use `root_mean_squared_error` (sklearn >= 1.4) or `np.sqrt(mean_squared_error(...))`.
+  - `make_scorer(..., needs_proba=True)` is deprecated; use `make_scorer(..., response_method="predict_proba")`.
+  - pandas `DataFrame.append` is REMOVED; use `pd.concat([...])`.
+  - pandas `df.iteritems()` is REMOVED; use `df.items()`.
+  - numpy `np.int`/`np.float`/`np.bool` are REMOVED; use built-in `int`/`float`/`bool` or `np.int64`/`np.float64`.
+If you are unsure whether a kwarg still exists, omit it and rely on defaults rather than guessing."""
+
+
 _SYSTEM_PROMPT_GENERATE = """\
 You are an expert Feature Engineering developer. \
 You write Python code according to the provided plan and constraints. \
@@ -104,7 +127,9 @@ You must only use columns that actually exist in the loaded DataFrame. Never inv
 If a planned grouping key, datetime column, or source column is missing, degrade gracefully: skip that advanced feature family and continue with simpler valid features instead of failing. \
 Column names in the saved CSV must stay human-interpretable for downstream model reports: \
 keep original names where columns are retained; name new features descriptively (snake_case). \
-Never bulk-rename features to generic x0, x1, x2, or feature_0 unless the prompt explicitly requires it."""
+Never bulk-rename features to generic x0, x1, x2, or feature_0 unless the prompt explicitly requires it.
+
+""" + _MODERN_SKLEARN_API_GUIDE
 
 _USER_PROMPT_GENERATE = """\
 # CONTEXT #
@@ -151,7 +176,9 @@ You are an expert Python debugger. \
 Analyze the error and fix the code. \
 Output the complete corrected code. \
 Only use columns that actually exist in the loaded DataFrame, and if expected columns are missing, degrade gracefully instead of failing. \
-Preserve the same column-naming rules as feature engineering: descriptive names, no generic x0/x1 renames."""
+Preserve the same column-naming rules as feature engineering: descriptive names, no generic x0/x1 renames.
+
+""" + _MODERN_SKLEARN_API_GUIDE
 
 _USER_PROMPT_FIX = """\
 # CONTEXT #
@@ -195,6 +222,25 @@ def _dataset_description_block(desc: str) -> str:
     return "(not provided; infer cautiously from column names and sample rows)"
 
 
+def _compress_supervisor_feedback(feedback: str, max_chars: int = 1200) -> str:
+    """
+    Trim overly long supervisor feedback before injecting it into the generate
+    prompt. See ``agents.model_selection._compress_supervisor_feedback`` for
+    the rationale — the two helpers intentionally mirror each other so that
+    both worker agents behave the same way under a verbose supervisor.
+    """
+    text = (feedback or "").strip()
+    if len(text) <= max_chars:
+        return text
+    head = (max_chars * 2) // 3
+    tail = max_chars - head
+    return (
+        text[:head].rstrip()
+        + "\n\n[...supervisor feedback truncated by pipeline: focus on the TOP 2-3 issues above; do NOT try to implement every sub-bullet in a single pass...]\n\n"
+        + text[-tail:].lstrip()
+    )
+
+
 def _generate_fe_code(
     plan: dict,
     data_path: str,
@@ -209,7 +255,13 @@ def _generate_fe_code(
     """
     feedback_section = ""
     if feedback:
-        feedback_section = f"# SUPERVISOR FEEDBACK #\nPrevious attempt was rejected. Fix based on:\n{feedback}"
+        compressed = _compress_supervisor_feedback(feedback)
+        feedback_section = (
+            "# SUPERVISOR FEEDBACK (compressed) #\n"
+            "Previous attempt was rejected. Focus on the TOP 2-3 issues; do NOT\n"
+            "try to implement every sub-bullet in a single pass:\n"
+            f"{compressed}"
+        )
 
     user_prompt = _USER_PROMPT_GENERATE.format(
         plan=json.dumps(plan, ensure_ascii=False, indent=2),
