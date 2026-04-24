@@ -17,6 +17,8 @@ class GraphState(TypedDict):
     user_goal: str                  # 用户的自然语言业务目标
     # Manager 检索/规划前可选：队友或用户提供的清洗规则、contract 等文字，会并入 user_requirement_summary
     manager_cleaning_hints: str
+    # 数据集背景说明（README / data dictionary / 论文等统一加载后的纯文本），所有阶段共用的语义锚
+    dataset_description: str
 
     # ---- Manager 产出 ----
     global_plan: dict               # Manager 通过 RAP 生成的结构化执行计划
@@ -29,7 +31,11 @@ class GraphState(TypedDict):
 
     # ---- 流水线运行时状态 ----
     current_phase: str              # 当前阶段名 ("data_cleaning" / "feature_engineering" / "model_selection")
-    current_data_path: str          # 当前阶段的数据输入路径 (文件交接机制)
+    current_data_path: str          # Raw input path for data_cleaning (first phase only).
+    #   Downstream feature_engineering / model_selection always read their upstream's
+    #   fixed output path (CLEANED_OUTPUT_PATH / FE_OUTPUT_PATH), so that a Supervisor
+    #   retry does not re-feed a worker's own previous output back into itself.
+    #   Worker nodes no longer mutate this field.
     current_code: str               # Worker 最近一次生成的代码
     current_execution_log: str      # Worker 代码执行后的 Stdout
     current_error: str              # Supervisor 打回时附带的反馈 / 内部自救时的 Stderr

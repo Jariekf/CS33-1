@@ -32,6 +32,12 @@ from config import MAX_INNER_RETRY
 
 logger = get_agent_logger("data_cleaning")
 
+# Fixed per-phase output path. Every worker in the pipeline reads a fixed
+# upstream output path and writes a fixed output path, so that Supervisor
+# retries do not accidentally re-feed a worker's own rejected output back
+# into itself. See agents/feature_engineering.py for the FE counterpart.
+CLEANED_OUTPUT_PATH = "./workspace/cleaned_data.csv"
+
 
 def data_cleaning_node(state: GraphState) -> dict:
     """LangGraph node function for Data Cleaning."""
@@ -42,11 +48,12 @@ def data_cleaning_node(state: GraphState) -> dict:
     plan: dict = _dcp if isinstance(_dcp, dict) else {}
     data_path = state["current_data_path"]
     feedback = state.get("current_error", "")
+    dataset_description = (state.get("dataset_description") or "").strip()
 
     # ------------------------------------------------------------------
     # Step 1: Generate cleaning code via LLM
     # ------------------------------------------------------------------
-    code = _generate_cleaning_code(plan, data_path, feedback)
+    code = _generate_cleaning_code(plan, data_path, feedback, dataset_description)
     logger.info("Data cleaning code generation completed.")
 
     # ------------------------------------------------------------------
@@ -73,7 +80,7 @@ def data_cleaning_node(state: GraphState) -> dict:
             stderr = f"[PostValidationFailed] {validation_error}"
         # Self-heal: feed the error back to the LLM and regenerate code
         logger.info("Inner self-heal attempt %d: %s", attempt + 1, stderr[:200])
-        code = _fix_code(code, stderr, plan)
+        code = _fix_code(code, stderr, plan, dataset_description)
 
     # ------------------------------------------------------------------
     # Step 3: Return state updates
@@ -88,12 +95,15 @@ def data_cleaning_node(state: GraphState) -> dict:
             "current_error": f"[InnerRetryExhausted] {stderr}",
         }
 
+    # Note: we intentionally do NOT set ``current_data_path`` here.
+    # The downstream feature_engineering node reads from a fixed
+    # ``CLEANED_OUTPUT_PATH``, so on a Supervisor-driven retry the FE worker
+    # will not accidentally read its own previous rejected output.
     return {
         "current_phase": "data_cleaning",
         "current_code": code,
         "current_execution_log": stdout,
         "current_error": "",
-        "current_data_path": output_path,
     }
 
 
@@ -113,6 +123,9 @@ Before saving, remove columns with no observed values (all-NaN / all-empty) so d
 _USER_PROMPT_GENERATE = """\
 # CONTEXT #
 Current phase: Data Cleaning
+
+# DATASET DESCRIPTION (authoritative) #
+{dataset_description_block}
 
 # PLAN #
 {plan}
@@ -144,6 +157,9 @@ Keep the cleaning output policy: no all-empty columns in the saved CSV."""
 _USER_PROMPT_FIX = """\
 # CONTEXT #
 Current phase: Data Cleaning
+
+# DATASET DESCRIPTION (authoritative) #
+{dataset_description_block}
 
 # PLAN #
 {plan}
@@ -193,7 +209,17 @@ def _plan_json_for_prompt(plan: dict) -> str:
     return json.dumps(body, ensure_ascii=False, indent=2)
 
 
-def _generate_cleaning_code(plan: dict, data_path: str, feedback: str) -> str:
+def _dataset_description_block(desc: str) -> str:
+    """Render the DATASET DESCRIPTION block for prompts (falls back to a neutral note)."""
+    text = (desc or "").strip()
+    if text:
+        return text
+    return "(not provided; infer cautiously from column names and sample rows)"
+
+
+def _generate_cleaning_code(
+    plan: dict, data_path: str, feedback: str, dataset_description: str = ""
+) -> str:
     """
     Call the LLM to generate data-cleaning code.
     If the LLM call fails, fall back to a template implementation.
@@ -207,6 +233,7 @@ def _generate_cleaning_code(plan: dict, data_path: str, feedback: str) -> str:
         cleaning_contract_body=_cleaning_contract_prompt_body(plan),
         data_path=data_path,
         feedback_section=feedback_section,
+        dataset_description_block=_dataset_description_block(dataset_description),
     )
 
     reply = call_llm(_SYSTEM_PROMPT_GENERATE, user_prompt, agent_name="data_cleaning")
@@ -221,7 +248,7 @@ def _generate_cleaning_code(plan: dict, data_path: str, feedback: str) -> str:
     return _fallback_cleaning_code(plan, data_path)
 
 
-def _fix_code(code: str, error: str, plan: dict) -> str:
+def _fix_code(code: str, error: str, plan: dict, dataset_description: str = "") -> str:
     """
     Call the LLM to fix code based on execution errors.
     Return original code if the LLM fix call fails.
@@ -231,6 +258,7 @@ def _fix_code(code: str, error: str, plan: dict) -> str:
         error=error,
         plan=_plan_json_for_prompt(plan),
         cleaning_contract_body=_cleaning_contract_prompt_body(plan),
+        dataset_description_block=_dataset_description_block(dataset_description),
     )
     reply = call_llm(_SYSTEM_PROMPT_FIX, user_prompt, agent_name="data_cleaning")
 
@@ -246,7 +274,7 @@ def _fix_code(code: str, error: str, plan: dict) -> str:
 
 def _get_output_path() -> str:
     """Return the standard output path for cleaned data."""
-    return "./workspace/cleaned_data.csv"
+    return CLEANED_OUTPUT_PATH
 
 
 def _get_file_signature(file_path: str) -> tuple[int, int] | None:

@@ -22,8 +22,15 @@ from core.state import GraphState
 from core.llm import call_llm, extract_code
 from tools.python_repl import execute_code
 from config import MAX_INNER_RETRY
+from agents.data_cleaning import CLEANED_OUTPUT_PATH
 
 logger = get_agent_logger("feature_engineering")
+
+# Fixed per-phase output path. FE always reads the cleaned CSV produced by
+# the data_cleaning node and writes its output here. Using a fixed path
+# (rather than ``state["current_data_path"]``) prevents Supervisor retries
+# from re-feeding FE's own rejected output back into itself.
+FE_OUTPUT_PATH = "./workspace/fe_output.csv"
 
 
 def feature_engineering_node(state: GraphState) -> dict:
@@ -32,15 +39,19 @@ def feature_engineering_node(state: GraphState) -> dict:
     logger.info("Feature Engineering node started.")
     # 【边界控制】只抽取属于自己的子计划
     plan = state["global_plan"].get("feature_engineering_plan", {})
-    data_path = state["current_data_path"]
+    # Always read from the upstream phase's fixed output, NOT from
+    # ``state["current_data_path"]`` — on a Supervisor retry the latter may
+    # point at FE's own previous rejected output.
+    data_path = CLEANED_OUTPUT_PATH
     feedback = state.get("current_error", "")
+    dataset_description = (state.get("dataset_description") or "").strip()
     # 只读取最近的 Memory 摘要 (上一阶段清洗成果)
     previous_summary = state["memory"][-1] if state.get("memory") else ""
 
     # ------------------------------------------------------------------
     # Step 1: 生成特征工程代码
     # ------------------------------------------------------------------
-    code = _generate_fe_code(plan, data_path, previous_summary, feedback)
+    code = _generate_fe_code(plan, data_path, previous_summary, feedback, dataset_description)
     logger.info("Feature engineering code generation completed.")
 
     # ------------------------------------------------------------------
@@ -53,7 +64,7 @@ def feature_engineering_node(state: GraphState) -> dict:
             logger.info("Feature engineering code executed successfully.")
             break
         logger.info("内部自救第 %d 次: %s", attempt + 1, stderr[:200])
-        code = _fix_code(code, stderr, plan, previous_summary)
+        code = _fix_code(code, stderr, plan, previous_summary, dataset_description)
 
     # ------------------------------------------------------------------
     # Step 3: 返回状态更新
@@ -67,12 +78,15 @@ def feature_engineering_node(state: GraphState) -> dict:
             "current_error": f"[InnerRetryExhausted] {stderr}",
         }
 
+    # Note: we intentionally do NOT set ``current_data_path`` here.
+    # The downstream model_selection node reads from a fixed ``FE_OUTPUT_PATH``,
+    # so on a Supervisor-driven retry we also avoid re-feeding FE's own
+    # previous rejected output back into itself.
     return {
         "current_phase": "feature_engineering",
         "current_code": code,
         "current_execution_log": stdout,
         "current_error": "",
-        "current_data_path": "./workspace/fe_output.csv",
     }
 
 
@@ -95,6 +109,9 @@ Never bulk-rename features to generic x0, x1, x2, or feature_0 unless the prompt
 _USER_PROMPT_GENERATE = """\
 # CONTEXT #
 Current phase: Feature Engineering
+
+# DATASET DESCRIPTION (authoritative) #
+{dataset_description_block}
 
 # PREVIOUS PHASE SUMMARY #
 {previous_summary}
@@ -140,6 +157,9 @@ _USER_PROMPT_FIX = """\
 # CONTEXT #
 Current phase: Feature Engineering
 
+# DATASET DESCRIPTION (authoritative) #
+{dataset_description_block}
+
 # PREVIOUS PHASE SUMMARY #
 {previous_summary}
 
@@ -167,8 +187,20 @@ Provide the complete corrected code in a single ```python ... ``` code block.
 """
 
 
+def _dataset_description_block(desc: str) -> str:
+    """Render the DATASET DESCRIPTION block for prompts (fallback to neutral note)."""
+    text = (desc or "").strip()
+    if text:
+        return text
+    return "(not provided; infer cautiously from column names and sample rows)"
+
+
 def _generate_fe_code(
-    plan: dict, data_path: str, previous_summary: str, feedback: str
+    plan: dict,
+    data_path: str,
+    previous_summary: str,
+    feedback: str,
+    dataset_description: str = "",
 ) -> str:
     """
     调用 LLM 生成特征工程代码。
@@ -184,6 +216,7 @@ def _generate_fe_code(
         data_path=data_path,
         previous_summary=previous_summary if previous_summary else "无上一阶段摘要",
         feedback_section=feedback_section,
+        dataset_description_block=_dataset_description_block(dataset_description),
     )
 
     reply = call_llm(_SYSTEM_PROMPT_GENERATE, user_prompt, agent_name="feature_engineering")
@@ -203,6 +236,7 @@ def _fix_code(
     error: str,
     plan: dict,
     previous_summary: str,
+    dataset_description: str = "",
 ) -> str:
     """
     调用 LLM 根据报错修复代码。
@@ -214,6 +248,7 @@ def _fix_code(
         error=error,
         plan=json.dumps(plan, ensure_ascii=False, indent=2),
         previous_summary=previous_summary if previous_summary else "无上一阶段摘要",
+        dataset_description_block=_dataset_description_block(dataset_description),
     )
     reply = call_llm(_SYSTEM_PROMPT_FIX, user_prompt, agent_name="feature_engineering")
 

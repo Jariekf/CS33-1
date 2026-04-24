@@ -54,8 +54,14 @@ def manager_node(state: GraphState) -> dict:
     user_goal = state["user_goal"]
     data_path = state["data_path"]
     cleaning_hints = (state["manager_cleaning_hints"] or "").strip()
+    dataset_description = (state.get("dataset_description") or "").strip()
 
-    logger.info(f"Starting manager_node with user_goal: '{user_goal}' and data_path: '{data_path}'")
+    logger.info(
+        "Starting manager_node with user_goal: '%s', data_path: '%s', dataset_description: %s",
+        user_goal,
+        data_path,
+        f"{len(dataset_description)} chars" if dataset_description else "none",
+    )
 
     # ------------------------------------------------------------------
     # Step 1a - Data profile (non-LLM).
@@ -73,6 +79,7 @@ def manager_node(state: GraphState) -> dict:
         user_goal,
         df_preview,
         cleaning_hints,
+        dataset_description,
     )
     logger.info("User requirement summary and retrieval slots ready.")
 
@@ -90,6 +97,7 @@ def manager_node(state: GraphState) -> dict:
         df_preview,
         rap_context,
         user_requirement_summary=req_summary,
+        dataset_description=dataset_description,
     )
     global_plan["_manager_summary_eval"] = summary_eval_meta
     global_plan["_manager_fusion_eval"] = fusion_eval_meta
@@ -147,12 +155,14 @@ def _generate_global_plan(
     rap_context: str,
     *,
     user_requirement_summary: str = "",
+    dataset_description: str = "",
 ) -> dict:
     plan, _ = _generate_global_plan_with_meta(
         user_goal,
         df_preview,
         rap_context,
         user_requirement_summary=user_requirement_summary,
+        dataset_description=dataset_description,
     )
     return plan
 
@@ -163,6 +173,7 @@ def _build_global_plan_prompts(
     rap_context: str,
     *,
     user_requirement_summary: str = "",
+    dataset_description: str = "",
 ) -> tuple[str, str, str, str]:
     """Build prompts for structured execution plan generation (JSON).
 
@@ -189,12 +200,21 @@ def _build_global_plan_prompts(
     """
     summary_block = user_requirement_summary.strip() or user_goal
     docs_context = rap_context.strip() if rap_context.strip() else "No retrieval results"
+    desc_text = dataset_description.strip() if dataset_description else ""
+    dataset_description_block = (
+        desc_text
+        if desc_text
+        else "(not provided; infer cautiously from column names and sample rows)"
+    )
 
     sys_prompt = """You are a Data Science Engineering Director generating an execution plan."""
     user_prompt = f"""
 User Goal: {user_goal}
 User requirement summary (for alignment):
 {summary_block}
+
+Dataset Description (authoritative; use this over guesses from column names):
+{dataset_description_block}
 
 Data Preview:
 {df_preview}
@@ -240,12 +260,14 @@ def _generate_global_plan_with_meta(
     rap_context: str,
     *,
     user_requirement_summary: str = "",
+    dataset_description: str = "",
 ) -> tuple[dict, dict]:
     sys_prompt, user_prompt, summary_block, docs_context = _build_global_plan_prompts(
         user_goal,
         df_preview,
         rap_context,
         user_requirement_summary=user_requirement_summary,
+        dataset_description=dataset_description,
     )
     reply = call_llm(sys_prompt, user_prompt, agent_name="manager_plan")
     parsed_obj: dict | None = None

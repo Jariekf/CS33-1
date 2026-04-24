@@ -14,6 +14,7 @@ from core.state import GraphState
 from core.llm import call_llm, extract_code
 from tools.python_repl import execute_code
 from config import MAX_INNER_RETRY
+from agents.feature_engineering import FE_OUTPUT_PATH
 
 logger = get_agent_logger("model_selection")
 
@@ -30,6 +31,9 @@ You must implement model building, hyperparameter tuning, and cross-validation."
 _USER_PROMPT_GENERATE = """\
 # CONTEXT #
 Current phase: Model Selection
+
+# DATASET DESCRIPTION (authoritative) #
+{dataset_description_block}
 
 # PLAN #
 {plan}
@@ -56,6 +60,9 @@ Output the complete corrected code."""
 _USER_PROMPT_FIX = """\
 # CONTEXT #
 Current phase: Model Selection
+
+# DATASET DESCRIPTION (authoritative) #
+{dataset_description_block}
 
 # PLAN #
 {plan}
@@ -85,13 +92,17 @@ def model_selection_node(state: GraphState) -> dict:
     logger.info("Model Selection node started.")
     # 【边界控制】只抽取属于自己的子计划
     plan = state["global_plan"].get("model_selection_plan", {})
-    data_path = state["current_data_path"]
+    # Always read from FE's fixed output. Not ``state["current_data_path"]``,
+    # so we stay consistent with the upstream workers and keep the retry
+    # semantics clean.
+    data_path = FE_OUTPUT_PATH
     feedback = state.get("current_error", "")
+    dataset_description = (state.get("dataset_description") or "").strip()
 
     # ------------------------------------------------------------------
     # Step 1: 生成模型训练 + 调参 + 评估代码
     # ------------------------------------------------------------------
-    code = _generate_model_code(plan, data_path, feedback)
+    code = _generate_model_code(plan, data_path, feedback, dataset_description)
     logger.info("Model selection code generation completed.")
 
     # ------------------------------------------------------------------
@@ -104,7 +115,7 @@ def model_selection_node(state: GraphState) -> dict:
             logger.info("Model selection code executed successfully.")
             break
         logger.info("内部自救第 %d 次: %s", attempt + 1, stderr[:200])
-        code = _fix_code(code, stderr, plan)
+        code = _fix_code(code, stderr, plan, dataset_description)
 
     # ------------------------------------------------------------------
     # Step 3: 返回状态
@@ -130,7 +141,17 @@ def model_selection_node(state: GraphState) -> dict:
 # 私有辅助函数
 # ======================================================================
 
-def _generate_model_code(plan: dict, data_path: str, feedback: str) -> str:
+def _dataset_description_block(desc: str) -> str:
+    """Render the DATASET DESCRIPTION block for prompts (fallback to neutral note)."""
+    text = (desc or "").strip()
+    if text:
+        return text
+    return "(not provided; infer cautiously from column names and sample rows)"
+
+
+def _generate_model_code(
+    plan: dict, data_path: str, feedback: str, dataset_description: str = ""
+) -> str:
     """
     调用 LLM 生成模型训练与调参代码。
     若调用失败，则返回桩实现代码。
@@ -143,6 +164,7 @@ def _generate_model_code(plan: dict, data_path: str, feedback: str) -> str:
         plan=json.dumps(plan, ensure_ascii=False, indent=2),
         data_path=data_path,
         feedback_section=feedback_section,
+        dataset_description_block=_dataset_description_block(dataset_description),
     )
 
     reply = call_llm(_SYSTEM_PROMPT_GENERATE, user_prompt, agent_name="model_selection")
@@ -155,12 +177,13 @@ def _generate_model_code(plan: dict, data_path: str, feedback: str) -> str:
     return _fallback_model_code(plan, data_path)
 
 
-def _fix_code(code: str, error: str, plan: dict) -> str:
+def _fix_code(code: str, error: str, plan: dict, dataset_description: str = "") -> str:
     """调用 LLM 修复代码。若失败则原样返回。"""
     user_prompt = _USER_PROMPT_FIX.format(
         code=code,
         error=error,
         plan=json.dumps(plan, ensure_ascii=False, indent=2),
+        dataset_description_block=_dataset_description_block(dataset_description),
     )
     reply = call_llm(_SYSTEM_PROMPT_FIX, user_prompt, agent_name="model_selection")
     if reply:

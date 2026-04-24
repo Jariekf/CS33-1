@@ -26,6 +26,7 @@ def business_translator_node(state: GraphState) -> dict:
 
     user_goal = state["user_goal"]
     memory = state.get("memory", [])
+    dataset_description = (state.get("dataset_description") or "").strip()
     logger.info("Business Translator node started.")
 
     # ------------------------------------------------------------------
@@ -55,7 +56,12 @@ def business_translator_node(state: GraphState) -> dict:
     # Step 4: 调用 LLM 生成商业分析报告 (TODO: 接入LLM)
     # ------------------------------------------------------------------
     report = _generate_business_report(
-        user_goal, model_summary, feature_importance, top_features, retrieved_docs
+        user_goal,
+        model_summary,
+        feature_importance,
+        top_features,
+        retrieved_docs,
+        dataset_description=dataset_description,
     )
     logger.info("Business report generation complete.")
 
@@ -114,6 +120,8 @@ def _generate_business_report(
     feature_importance: dict,
     top_features: list[str],
     retrieved_docs: list[dict],
+    *,
+    dataset_description: str = "",
 ) -> str:
     """调用 LLM 生成最终商业报告。"""
     docs_text = "\n".join(
@@ -124,12 +132,23 @@ def _generate_business_report(
         [f"  - {k}: {v:.4f}" for k, v in list(feature_importance.items())[:5]]
     ) if feature_importance else "  暂无特征权重数据"
 
+    desc_text = dataset_description.strip() if dataset_description else ""
+    dataset_description_block = (
+        desc_text
+        if desc_text
+        else "(not provided; base the report on the user goal and model outputs only.)"
+    )
+
     sys_prompt = "You are an elite Data Strategy Consultant and Business Analyst. Your role is to interpret machine learning results and synthesize them into a highly professional, expert-level business insight report. CRITICAL INSTRUCTION: Be concise, strictly avoid repeating any sentences, phrases, or ideas. DO NOT fall into an infinite generation loop."
-    
+
     user_prompt = f"""
-Please generate a structured Business Strategy & Insight Report in Markdown format (always output in Chinese). 
+Please generate a structured Business Strategy & Insight Report in Markdown format (always output in Chinese).
 
 User Goal: {user_goal}
+
+Dataset Description (authoritative; use this to interpret features and business context):
+{dataset_description_block}
+
 Model Validation Summary:
 {model_summary}
 

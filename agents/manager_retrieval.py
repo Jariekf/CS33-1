@@ -67,14 +67,21 @@ def summarize_and_extract_slots(
     user_goal: str,
     df_preview: str,
     cleaning_hints: str,
+    dataset_description: str = "",
 ) -> tuple[str, dict[str, str]]:
     """
-    Generate user_requirement_sum and extract downstream_task, application_domain, and area.
+    Generate user_requirement_summary and extract downstream_task, application_domain, and area.
+
+    cleaning_hints: data_cleaning rules/contract text supplied by the team or user;
+        woven into the summary so retrieval and planning stay aligned.
+    dataset_description: authoritative dataset documentation (README / data dictionary);
+        treated as ground truth over guesses inferred from column names alone.
     """
     summary, slots, _ = summarize_and_extract_slots_with_meta(
         user_goal=user_goal,
         df_preview=df_preview,
         cleaning_hints=cleaning_hints,
+        dataset_description=dataset_description,
     )
     return summary, slots
 
@@ -83,6 +90,7 @@ def summarize_and_extract_slots_with_meta(
     user_goal: str,
     df_preview: str,
     cleaning_hints: str,
+    dataset_description: str = "",
 ) -> tuple[str, dict[str, str], dict]:
     """Generate summary/slots with lightweight health + faithfulness metrics."""
     hints_block = ""
@@ -91,6 +99,12 @@ def summarize_and_extract_slots_with_meta(
 Additional cleaning / contract hints from the team (must be reflected in the summary and kept consistent for retrieval):
 {cleaning_hints.strip()}
 """
+    desc_block = ""
+    if dataset_description and dataset_description.strip():
+        desc_block = f"""
+Authoritative dataset documentation (treat as ground truth; prefer this over guesses inferred from column names):
+{dataset_description.strip()}
+"""
     sys_prompt = "You are a senior data science project manager. Output only valid JSON, no markdown."
     user_prompt = f"""
 User goal:
@@ -98,7 +112,7 @@ User goal:
 
 Data preview:
 {df_preview}
-{hints_block}
+{desc_block}{hints_block}
 
 Return a single JSON object with exactly these string fields:
 - "user_requirement_summary": one concise paragraph (English or Chinese matching the user goal) describing the ML task, data, and objectives; if cleaning hints were given, weave them in as constraints.
@@ -378,6 +392,7 @@ def build_rap_context(
     df_preview: str,
     *,
     cleaning_hints: str = "",
+    dataset_description: str = "",
 ) -> tuple[str, str]:
     """
     Convenience wrapper that runs Step 1b (summary + slots) and Step 2 (retrieval + fusion).
@@ -386,7 +401,9 @@ def build_rap_context(
         user_requirement_summary: reusable by logs, later nodes, or another retrieval pass.
         rap_context: fused RAP text that can be injected directly into _generate_global_plan.
     """
-    summary, slots = summarize_and_extract_slots(user_goal, df_preview, cleaning_hints)
+    summary, slots = summarize_and_extract_slots(
+        user_goal, df_preview, cleaning_hints, dataset_description=dataset_description
+    )
     rap_context = retrieve_and_fuse_rap_context(summary, slots, user_goal)
     return summary, rap_context
 
