@@ -46,7 +46,13 @@ For detailed multi-provider model setup (API keys, model version, temperature, a
 
 ## 4. Run the pipeline
 
-Example:
+The CLI takes two required positional arguments (the dataset CSV and the natural-language business goal) and two optional flags:
+
+```bash
+python main.py <data_path> "<user_goal>" [--desc PATH] [--hints TEXT]
+```
+
+Minimal run (no dataset description, legacy behaviour):
 
 ```bash
 python main.py ./data/Financials.csv "Predict business-relevant outcomes and generate actionable recommendations"
@@ -57,6 +63,56 @@ You can also test with the small sample file:
 ```bash
 python main.py ./data/test_data.csv "Predict customer churn and provide business insights"
 ```
+
+### 4.1 `--desc` — attach an authoritative dataset description (recommended)
+
+By default the pipeline only sees the CSV header, the first few rows, and your one-line `user_goal`. Every downstream LLM has to guess what each column means, which makes successive runs on the same dataset drift (different task framings → different plans → different code).
+
+To fix this, provide a description file via `--desc` (alias `-d`). The content is loaded once and injected into every agent's prompt as the authoritative source of truth, so all stages share the same semantic anchor.
+
+```bash
+# Single file: README / data dictionary / accompanying text
+python main.py ./data/bank.csv "Predict term deposit subscription" --desc ./data/bank-names.txt
+
+# Entire documentation folder (all readable files are concatenated,
+# each segment prefixed with "===== FILE: <name> =====")
+python main.py ./data/bank.csv "Predict term deposit subscription" --desc ./data/docs/
+```
+
+Supported formats (detected by extension; unknown extensions fall back to best-effort UTF-8 text read):
+
+| Type | Extensions | Requirements |
+| --- | --- | --- |
+| Plain text / structured text | `.md` `.txt` `.rst` `.json` `.yaml` `.yml` `.toml` `.ini` `.cfg` `.html` `.xml` `.log` | none |
+| Tabular (data dictionary) | `.csv` `.tsv` | bundled `pandas` + `tabulate` |
+| Excel | `.xlsx` `.xlsm` | `openpyxl` (in `requirements.txt`) |
+| PDF | `.pdf` | optional `pip install pypdf` — otherwise the file is skipped with a placeholder note |
+| Word | `.docx` | optional `pip install python-docx` — otherwise placeholder note |
+
+Behaviour notes:
+
+- Empty / missing `--desc` argument: the pipeline runs as before; every prompt uses a neutral fallback line.
+- Path does not exist: the CLI exits with a clear error before any LLM call.
+- A file whose contents cannot be extracted (missing optional dependency, unreadable encoding, etc.) is represented by a short `[filename] (...)` placeholder rather than aborting the run.
+
+### 4.2 `--hints` — narrow cleaning hints (optional)
+
+`--hints` passes a short free-form string that is read **only** by the Manager's requirement-summary step. Use it for targeted cleaning constraints you want to survive into the plan (e.g. `"mask phone numbers; do not drop rows with null balance"`). For anything broader than cleaning rules, prefer `--desc`.
+
+```bash
+python main.py ./data/bank.csv "Predict term deposit subscription" \
+  --desc ./data/bank-names.txt \
+  --hints "Do not drop rows where 'duration' is zero; keep 'pdays' as-is."
+```
+
+### 4.3 When to use which
+
+| You have... | Use |
+| --- | --- |
+| A README, data dictionary, Kaggle description, or paper | `--desc <path>` |
+| A folder with several such files | `--desc <folder>` |
+| A one-line cleaning constraint | `--hints "<text>"` |
+| Only a CSV and a goal | neither — legacy two-argument form still works |
 
 ## 5. Check generated outputs
 
