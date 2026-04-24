@@ -64,6 +64,23 @@ You can also test with the small sample file:
 python main.py ./data/test_data.csv "Predict customer churn and provide business insights"
 ```
 
+### Dataset setup for the `--desc` examples below
+
+The repo bundles `Financials.csv` and `test_data.csv` for a quick smoke test. For the richer `--desc` examples in sections 4.1–4.3 we use the **UCI Bank Marketing** dataset, which is **not committed to this repo** to keep the repository lightweight.
+
+Download it yourself before running those examples:
+
+1. Open [UCI Bank Marketing](https://archive.ics.uci.edu/dataset/222/bank+marketing).
+2. Click **Download** to get `bank.zip` (~565 KB).
+3. Extract the archive into the `data/` folder so the layout looks like:
+   ```
+   data/
+   ├── bank-full.csv      # 45,211 rows, 17 input columns (used in examples below)
+   └── bank-names.txt     # data dictionary (used as --desc input below)
+   ```
+
+If you skip this download, the `bank-full.csv` examples below will fail with "file not found"; you can substitute `./data/Financials.csv` or `./data/test_data.csv` to preview the CLI without the dataset.
+
 ### 4.1 `--desc` — attach an authoritative dataset description (recommended)
 
 By default the pipeline only sees the CSV header, the first few rows, and your one-line `user_goal`. Every downstream LLM has to guess what each column means, which makes successive runs on the same dataset drift (different task framings → different plans → different code).
@@ -72,11 +89,11 @@ To fix this, provide a description file via `--desc` (alias `-d`). The content i
 
 ```bash
 # Single file: README / data dictionary / accompanying text
-python main.py ./data/bank.csv "Predict term deposit subscription" --desc ./data/bank-names.txt
+python main.py ./data/bank-full.csv "Predict term deposit subscription" --desc ./data/bank-names.txt
 
 # Entire documentation folder (all readable files are concatenated,
 # each segment prefixed with "===== FILE: <name> =====")
-python main.py ./data/bank.csv "Predict term deposit subscription" --desc ./data/docs/
+python main.py ./data/bank-full.csv "Predict term deposit subscription" --desc ./data/docs/
 ```
 
 Supported formats (detected by extension; unknown extensions fall back to best-effort UTF-8 text read):
@@ -100,7 +117,7 @@ Behaviour notes:
 `--hints` passes a short free-form string that is read **only** by the Manager's requirement-summary step. Use it for targeted cleaning constraints you want to survive into the plan (e.g. `"mask phone numbers; do not drop rows with null balance"`). For anything broader than cleaning rules, prefer `--desc`.
 
 ```bash
-python main.py ./data/bank.csv "Predict term deposit subscription" \
+python main.py ./data/bank-full.csv "Predict term deposit subscription" \
   --desc ./data/bank-names.txt \
   --hints "Do not drop rows where 'duration' is zero; keep 'pdays' as-is."
 ```
