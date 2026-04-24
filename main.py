@@ -43,7 +43,12 @@ def _write_data_cleaning_plan_snapshot(
     )
 
 
-def run(data_path: str, user_goal: str, manager_cleaning_hints: str = "") -> str:
+def run(
+    data_path: str,
+    user_goal: str,
+    manager_cleaning_hints: str = "",
+    dataset_description: str = "",
+) -> str:
     """
     启动多智能体分析流水线。
 
@@ -51,6 +56,9 @@ def run(data_path: str, user_goal: str, manager_cleaning_hints: str = "") -> str
         data_path: 数据集文件路径
         user_goal: 用户的自然语言业务目标
         manager_cleaning_hints: 可选；清洗规则/contract 等文字，写入检索摘要并与规划对齐
+        dataset_description: 可选；数据集权威说明（README / 数据字典 / 论文等文本），
+            由 ``tools.description_loader.load_dataset_description`` 从文件/目录加载后传入。
+            所有 Agent prompt 都会注入此文本作为语义锚。
 
     Returns:
         最终的商业洞察分析报告文本
@@ -65,6 +73,7 @@ def run(data_path: str, user_goal: str, manager_cleaning_hints: str = "") -> str
         "data_path": data_path,
         "user_goal": user_goal,
         "manager_cleaning_hints": manager_cleaning_hints,
+        "dataset_description": dataset_description,
         "global_plan": {},
         "current_phase": "",
         "current_data_path": data_path,
@@ -101,15 +110,57 @@ def run(data_path: str, user_goal: str, manager_cleaning_hints: str = "") -> str
 
 
 if __name__ == "__main__":
+    import argparse
     import sys
 
-    if len(sys.argv) < 3:
-        print("Usage: python main.py <data_path> <user_goal>")
-        print('Example: python main.py ./data/train.csv "预测客户流失并给出挽留策略"')
+    from tools.description_loader import load_dataset_description
+
+    parser = argparse.ArgumentParser(
+        description="Run the multi-agent data-analysis pipeline.",
+    )
+    parser.add_argument(
+        "data_path",
+        help="Path to the input CSV dataset, e.g. ./data/train.csv",
+    )
+    parser.add_argument(
+        "user_goal",
+        help='Business goal in natural language, e.g. "预测客户流失并给出挽留策略"',
+    )
+    parser.add_argument(
+        "--desc",
+        "-d",
+        default="",
+        metavar="PATH",
+        help="Path to dataset description file OR directory "
+             "(README.md / data_dictionary.xlsx / docs/ / paper.pdf ...). "
+             "Content is injected into every agent as authoritative context.",
+    )
+    parser.add_argument(
+        "--hints",
+        default="",
+        help="Optional narrow cleaning hints text (prefer --desc for general context).",
+    )
+    args = parser.parse_args()
+
+    try:
+        dataset_description = load_dataset_description(args.desc)
+    except (FileNotFoundError, ValueError) as e:
+        print(f"[!] Failed to load --desc: {e}", file=sys.stderr)
         sys.exit(1)
 
-    report = run(sys.argv[1], sys.argv[2])
-    
+    if args.desc and not dataset_description:
+        sys_logger.warning(
+            "Dataset description path '%s' loaded empty content; proceeding without it.",
+            args.desc,
+        )
+
+    report = run(
+        args.data_path,
+        args.user_goal,
+        manager_cleaning_hints=args.hints,
+        dataset_description=dataset_description,
+    )
+
     # 【修复】先落盘保存，防止终端打印遇到 Unicode 报错导致没保存上
     import os
     os.makedirs("./workspace", exist_ok=True)
