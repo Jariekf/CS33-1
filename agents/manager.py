@@ -1,12 +1,12 @@
 """
 Manager Agent (coordination and planning agent)
 Responsibilities:
-  1. Parse the user goal and optional cleaning hints, then generate a
-     user_requirement_summary with an LLM.
+  1. Read the user goal plus optional hints / dataset description, then
+     generate a user_requirement_summary with an LLM.
   2. Build a RAP (Retrieval-Augmented Planning) context through lightweight
      multi-source retrieval and fusion.
-  3. Combine the summary, RAP context, and data preview into a structured
-     global execution plan.
+  3. Combine the summary, dataset description, RAP context, and data preview
+     into a structured global execution plan.
   4. Initialize the global state and start the workflow.
 
 Execution order inside manager_node:
@@ -47,8 +47,11 @@ _MANAGER_PLAN_ALLOWED_TOP_LEVEL_KEYS = {
 def manager_node(state: GraphState) -> dict:
     """
     LangGraph node function for the Manager Agent.
-    Input: initial state containing data_path and user_goal.
-    Output: updated global_plan, current_phase, current_data_path, and related fields.
+    Input: initial state with ``data_path``, ``user_goal``, and optional
+    Manager-side context such as ``manager_cleaning_hints`` /
+    ``dataset_description``.
+    Output: updated ``global_plan`` plus runtime fields for the first worker
+    phase.
     """
 
     user_goal = state["user_goal"]
@@ -72,8 +75,8 @@ def manager_node(state: GraphState) -> dict:
 
     # ------------------------------------------------------------------
     # Step 1b - Requirement summary and retrieval slots (LLM).
-    # manager_cleaning_hints is optional input context used only by this summary prompt.
-    # The output is a narrative summary plus slots; rules/cleaning_contract are generated in Step 3.
+    # This step consumes optional hints / dataset description and produces the
+    # narrative summary plus retrieval slots used downstream.
     # ------------------------------------------------------------------
     req_summary, slots, summary_eval_meta = summarize_and_extract_slots_with_meta(
         user_goal,
@@ -182,9 +185,9 @@ def _build_global_plan_prompts(
     - Now, `retrieve_and_fuse_rap_context` produces `rap_context` first, and this function consumes that string.
     - `plan["_rap_context"]` stores the RAP text injected into the planning prompt for audit and reproduction.
 
-    `user_requirement_sum` and `manager_cleaning_hints`:
-    - Hints are written into the Step 1b summary prompt only.
-    - Planning sees `user_goal`, the summary block, `df_preview`, and `rap_context`; each has a distinct role.
+    Planning sees `user_goal`, the summary block, optional
+    `dataset_description`, `df_preview`, and `rap_context`; each serves a
+    different role.
 
     `data_cleaning_plan.cleaning_contract` - Minimal general mode (keys are optional; default or `{}` indicates no validation):
 
