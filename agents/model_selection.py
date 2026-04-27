@@ -14,7 +14,7 @@ from core.state import GraphState
 from core.llm import call_llm, extract_code
 from tools.python_repl import execute_code
 from config import MAX_INNER_RETRY
-from agents.feature_engineering import FE_OUTPUT_PATH, _MODERN_SKLEARN_API_GUIDE
+from agents.feature_engineering import FE_OUTPUT_PATH, FE_TEST_OUTPUT_PATH, _MODERN_SKLEARN_API_GUIDE
 
 logger = get_agent_logger("model_selection")
 
@@ -41,12 +41,15 @@ Current phase: Model Selection
 {plan}
 
 # CONSTRAINTS #
-1. Load data from: `{data_path}` using `pd.read_csv`.
-2. Assuming the target variable is known or inferable, if not mentioned, assume the last column is the target `y` and other numeric/categorical columns are features `X`.
-3. Do model selection and cross-validation as instructed by the Plan.
-4. Export the top feature importances to a dict, sorted by value descending, and save it to `./workspace/feature_importance.json`.
-5. Use `print()` to output the Best Model name, Cross-Validation score, and Top Feature Importances.
-6. Import all necessary libraries at the top of the code.
+1. Load training data from: `{data_path}` (feature-engineered 80% train split) using `pd.read_csv`.
+2. A held-out test set is available at: `{test_data_path}`. Use it ONLY for final model evaluation after training/CV is complete — never use it during training or cross-validation.
+3. Assuming the target variable is known or inferable, if not mentioned, assume the last column is the target `y` and other numeric/categorical columns are features `X`. Apply the same target/feature split to the test set.
+   Before applying any label mapping or encoding to the target column, inspect its actual dtype and unique values (e.g. `print(df[target_col].dtype, df[target_col].unique())`). If the target is already numeric (int/float), use it directly — do NOT re-apply a string→int mapping, as that will produce all-NaN. Only convert string labels (e.g. 'yes'/'no', 'True'/'False') if the column genuinely contains non-numeric values.
+4. Do model selection and cross-validation as instructed by the Plan.
+5. Export the top feature importances to a dict, sorted by value descending, and save it to `./workspace/feature_importance.json`.
+6. Use `print()` to output the Best Model name, Cross-Validation score, Top Feature Importances, and final test-set evaluation metrics.
+7. Import all necessary libraries at the top of the code.
+8. NEVER hardcode column names. Always discover feature columns dynamically from the loaded DataFrame (e.g. `numeric_cols = df.select_dtypes(include='number').columns.tolist()`; `cat_cols = df.select_dtypes(include='object').columns.tolist()`). The upstream feature engineering step may rename, add, or one-hot-encode columns unpredictably — hardcoded column lists will cause `ValueError: A given column is not a column of the dataframe`.
 
 {feedback_section}
 
@@ -84,6 +87,8 @@ Current phase: Model Selection
 2. Save feature importance to `./workspace/feature_importance.json`.
 3. Keep model selection, hyperparameter tuning, and cross-validation aligned with the plan.
 4. If the previous attempt failed functionally, fix the implementation gap rather than only fixing syntax.
+5. Before applying any label mapping or encoding to the target column, inspect its actual dtype and unique values. If the target is already numeric (int/float), use it directly — do NOT re-apply a string→int mapping, as that produces all-NaN and causes single-class errors.
+6. NEVER hardcode column names. Discover feature columns dynamically from the DataFrame (e.g. `select_dtypes`). Hardcoded column lists break when upstream feature engineering changes columns.
 
 # RESPONSE: CORRECTED CODE #
 Provide the complete corrected code in a single ```python ... ``` code block.
@@ -106,7 +111,7 @@ def model_selection_node(state: GraphState) -> dict:
     # ------------------------------------------------------------------
     # Step 1: 生成模型训练 + 调参 + 评估代码
     # ------------------------------------------------------------------
-    code = _generate_model_code(plan, data_path, feedback, dataset_description)
+    code = _generate_model_code(plan, data_path, FE_TEST_OUTPUT_PATH, feedback, dataset_description)
     logger.info("Model selection code generation completed.")
 
     # ------------------------------------------------------------------
@@ -118,9 +123,9 @@ def model_selection_node(state: GraphState) -> dict:
         if not stderr:
             logger.info("Model selection code executed successfully.")
             break
-        # Use tail slice: the exception type + message (most diagnostic line)
-        # is always at the BOTTOM of a Python traceback, not the top.
-        logger.info("内部自救第 %d 次: %s", attempt + 1, stderr[-500:])
+        # Show head (traceback origin) + tail (exception type & message) for diagnosis.
+        _snippet = stderr if len(stderr) <= 2000 else f"{stderr[:1000]}\n...[truncated {len(stderr)} chars total]...\n{stderr[-1000:]}"
+        logger.info("内部自救第 %d 次: %s", attempt + 1, _snippet)
         # On the final iteration there is no next execute_code, so calling
         # _fix_code would burn an LLM request whose output is never run.
         if attempt == MAX_INNER_RETRY - 1:
@@ -184,7 +189,7 @@ def _compress_supervisor_feedback(feedback: str, max_chars: int = 1200) -> str:
 
 
 def _generate_model_code(
-    plan: dict, data_path: str, feedback: str, dataset_description: str = ""
+    plan: dict, data_path: str, test_data_path: str, feedback: str, dataset_description: str = ""
 ) -> str:
     """
     调用 LLM 生成模型训练与调参代码。
@@ -203,6 +208,7 @@ def _generate_model_code(
     user_prompt = _USER_PROMPT_GENERATE.format(
         plan=json.dumps(plan, ensure_ascii=False, indent=2),
         data_path=data_path,
+        test_data_path=test_data_path,
         feedback_section=feedback_section,
         dataset_description_block=_dataset_description_block(dataset_description),
     )

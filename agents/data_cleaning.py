@@ -38,6 +38,11 @@ logger = get_agent_logger("data_cleaning")
 # into itself. See agents/feature_engineering.py for the FE counterpart.
 CLEANED_OUTPUT_PATH = "./workspace/cleaned_data.csv"
 
+# Train/test split paths produced at the end of data_cleaning.
+# Feature Engineering reads TRAIN_DATA_PATH; both are exposed to Model Selection.
+TRAIN_DATA_PATH = "./workspace/train_data.csv"
+TEST_DATA_PATH = "./workspace/test_data.csv"
+
 
 def data_cleaning_node(state: GraphState) -> dict:
     """LangGraph node function for Data Cleaning."""
@@ -79,9 +84,9 @@ def data_cleaning_node(state: GraphState) -> dict:
                 break
             stderr = f"[PostValidationFailed] {validation_error}"
         # Self-heal: feed the error back to the LLM and regenerate code
-        # Use tail slice: the exception type + message (most diagnostic line)
-        # is always at the BOTTOM of a Python traceback, not the top.
-        logger.info("Inner self-heal attempt %d: %s", attempt + 1, stderr[-500:])
+        # Show head (traceback origin) + tail (exception type & message) for diagnosis.
+        _snippet = stderr if len(stderr) <= 2000 else f"{stderr[:1000]}\n...[truncated {len(stderr)} chars total]...\n{stderr[-1000:]}"
+        logger.info("Inner self-heal attempt %d: %s", attempt + 1, _snippet)
         # On the final iteration there is no next execute_code, so calling
         # _fix_code would burn an LLM request whose output is never run.
         if attempt == MAX_INNER_RETRY - 1:
@@ -101,9 +106,27 @@ def data_cleaning_node(state: GraphState) -> dict:
             "current_error": f"[InnerRetryExhausted] {stderr}",
         }
 
+    # ------------------------------------------------------------------
+    # Step 3b: Split cleaned data into train (80%) / test (20%)
+    # ------------------------------------------------------------------
+    split_error = _split_cleaned_data(output_path)
+    if split_error:
+        logger.error("Train/test split failed: %s", split_error)
+        return {
+            "current_phase": "data_cleaning",
+            "current_code": code,
+            "current_execution_log": stdout,
+            "current_error": f"[SplitFailed] {split_error}",
+        }
+    logger.info(
+        "Train/test split complete → %s (80%%) / %s (20%%)",
+        TRAIN_DATA_PATH,
+        TEST_DATA_PATH,
+    )
+
     # Note: we intentionally do NOT set ``current_data_path`` here.
     # The downstream feature_engineering node reads from a fixed
-    # ``CLEANED_OUTPUT_PATH``, so on a Supervisor-driven retry the FE worker
+    # ``TRAIN_DATA_PATH``, so on a Supervisor-driven retry the FE worker
     # will not accidentally read its own previous rejected output.
     return {
         "current_phase": "data_cleaning",
@@ -379,6 +402,17 @@ def _validate_cleaned_csv_quality(output_csv_path: str) -> str:
     if df.columns.empty:
         return "cleaned CSV has no columns"
 
+    # --- Hard safety net: catastrophic row loss ---
+    # Regardless of cleaning_contract, reject if the output has fewer than
+    # 50 rows — this almost always indicates the LLM-generated code
+    # accidentally filtered out the entire dataset.
+    if len(df) < 50:
+        return (
+            f"cleaned CSV has only {len(df)} rows, which is almost certainly a bug "
+            f"in the generated cleaning code (catastrophic row loss). "
+            f"The cleaning code should retain the vast majority of rows."
+        )
+
     # --- Check 1: case-insensitive duplicate *labels* ---
     # Same logical name written twice with different casing (Year vs year) maps to the same
     # "folded" key via casefold(), so we group originals under that key and flag groups
@@ -476,6 +510,30 @@ def _validate_cleaning_contract(
                 )
 
     return ""
+
+
+def _split_cleaned_data(cleaned_csv_path: str, test_size: float = 0.2, random_state: int = 42) -> str:
+    """
+    Split the cleaned CSV into train (80%) and test (20%) sets.
+    Writes TRAIN_DATA_PATH and TEST_DATA_PATH.
+    Returns an empty string on success, or an error message on failure.
+    """
+    try:
+        import pandas as pd
+        from sklearn.model_selection import train_test_split
+
+        df = pd.read_csv(cleaned_csv_path)
+        train_df, test_df = train_test_split(df, test_size=test_size, random_state=random_state)
+        train_df.to_csv(TRAIN_DATA_PATH, index=False)
+        test_df.to_csv(TEST_DATA_PATH, index=False)
+        logger.info(
+            "Split: %d train rows → %s, %d test rows → %s",
+            len(train_df), TRAIN_DATA_PATH,
+            len(test_df), TEST_DATA_PATH,
+        )
+        return ""
+    except Exception as exc:
+        return str(exc)
 
 
 def _fallback_cleaning_code(plan: dict, data_path: str) -> str:
