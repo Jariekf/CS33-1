@@ -54,7 +54,7 @@ The current pipeline is organised as the following sequence:
 3. `Supervisor Agent`
    Reviews code and execution logs through a structured JSON report, and either passes the stage or requests a retry.
 4. `Feature Engineering Agent`
-   Generates and executes feature engineering code based on the manager plan and prior stage summary, reading the cleaned artifact from a fixed upstream path.
+   Generates and executes feature engineering code based on the manager plan and prior stage summary, reading the cleaned train split from a fixed upstream path and applying aligned transformations to both train and test artifacts.
 5. `Supervisor Agent`
    Performs another review checkpoint.
 6. `Model Agent`
@@ -62,7 +62,7 @@ The current pipeline is organised as the following sequence:
 7. `Supervisor Agent`
    Validates the modelling stage.
 8. `Business Action Translator Agent`
-   Combines model outputs, feature importance, and arXiv retrieval results to produce a business insight report.
+   Combines the model-stage summary, feature importance, dataset context, and arXiv retrieval results to produce a business insight report.
 
 ### Core Design Highlights
 
