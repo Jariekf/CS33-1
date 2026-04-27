@@ -91,11 +91,11 @@ AGENT_PROFILE_MAP: dict[str, str] = {
     "manager_summary": "deepseek",
     "manager_fusion": "deepseek",
     "manager_plan": "deepseek",
-    "data_cleaning": "qwen",
+    "data_cleaning": "deepseek",
     "feature_engineering": "deepseek",
-    "model_selection": "openai",
-    "business_translator": "gemini",
-    "supervisor": "openai",
+    "model_selection": "deepseek",
+    "business_translator": "deepseek",
+    "supervisor": "deepseek",
 }
 
 # AGENT_PROFILE_MAP = {
