@@ -22,7 +22,7 @@ from core.state import GraphState
 from core.llm import call_llm, extract_code
 from tools.python_repl import execute_code
 from config import MAX_INNER_RETRY
-from agents.data_cleaning import CLEANED_OUTPUT_PATH
+from agents.data_cleaning import TRAIN_DATA_PATH
 
 logger = get_agent_logger("feature_engineering")
 
@@ -31,6 +31,7 @@ logger = get_agent_logger("feature_engineering")
 # (rather than ``state["current_data_path"]``) prevents Supervisor retries
 # from re-feeding FE's own rejected output back into itself.
 FE_OUTPUT_PATH = "./workspace/fe_output.csv"
+FE_TEST_OUTPUT_PATH = "./workspace/fe_test_output.csv"
 
 
 def feature_engineering_node(state: GraphState) -> dict:
@@ -39,10 +40,10 @@ def feature_engineering_node(state: GraphState) -> dict:
     logger.info("Feature Engineering node started.")
     # 【边界控制】只抽取属于自己的子计划
     plan = state["global_plan"].get("feature_engineering_plan", {})
-    # Always read from the upstream phase's fixed output, NOT from
+    # Always read from the train split produced by data_cleaning, NOT from
     # ``state["current_data_path"]`` — on a Supervisor retry the latter may
     # point at FE's own previous rejected output.
-    data_path = CLEANED_OUTPUT_PATH
+    data_path = TRAIN_DATA_PATH
     feedback = state.get("current_error", "")
     dataset_description = (state.get("dataset_description") or "").strip()
     # 只读取最近的 Memory 摘要 (上一阶段清洗成果)
@@ -51,7 +52,8 @@ def feature_engineering_node(state: GraphState) -> dict:
     # ------------------------------------------------------------------
     # Step 1: 生成特征工程代码
     # ------------------------------------------------------------------
-    code = _generate_fe_code(plan, data_path, previous_summary, feedback, dataset_description)
+    from agents.data_cleaning import TEST_DATA_PATH
+    code = _generate_fe_code(plan, data_path, TEST_DATA_PATH, previous_summary, feedback, dataset_description)
     logger.info("Feature engineering code generation completed.")
 
     # ------------------------------------------------------------------
@@ -63,9 +65,9 @@ def feature_engineering_node(state: GraphState) -> dict:
         if not stderr:
             logger.info("Feature engineering code executed successfully.")
             break
-        # Use tail slice: the exception type + message (most diagnostic line)
-        # is always at the BOTTOM of a Python traceback, not the top.
-        logger.info("内部自救第 %d 次: %s", attempt + 1, stderr[-500:])
+        # Show head (traceback origin) + tail (exception type & message) for diagnosis.
+        _snippet = stderr if len(stderr) <= 2000 else f"{stderr[:1000]}\n...[truncated {len(stderr)} chars total]...\n{stderr[-1000:]}"
+        logger.info("内部自救第 %d 次: %s", attempt + 1, _snippet)
         # On the final iteration there is no next execute_code, so calling
         # _fix_code would burn an LLM request whose output is never run.
         if attempt == MAX_INNER_RETRY - 1:
@@ -145,8 +147,10 @@ Current phase: Feature Engineering
 {plan}
 
 # CONSTRAINTS #
-1. Load data from: `{data_path}` using `pd.read_csv`.
-2. Save feature-engineered data to: `./workspace/fe_output.csv` using `df.to_csv(..., index=False)`.
+1. Load training data from: `{data_path}` (80% train split) using `pd.read_csv`.
+   Also load the held-out test set from: `{test_data_path}` (20% test split).
+2. Save feature-engineered training data to: `./workspace/fe_output.csv` and feature-engineered test data to: `./workspace/fe_test_output.csv` using `df.to_csv(..., index=False)`.
+   Both files MUST have exactly the same columns. Fit all encoders/scalers on the training set only, then transform both train and test sets with the fitted objects.
 3. Always work on a copy of the DataFrame, not the original.
 4. Apply consistent modifications (e.g., scaling, encoding) to ensure reproducibility.
 5. Use `print()` to output a summary (feature count before/after, new features created, etc.).
@@ -203,7 +207,7 @@ Current phase: Feature Engineering
 
 # TASK REQUIREMENTS #
 1. Continue following the original Feature Engineering plan and constraints.
-2. Save the feature-engineered output to `./workspace/fe_output.csv`.
+2. Save the feature-engineered output to `./workspace/fe_output.csv` (train) and `./workspace/fe_test_output.csv` (test). Both must have the same columns. Fit encoders/scalers on train only, then transform both.
 3. Preserve meaningful, human-interpretable column names.
 4. If the previous attempt was rejected, fix the implementation gap rather than only fixing syntax.
 5. Do not use or reference columns that are not present in the loaded dataframe.
@@ -244,6 +248,7 @@ def _compress_supervisor_feedback(feedback: str, max_chars: int = 1200) -> str:
 def _generate_fe_code(
     plan: dict,
     data_path: str,
+    test_data_path: str,
     previous_summary: str,
     feedback: str,
     dataset_description: str = "",
@@ -266,6 +271,7 @@ def _generate_fe_code(
     user_prompt = _USER_PROMPT_GENERATE.format(
         plan=json.dumps(plan, ensure_ascii=False, indent=2),
         data_path=data_path,
+        test_data_path=test_data_path,
         previous_summary=previous_summary if previous_summary else "无上一阶段摘要",
         feedback_section=feedback_section,
         dataset_description_block=_dataset_description_block(dataset_description),
