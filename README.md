@@ -39,6 +39,7 @@ The system is designed to:
 - decompose data science work into specialised agent roles
 - support staged execution across cleaning, feature engineering, modelling, and reporting
 - convert model outputs into business-facing recommendations
+- keep multi-stage runs semantically aligned through shared dataset context when available
 
 ## System Architecture
 
@@ -47,13 +48,13 @@ The system is designed to:
 The current pipeline is organised as the following sequence:
 
 1. `Manager Agent`
-   Serves as the main user-facing entry point: interprets the user goal, previews the dataset, retrieves related papers from arXiv, produces a structured global plan, initializes shared workflow state, and integrates the final report for delivery.
+   Serves as the main planning entry point: interprets the user goal, optional cleaning hints, and optional authoritative dataset description, previews the dataset, generates a requirement summary and retrieval slots, optionally builds RAP context from external sources, produces a structured global plan, and initializes shared workflow state.
 2. `Data Cleaning Agent`
-   Generates and executes cleaning code for the input dataset.
+   Generates and executes cleaning code for the raw input dataset, then writes the cleaned artifact to a fixed workspace path for downstream reuse.
 3. `Supervisor Agent`
-   Reviews code and execution logs, and either passes the stage or requests a retry.
+   Reviews code and execution logs through a structured JSON report, and either passes the stage or requests a retry.
 4. `Feature Engineering Agent`
-   Generates and executes feature engineering code based on the manager plan and prior stage summary.
+   Generates and executes feature engineering code based on the manager plan and prior stage summary, reading the cleaned train split from a fixed upstream path and applying aligned transformations to both train and test artifacts.
 5. `Supervisor Agent`
    Performs another review checkpoint.
 6. `Model Agent`
@@ -61,20 +62,24 @@ The current pipeline is organised as the following sequence:
 7. `Supervisor Agent`
    Validates the modelling stage.
 8. `Business Action Translator Agent`
-   Combines model outputs, feature importance, and arXiv retrieval results to produce a business insight report.
+   Combines the model-stage summary, feature importance, dataset context, and arXiv retrieval results to produce a business insight report.
 
 ### Core Design Highlights
 
 - **State-driven orchestration**
   The workflow is managed through LangGraph and a shared `GraphState`.
+- **Shared dataset semantics**
+  Optional dataset description files or folders can be injected once and reused across Manager and worker prompts as authoritative context.
 - **Specialised agents**
   Each stage is handled by a separate module under `agents/`.
+- **Fixed-path worker handoff**
+  Downstream workers read upstream artifacts from fixed workspace paths rather than mutating a shared data pointer, which keeps Supervisor retries cleaner.
 - **Supervisor quality gate**
-  The supervisor reviews intermediate outputs before the next stage proceeds.
+  The supervisor reviews intermediate outputs before the next stage proceeds, with structured parsing, repair re-asks, and a clearly marked degraded-pass fallback.
 - **RAP/RAG support**
-  arXiv retrieval is used both in planning and in business interpretation.
+  Manager-side RAP supports arXiv abstracts plus optional web search, PapersWithCode metadata, and Kaggle kernel metadata. The Business Action Translator uses arXiv-style retrieval to support business interpretation.
 - **Workspace-based artifact generation**
-  Intermediate outputs and reports are stored under `workspace/`.
+  Intermediate outputs and reports are stored under `workspace/`; transient per-run artifacts are purged at startup to reduce stale-output reuse.
 
 ## Repository Structure
 
@@ -130,24 +135,41 @@ CS33-1/
 The current repository exposes the following prototype capabilities:
 
 - dataset preview and initial goal-aware planning
+- optional `--desc/-d` dataset-description loading (file or directory) plus optional `--hints` input for narrower cleaning constraints
+- shared dataset-description injection across Manager and worker prompts for more semantically stable runs on the same dataset
 - LLM- and arXiv-integrated workflow stages, with stub/fallback paths for local development and failure recovery
 - LLM-assisted cleaning code generation
 - LLM-assisted feature engineering code generation
 - LLM-assisted model selection and feature-importance export
-- supervisor review and retry routing
+- fixed-path artifact handoff across cleaning -> feature engineering -> model selection, improving retry semantics
+- supervisor review and retry routing, with structured JSON parsing hardening and degraded-pass placeholders on parse failure
 - business report generation in markdown
+- manager-side prompt and midlayer evaluation reports with health metrics, faithfulness warnings, failure attribution labels, and artifact status checks
+- structured workflow outputs that support traceability, including run logs, stage review records, manager evaluation artifacts, and workspace-level execution artifacts
+- an initial business-report generation chain that connects Manager outputs, model-stage artifacts, feature importance, and BAT-oriented reporting
+- early baseline-planning work, including identification of candidate comparison workflows and evaluation dimensions for later benchmarking
 - local artifact persistence in `workspace/`
 
 
 ## What's Next
 
-- add stronger observability with structured per-stage logs for plan, generated code, execution output, review result, retry count, and artifact paths
-- make the supervisor gate stricter and more inspectable, especially around fail-close review behaviour and explicit pass/fail criteria
-- refine worker-agent prompts and execution constraints so stage outputs more reliably match the intended plan rather than only producing runnable code
+- consolidate and strengthen existing observability/reporting across run logs, stage reports, manager evaluation artifacts, retry counts, and artifact paths
+- refine the Feature Engineering Agent and improve output consistency across datasets and input schemas
+- establish the postponed traditional baseline workflow and continue defining benchmark metrics for comparison against the multi-agent system
+- improve the Model Agent and Supervisor Agent with stronger checks for valid model outputs, generated evaluation metrics, and retry/revision decisions
+- refine the Business Action Translator so it more consistently translates model outputs, feature importance, and evaluation results into business-oriented recommendations
+- conduct incremental integration testing, result validation, and benchmark evaluation against baseline workflows before final documentation and demo preparation
 
 ## Quick Start
 
-For setup and first run, see [Quick Start](docs/quick-start.md).
+For setup and first run, see [Quick Start](docs/quick-start.md). The current CLI supports:
+
+```bash
+python main.py <data_path> "<user_goal>" [--desc PATH] [--hints TEXT]
+```
+
+Use `--desc` for authoritative dataset context such as a README, data dictionary, or docs folder; use `--hints` for short cleaning-specific constraints.
+
 For model setup and agent-to-LLM mapping, see [LLM Model Configuration Guide](docs/llm-model-config-guide.md).
 
 ## Testing

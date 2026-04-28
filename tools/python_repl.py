@@ -10,7 +10,7 @@ import tempfile
 import os
 
 
-def execute_code(code: str, timeout: int = 120) -> tuple[str, str]:
+def execute_code(code: str, timeout: int = 300) -> tuple[str, str]:
     """
     将代码写入临时文件并在子进程中执行。
 
@@ -28,8 +28,20 @@ def execute_code(code: str, timeout: int = 120) -> tuple[str, str]:
         with os.fdopen(tmp_fd, "w", encoding="utf-8") as f:
             f.write(code)
 
+        # Agent 常生成 pd.to_datetime 等；pandas 会把 UserWarning/FutureWarning 打到 stderr，
+        # 若原样返回会导致 data_cleaning 等节点把「仅警告」误判为执行失败。子进程里忽略常见
+        # 警告类；真正的 Traceback/Exception 仍会出现在 stderr。
         result = subprocess.run(
-            [sys.executable, tmp_path],
+            [
+                sys.executable,
+                "-W",
+                "ignore::UserWarning",
+                "-W",
+                "ignore::FutureWarning",
+                "-W",
+                "ignore::DeprecationWarning",
+                tmp_path,
+            ],
             capture_output=True,
             text=True,
             timeout=timeout,
@@ -57,7 +69,7 @@ def execute_code(code: str, timeout: int = 120) -> tuple[str, str]:
         return stdout, ""
 
     except subprocess.TimeoutExpired:
-        return "", f"[TimeoutError] 代码执行超过 {timeout} 秒限制"
+        return "", f"[TimeoutError] Code execution exceeded the {timeout}-second limit."
     except Exception as e:
         return "", f"[ExecutionError] {str(e)}"
     finally:

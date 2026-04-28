@@ -1,17 +1,20 @@
 """
-Manager Agent (统筹与规划智能体)
-职责：
-  1. 解析用户目标（与可选 cleaning hints），生成 user_requirement_summary（LLM）
-  2. 通过 RAP (Retrieval-Augmented Planning) 多源轻量检索并融合为 rap_context
-  3. 结合摘要、RAP与数据概览，生成结构化的全局执行计划global_plan
-  4. 初始化全局State并启动流水线
+Manager Agent (coordination and planning agent)
+Responsibilities:
+  1. Read the user goal plus optional hints / dataset description, then
+     generate a user_requirement_summary with an LLM.
+  2. Build a RAP (Retrieval-Augmented Planning) context through lightweight
+     multi-source retrieval and fusion.
+  3. Combine the summary, dataset description, RAP context, and data preview
+     into a structured global execution plan.
+  4. Initialize the global state and start the workflow.
 
-注（manager_node内执行顺序）：
-  Step 1a — 数据轮廓：读CSV元信息（列、dtype、样例行），无 LLM。
-  Step 1b — 需求理解：LLM产出user_requirement_summary + 检索槽位（manager_retrieval.summarize_and_extract_slots）。
-  Step 2 — RAP：多源轻量检索并融合（manager_retrieval.retrieve_and_fuse_rap_context）。
-  Step 3 — 规划：LLM产出global_plan；另附只读元数据_rap_context、_user_requirement_summary。
-  Step 4 — 初始化工作区与运行时状态并返回。
+Execution order inside manager_node:
+  Step 1a - Data profile: read CSV metadata such as columns, dtypes, and sample rows without an LLM.
+  Step 1b - Requirement understanding: generate user_requirement_summary and retrieval slots.
+  Step 2 - RAP: retrieve and fuse lightweight multi-source context.
+  Step 3 - Planning: generate global_plan and attach read-only metadata.
+  Step 4 - Initialize workspace/runtime state and return.
 """
 from __future__ import annotations
 
@@ -28,8 +31,8 @@ from core.logger import get_agent_logger
 
 from agents.manager_retrieval import (
     generate_arxiv_search_queries,
-    retrieve_and_fuse_rap_context,
-    summarize_and_extract_slots,
+    retrieve_and_fuse_rap_context_with_meta,
+    summarize_and_extract_slots_with_meta,
 )
 
 logger = get_agent_logger("manager")
@@ -43,55 +46,68 @@ _MANAGER_PLAN_ALLOWED_TOP_LEVEL_KEYS = {
 
 def manager_node(state: GraphState) -> dict:
     """
-    Manager Agent 的 LangGraph 节点函数。
-    输入: 包含 data_path 和 user_goal 的初始 State。
-    输出: 更新 global_plan, current_phase, current_data_path 等字段。
+    LangGraph node function for the Manager Agent.
+    Input: initial state with ``data_path``, ``user_goal``, and optional
+    Manager-side context such as ``manager_cleaning_hints`` /
+    ``dataset_description``.
+    Output: updated ``global_plan`` plus runtime fields for the first worker
+    phase.
     """
 
     user_goal = state["user_goal"]
     data_path = state["data_path"]
     cleaning_hints = (state["manager_cleaning_hints"] or "").strip()
+    dataset_description = (state.get("dataset_description") or "").strip()
 
-    logger.info(f"Starting manager_node with user_goal: '{user_goal}' and data_path: '{data_path}'")
+    logger.info(
+        "Starting manager_node with user_goal: '%s', data_path: '%s', dataset_description: %s",
+        user_goal,
+        data_path,
+        f"{len(dataset_description)} chars" if dataset_description else "none",
+    )
 
     # ------------------------------------------------------------------
-    # Step 1a — 数据轮廓（非LLM）
-    # 从CSV读取列名、dtype、shape、前几行样例；不是「关键词提取」，而是结构化表头/类型事实，供1b与规划LLM使用。
+    # Step 1a - Data profile (non-LLM).
+    # Read CSV columns, dtypes, shape, and sample rows as structured facts for later LLM steps.
     # ------------------------------------------------------------------
     df_preview = _get_data_preview(data_path)
     logger.info("Data preview generated.")
 
     # ------------------------------------------------------------------
-    # Step 1b — 需求摘要与检索槽位（LLM）
-    # manager_cleaning_hints：可选「输入便签」——用户/队友给的清洗约定草稿等，只参与本段摘要prompt；
-    # 产出物是user_requirement_sum（叙述）+ 槽位；不等于 global_plan里的rules/cleaning_contract（那些由 Step 3单独生成）。
+    # Step 1b - Requirement summary and retrieval slots (LLM).
+    # This step consumes optional hints / dataset description and produces the
+    # narrative summary plus retrieval slots used downstream.
     # ------------------------------------------------------------------
-    req_summary, slots = summarize_and_extract_slots(
+    req_summary, slots, summary_eval_meta = summarize_and_extract_slots_with_meta(
         user_goal,
         df_preview,
         cleaning_hints,
+        dataset_description,
     )
     logger.info("User requirement summary and retrieval slots ready.")
 
     # ------------------------------------------------------------------
-    # Step 2 — RAP：检索 + 融合（与1b分离，便于理解与测试）
+    # Step 2 - RAP retrieval and fusion, separated from Step 1b for readability and testing.
     # ------------------------------------------------------------------
-    rap_context = retrieve_and_fuse_rap_context(req_summary, slots, user_goal)
+    rap_context, fusion_eval_meta = retrieve_and_fuse_rap_context_with_meta(req_summary, slots, user_goal)
     logger.info("RAP context built (arXiv + optional web/PWC/Kaggle).")
 
     # ------------------------------------------------------------------
-    # Step 3 — 结构化global_plan（LLM）
+    # Step 3 - Structured global_plan generation (LLM).
     # ------------------------------------------------------------------
     global_plan = _generate_global_plan(
         user_goal,
         df_preview,
         rap_context,
         user_requirement_summary=req_summary,
+        dataset_description=dataset_description,
     )
+    global_plan["_manager_summary_eval"] = summary_eval_meta
+    global_plan["_manager_fusion_eval"] = fusion_eval_meta
     logger.info("Global structured plan generated successfully.")
 
     # ------------------------------------------------------------------
-    # Step 4 — 初始化运行时状态并返回
+    # Step 4 - Initialize runtime state and return.
     # ------------------------------------------------------------------
     os.makedirs(WORKSPACE_DIR, exist_ok=True)
 
@@ -110,13 +126,13 @@ def manager_node(state: GraphState) -> dict:
 
 
 # ======================================================================
-# 私有辅助函数 (待接入真实LLM时替换桩逻辑)
+# Private helper functions.
 # ======================================================================
 
 def _get_data_preview(data_path: str) -> str:
     """
-    读取 CSV 的结构化轮廓（列名、 dtypes、shape、前几行），拼成一段纯文本。
-    不调用 LLM、不做关键词抽取；仅为后续 LLM（Step 1b 摘要、Step 3 规划）提供可引用的数据事实。
+    Read a structured CSV profile (columns, dtypes, shape, and sample rows)
+    and render it as plain text for later LLM steps.
     """
     try:
         df = pd.read_csv(data_path, nrows=5)
@@ -128,11 +144,11 @@ def _get_data_preview(data_path: str) -> str:
         )
         return info
     except Exception as e:
-        return f"[Warning] 无法预览数据: {e}"
+        return f"[Warning] Unable to preview data: {e}"
 
 
 def _generate_search_queries(user_goal: str, df_preview: str) -> list[str]:
-    """兼容测试与外部调用：基于摘要+槽位生成 arXiv 检索词。"""
+    """Compatibility helper for tests and external callers: generate arXiv search queries."""
     return generate_arxiv_search_queries(user_goal, df_preview)
 
 
@@ -142,12 +158,14 @@ def _generate_global_plan(
     rap_context: str,
     *,
     user_requirement_summary: str = "",
+    dataset_description: str = "",
 ) -> dict:
     plan, _ = _generate_global_plan_with_meta(
         user_goal,
         df_preview,
         rap_context,
         user_requirement_summary=user_requirement_summary,
+        dataset_description=dataset_description,
     )
     return plan
 
@@ -158,19 +176,20 @@ def _build_global_plan_prompts(
     rap_context: str,
     *,
     user_requirement_summary: str = "",
+    dataset_description: str = "",
 ) -> tuple[str, str, str, str]:
-    """调用 LLM 生成结构化执行计划 (JSON)。
+    """Build prompts for structured execution plan generation (JSON).
 
-    与旧版参数 `retrieved_docs: list[dict]` 的对应关系：
-    - 旧：在函数内把多篇 {title, summary} 拼成一段「文献上下文」字符串。
-    - 现：由 `retrieve_and_fuse_rap_context` 预先产出 `rap_context`（已含多源融合后的叙述），本函数只消费字符串。
-    - `plan["_rap_context"]` 存的是注入规划prompt的那份RAP文本，便于审计与复现。
+    Relationship with the older `retrieved_docs: list[dict]` parameter:
+    - Previously, this function joined several {title, summary} items into a literature context string.
+    - Now, `retrieve_and_fuse_rap_context` produces `rap_context` first, and this function consumes that string.
+    - `plan["_rap_context"]` stores the RAP text injected into the planning prompt for audit and reproduction.
 
-    `user_requirement_sum` 与 `manager_cleaning_hints`：
-    - hints 仅在Step 1b写入摘要prompt；本参数收到的是已生成的摘要（可已内含hints的语义）。
-    - 规划阶段同时看到 `user_goal`、摘要块、`df_preview` 与 `rap_context`，四者角色不同，勿混同。
+    Planning sees `user_goal`, the summary block, optional
+    `dataset_description`, `df_preview`, and `rap_context`; each serves a
+    different role.
 
-    `data_cleaning_plan.cleaning_contract` — Minimal general mode (keys are optional; default or `{}` indicates no validation):
+    `data_cleaning_plan.cleaning_contract` - Minimal general mode (keys are optional; default or `{}` indicates no validation):
 
     - `max_row_drop_ratio`: A floating-point number from 0 to 1, representing the maximum percentage of rows allowed to be deleted/dropped relative to the number of rows in the input CSV.
 
@@ -183,13 +202,22 @@ def _build_global_plan_prompts(
     - `cleaning_contract`: Task-level safety boundaries (results), hard-validated by the Data Cleaning node after data is written to disk.
     """
     summary_block = user_requirement_summary.strip() or user_goal
-    docs_context = rap_context.strip() if rap_context.strip() else "无检索结果"
+    docs_context = rap_context.strip() if rap_context.strip() else "No retrieval results"
+    desc_text = dataset_description.strip() if dataset_description else ""
+    dataset_description_block = (
+        desc_text
+        if desc_text
+        else "(not provided; infer cautiously from column names and sample rows)"
+    )
 
     sys_prompt = """You are a Data Science Engineering Director generating an execution plan."""
     user_prompt = f"""
 User Goal: {user_goal}
 User requirement summary (for alignment):
 {summary_block}
+
+Dataset Description (authoritative; use this over guesses from column names):
+{dataset_description_block}
 
 Data Preview:
 {df_preview}
@@ -218,7 +246,7 @@ You must output ONLY a valid JSON object with EXACTLY the following structure (n
 
 Notes for data_cleaning_plan:
 - "rules": procedural steps to perform (what to run). Optional list of objects like {{"rule": "drop_duplicates", "params": {{}}}}. Use [] if none. Not validated as bounds.
-- "cleaning_contract": post-execution guardrails. Prefer {{}} or only "max_row_drop_ratio". Do not list "protected_columns" or imply all columns must survive cleaning — dropping columns is allowed.
+- "cleaning_contract": post-execution guardrails. Prefer {{}} or only "max_row_drop_ratio". Do not list "protected_columns" or imply all columns must survive cleaning - dropping columns is allowed.
     * "max_row_drop_ratio" (number 0..1, optional): only enforced key; max allowed fraction of input rows removed, i.e. (rows_in - rows_out) / rows_in.
 
 Notes for feature_engineering_plan:
@@ -235,12 +263,14 @@ def _generate_global_plan_with_meta(
     rap_context: str,
     *,
     user_requirement_summary: str = "",
+    dataset_description: str = "",
 ) -> tuple[dict, dict]:
     sys_prompt, user_prompt, summary_block, docs_context = _build_global_plan_prompts(
         user_goal,
         df_preview,
         rap_context,
         user_requirement_summary=user_requirement_summary,
+        dataset_description=dataset_description,
     )
     reply = call_llm(sys_prompt, user_prompt, agent_name="manager_plan")
     parsed_obj: dict | None = None
@@ -274,17 +304,17 @@ def _generate_global_plan_with_meta(
     # Fallback
     fallback_plan = {
         "data_cleaning_plan": {
-            "objectives": ["检查并处理缺失值", "移除重复行", "修正数据类型"],
-            "constraints": "删除行数不超过总数据 5%",
+            "objectives": ["Check and handle missing values", "Remove duplicate rows", "Correct data types"],
+            "constraints": "Do not remove more than 5% of total rows",
             "rules": [],
             "cleaning_contract": {},
         },
         "feature_engineering_plan": {
-            "objectives": ["基于 RAP 文献构造关键衍生特征", "类别编码", "特征缩放"],
-            "constraints": "特征维度控制在合理范围",
+            "objectives": ["Create key derived features based on RAP context", "Encode categorical features", "Scale features"],
+            "constraints": "Keep feature dimensionality within a reasonable range",
         },
         "model_selection_plan": {
-            "objectives": ["测试 XGBoost / LightGBM / RandomForest", "交叉验证"],
+            "objectives": ["Test XGBoost / LightGBM / RandomForest", "Use cross-validation"],
             "evaluation_metric": "f1",
         },
         "_rap_context": docs_context,

@@ -32,6 +32,56 @@ from config import MAX_INNER_RETRY
 
 logger = get_agent_logger("data_cleaning")
 
+# Fixed per-phase output path. Every worker in the pipeline reads a fixed
+# upstream output path and writes a fixed output path, so that Supervisor
+# retries do not accidentally re-feed a worker's own rejected output back
+# into itself. See agents/feature_engineering.py for the FE counterpart.
+CLEANED_OUTPUT_PATH = "./workspace/cleaned_data.csv"
+
+# Train/test split paths produced at the end of data_cleaning.
+# Feature Engineering reads TRAIN_DATA_PATH; both are exposed to Model Selection.
+TRAIN_DATA_PATH = "./workspace/train_data.csv"
+TEST_DATA_PATH = "./workspace/test_data.csv"
+
+
+def _infer_target_column_name(
+    columns: list[str],
+    model_selection_plan: dict | None = None,
+) -> str | None:
+    """Infer a likely supervised target column conservatively."""
+    if not columns:
+        return None
+    explicit = ""
+    if isinstance(model_selection_plan, dict):
+        explicit = str(model_selection_plan.get("target_column") or "").strip()
+    if explicit and explicit in columns:
+        return explicit
+    semantic_exact = {"target", "label", "labels", "outcome", "response", "dependent", "y", "class"}
+    semantic_contains = ("target", "label", "outcome", "response", "dependent")
+    lowered = {c: str(c).strip().lower().replace(" ", "_") for c in columns}
+    exact_hits = [c for c, lc in lowered.items() if lc in semantic_exact]
+    contains_hits = [c for c, lc in lowered.items() if any(tok in lc for tok in semantic_contains)]
+    candidates = exact_hits or contains_hits
+    return candidates[0] if candidates else None
+
+
+def _move_target_column_to_end(csv_path: str, model_selection_plan: dict | None = None) -> str:
+    """Best-effort reorder so a reliable target column sits at the end."""
+    try:
+        import pandas as pd
+
+        df = pd.read_csv(csv_path)
+        target_col = _infer_target_column_name(df.columns.tolist(), model_selection_plan)
+        if not target_col or target_col == df.columns[-1]:
+            return ""
+        reordered = [c for c in df.columns if c != target_col] + [target_col]
+        df = df[reordered]
+        df.to_csv(csv_path, index=False)
+        logger.info("Moved inferred target column '%s' to the end of %s.", target_col, csv_path)
+        return ""
+    except Exception as exc:
+        return str(exc)
+
 
 def data_cleaning_node(state: GraphState) -> dict:
     """LangGraph node function for Data Cleaning."""
@@ -42,11 +92,12 @@ def data_cleaning_node(state: GraphState) -> dict:
     plan: dict = _dcp if isinstance(_dcp, dict) else {}
     data_path = state["current_data_path"]
     feedback = state.get("current_error", "")
+    dataset_description = (state.get("dataset_description") or "").strip()
 
     # ------------------------------------------------------------------
     # Step 1: Generate cleaning code via LLM
     # ------------------------------------------------------------------
-    code = _generate_cleaning_code(plan, data_path, feedback)
+    code = _generate_cleaning_code(plan, data_path, feedback, dataset_description)
     logger.info("Data cleaning code generation completed.")
 
     # ------------------------------------------------------------------
@@ -72,8 +123,14 @@ def data_cleaning_node(state: GraphState) -> dict:
                 break
             stderr = f"[PostValidationFailed] {validation_error}"
         # Self-heal: feed the error back to the LLM and regenerate code
-        logger.info("Inner self-heal attempt %d: %s", attempt + 1, stderr[:200])
-        code = _fix_code(code, stderr, plan)
+        # Show head (traceback origin) + tail (exception type & message) for diagnosis.
+        _snippet = stderr if len(stderr) <= 2000 else f"{stderr[:1000]}\n...[truncated {len(stderr)} chars total]...\n{stderr[-1000:]}"
+        logger.info("Inner self-heal attempt %d: %s", attempt + 1, _snippet)
+        # On the final iteration there is no next execute_code, so calling
+        # _fix_code would burn an LLM request whose output is never run.
+        if attempt == MAX_INNER_RETRY - 1:
+            break
+        code = _fix_code(code, stderr, plan, dataset_description)
 
     # ------------------------------------------------------------------
     # Step 3: Return state updates
@@ -88,12 +145,43 @@ def data_cleaning_node(state: GraphState) -> dict:
             "current_error": f"[InnerRetryExhausted] {stderr}",
         }
 
+    reorder_error = _move_target_column_to_end(
+        output_path,
+        (_gp.get("model_selection_plan") if isinstance(_gp, dict) else None),
+    )
+    if reorder_error:
+        logger.warning("Target-column reorder skipped for cleaned CSV: %s", reorder_error)
+
+    # ------------------------------------------------------------------
+    # Step 3b: Split cleaned data into train (80%) / test (20%)
+    # ------------------------------------------------------------------
+    split_error = _split_cleaned_data(
+        output_path,
+        model_selection_plan=(_gp.get("model_selection_plan") if isinstance(_gp, dict) else None),
+    )
+    if split_error:
+        logger.error("Train/test split failed: %s", split_error)
+        return {
+            "current_phase": "data_cleaning",
+            "current_code": code,
+            "current_execution_log": stdout,
+            "current_error": f"[SplitFailed] {split_error}",
+        }
+    logger.info(
+        "Train/test split complete → %s (80%%) / %s (20%%)",
+        TRAIN_DATA_PATH,
+        TEST_DATA_PATH,
+    )
+
+    # Note: we intentionally do NOT set ``current_data_path`` here.
+    # The downstream feature_engineering node reads from a fixed
+    # ``TRAIN_DATA_PATH``, so on a Supervisor-driven retry the FE worker
+    # will not accidentally read its own previous rejected output.
     return {
         "current_phase": "data_cleaning",
         "current_code": code,
         "current_execution_log": stdout,
         "current_error": "",
-        "current_data_path": output_path,
     }
 
 
@@ -113,6 +201,9 @@ Before saving, remove columns with no observed values (all-NaN / all-empty) so d
 _USER_PROMPT_GENERATE = """\
 # CONTEXT #
 Current phase: Data Cleaning
+
+# DATASET DESCRIPTION (authoritative) #
+{dataset_description_block}
 
 # PLAN #
 {plan}
@@ -144,6 +235,9 @@ Keep the cleaning output policy: no all-empty columns in the saved CSV."""
 _USER_PROMPT_FIX = """\
 # CONTEXT #
 Current phase: Data Cleaning
+
+# DATASET DESCRIPTION (authoritative) #
+{dataset_description_block}
 
 # PLAN #
 {plan}
@@ -193,7 +287,17 @@ def _plan_json_for_prompt(plan: dict) -> str:
     return json.dumps(body, ensure_ascii=False, indent=2)
 
 
-def _generate_cleaning_code(plan: dict, data_path: str, feedback: str) -> str:
+def _dataset_description_block(desc: str) -> str:
+    """Render the DATASET DESCRIPTION block for prompts (falls back to a neutral note)."""
+    text = (desc or "").strip()
+    if text:
+        return text
+    return "(not provided; infer cautiously from column names and sample rows)"
+
+
+def _generate_cleaning_code(
+    plan: dict, data_path: str, feedback: str, dataset_description: str = ""
+) -> str:
     """
     Call the LLM to generate data-cleaning code.
     If the LLM call fails, fall back to a template implementation.
@@ -207,6 +311,7 @@ def _generate_cleaning_code(plan: dict, data_path: str, feedback: str) -> str:
         cleaning_contract_body=_cleaning_contract_prompt_body(plan),
         data_path=data_path,
         feedback_section=feedback_section,
+        dataset_description_block=_dataset_description_block(dataset_description),
     )
 
     reply = call_llm(_SYSTEM_PROMPT_GENERATE, user_prompt, agent_name="data_cleaning")
@@ -221,7 +326,7 @@ def _generate_cleaning_code(plan: dict, data_path: str, feedback: str) -> str:
     return _fallback_cleaning_code(plan, data_path)
 
 
-def _fix_code(code: str, error: str, plan: dict) -> str:
+def _fix_code(code: str, error: str, plan: dict, dataset_description: str = "") -> str:
     """
     Call the LLM to fix code based on execution errors.
     Return original code if the LLM fix call fails.
@@ -231,6 +336,7 @@ def _fix_code(code: str, error: str, plan: dict) -> str:
         error=error,
         plan=_plan_json_for_prompt(plan),
         cleaning_contract_body=_cleaning_contract_prompt_body(plan),
+        dataset_description_block=_dataset_description_block(dataset_description),
     )
     reply = call_llm(_SYSTEM_PROMPT_FIX, user_prompt, agent_name="data_cleaning")
 
@@ -246,7 +352,7 @@ def _fix_code(code: str, error: str, plan: dict) -> str:
 
 def _get_output_path() -> str:
     """Return the standard output path for cleaned data."""
-    return "./workspace/cleaned_data.csv"
+    return CLEANED_OUTPUT_PATH
 
 
 def _get_file_signature(file_path: str) -> tuple[int, int] | None:
@@ -345,6 +451,17 @@ def _validate_cleaned_csv_quality(output_csv_path: str) -> str:
     if df.columns.empty:
         return "cleaned CSV has no columns"
 
+    # --- Hard safety net: catastrophic row loss ---
+    # Regardless of cleaning_contract, reject if the output has fewer than
+    # 50 rows — this almost always indicates the LLM-generated code
+    # accidentally filtered out the entire dataset.
+    if len(df) < 50:
+        return (
+            f"cleaned CSV has only {len(df)} rows, which is almost certainly a bug "
+            f"in the generated cleaning code (catastrophic row loss). "
+            f"The cleaning code should retain the vast majority of rows."
+        )
+
     # --- Check 1: case-insensitive duplicate *labels* ---
     # Same logical name written twice with different casing (Year vs year) maps to the same
     # "folded" key via casefold(), so we group originals under that key and flag groups
@@ -442,6 +559,40 @@ def _validate_cleaning_contract(
                 )
 
     return ""
+
+
+def _split_cleaned_data(
+    cleaned_csv_path: str,
+    test_size: float = 0.2,
+    random_state: int = 42,
+    model_selection_plan: dict | None = None,
+) -> str:
+    """
+    Split the cleaned CSV into train (80%) and test (20%) sets.
+    Writes TRAIN_DATA_PATH and TEST_DATA_PATH.
+    Returns an empty string on success, or an error message on failure.
+    """
+    try:
+        import pandas as pd
+        from sklearn.model_selection import train_test_split
+
+        df = pd.read_csv(cleaned_csv_path)
+        train_df, test_df = train_test_split(df, test_size=test_size, random_state=random_state)
+        target_col = _infer_target_column_name(train_df.columns.tolist(), model_selection_plan)
+        if target_col and target_col in train_df.columns and target_col in test_df.columns:
+            reordered = [c for c in train_df.columns if c != target_col] + [target_col]
+            train_df = train_df[reordered]
+            test_df = test_df[reordered]
+        train_df.to_csv(TRAIN_DATA_PATH, index=False)
+        test_df.to_csv(TEST_DATA_PATH, index=False)
+        logger.info(
+            "Split: %d train rows → %s, %d test rows → %s",
+            len(train_df), TRAIN_DATA_PATH,
+            len(test_df), TEST_DATA_PATH,
+        )
+        return ""
+    except Exception as exc:
+        return str(exc)
 
 
 def _fallback_cleaning_code(plan: dict, data_path: str) -> str:

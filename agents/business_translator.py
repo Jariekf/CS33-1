@@ -26,6 +26,8 @@ def business_translator_node(state: GraphState) -> dict:
 
     user_goal = state["user_goal"]
     memory = state.get("memory", [])
+    dataset_description = (state.get("dataset_description") or "").strip()
+    eda_summary = (state.get("eda_summary") or "").strip()
     logger.info("Business Translator node started.")
 
     # ------------------------------------------------------------------
@@ -33,7 +35,7 @@ def business_translator_node(state: GraphState) -> dict:
     # ------------------------------------------------------------------
     fi_path = os.path.join(WORKSPACE_DIR, "feature_importance.json")
     feature_importance = _load_feature_importance(fi_path)
-    model_summary = memory[-1] if memory else "无模型阶段摘要"
+    model_summary = memory[-1] if memory else "No model-stage summary available."
     logger.info(f"Loaded feature importance for {len(feature_importance)} features.")
 
     # ------------------------------------------------------------------
@@ -55,7 +57,13 @@ def business_translator_node(state: GraphState) -> dict:
     # Step 4: 调用 LLM 生成商业分析报告 (TODO: 接入LLM)
     # ------------------------------------------------------------------
     report = _generate_business_report(
-        user_goal, model_summary, feature_importance, top_features, retrieved_docs
+        user_goal,
+        model_summary,
+        feature_importance,
+        top_features,
+        retrieved_docs,
+        dataset_description=dataset_description,
+        eda_summary=eda_summary,
     )
     logger.info("Business report generation complete.")
 
@@ -67,12 +75,68 @@ def business_translator_node(state: GraphState) -> dict:
 # ======================================================================
 
 def _load_feature_importance(path: str) -> dict:
-    """加载模型选择阶段落盘的特征重要性文件。"""
+    """
+    Load the feature-importance artifact produced by model_selection.
+
+    The contract is a flat JSON object ``{feature_name: importance}``, but in
+    practice the LLM-generated model-selection code drifts into two other
+    shapes from time to time:
+
+      1. List of pairs:        ``[["duration", 0.39], ["poutcome", 0.15], ...]``
+      2. List of dict entries: ``[{"feature": "duration", "importance": 0.39}, ...]``
+         (also seen: ``"name"``/``"column"`` instead of ``"feature"``,
+         ``"score"``/``"value"`` instead of ``"importance"``)
+
+    We accept all three, normalise into a dict, and sort descending by value
+    so ``list(...)[:5]`` in the caller still gets the top-K. Returning a
+    plain dict keeps the downstream ``.keys()`` / ``.items()`` call sites
+    unchanged.
+    """
     try:
         content = read_file(path)
-        return json.loads(content)
+        raw = json.loads(content)
     except Exception:
         return {}
+
+    normalised: dict[str, float] = {}
+
+    if isinstance(raw, dict):
+        for k, v in raw.items():
+            try:
+                normalised[str(k)] = float(v)
+            except (TypeError, ValueError):
+                continue
+    elif isinstance(raw, list):
+        for item in raw:
+            if isinstance(item, (list, tuple)) and len(item) >= 2:
+                name, score = item[0], item[1]
+            elif isinstance(item, dict):
+                name = (
+                    item.get("feature")
+                    or item.get("name")
+                    or item.get("column")
+                )
+                score = (
+                    item.get("importance")
+                    if "importance" in item
+                    else item.get("score", item.get("value"))
+                )
+            else:
+                continue
+            if name is None or score is None:
+                continue
+            try:
+                normalised[str(name)] = float(score)
+            except (TypeError, ValueError):
+                continue
+    else:
+        return {}
+
+    # Sort descending so list(d.keys())[:5] gives top-5 regardless of how the
+    # producer ordered the file.
+    return dict(
+        sorted(normalised.items(), key=lambda kv: kv[1], reverse=True)
+    )
 
 
 def _build_rag_queries(user_goal: str, top_features: list[str]) -> list[str]:
@@ -114,22 +178,40 @@ def _generate_business_report(
     feature_importance: dict,
     top_features: list[str],
     retrieved_docs: list[dict],
+    *,
+    dataset_description: str = "",
+    eda_summary: str = "",
 ) -> str:
     """调用 LLM 生成最终商业报告。"""
     docs_text = "\n".join(
         [f"- {d.get('title', 'N/A')}: {d.get('summary', '')[:150]}..." for d in retrieved_docs]
-    ) if retrieved_docs else "暂无外部文献支撑"
+    ) if retrieved_docs else "No external literature support available."
 
     fi_text = "\n".join(
         [f"  - {k}: {v:.4f}" for k, v in list(feature_importance.items())[:5]]
-    ) if feature_importance else "  暂无特征权重数据"
+    ) if feature_importance else "  No feature-importance data available."
+
+    desc_text = dataset_description.strip() if dataset_description else ""
+    dataset_description_block = (
+        desc_text
+        if desc_text
+        else "(not provided; base the report on the user goal and model outputs only.)"
+    )
+    eda_block = eda_summary if eda_summary else "(not provided by feature engineering)"
 
     sys_prompt = "You are an elite Data Strategy Consultant and Business Analyst. Your role is to interpret machine learning results and synthesize them into a highly professional, expert-level business insight report. CRITICAL INSTRUCTION: Be concise, strictly avoid repeating any sentences, phrases, or ideas. DO NOT fall into an infinite generation loop."
-    
+
     user_prompt = f"""
-Please generate a structured Business Strategy & Insight Report in Markdown format (always output in Chinese). 
+Please generate a structured Business Strategy & Insight Report in Markdown format. Always output in English.
 
 User Goal: {user_goal}
+
+Dataset Description (authoritative; use this to interpret features and business context):
+{dataset_description_block}
+
+EDA Summary from Feature Engineering (markdown-like):
+{eda_block}
+
 Model Validation Summary:
 {model_summary}
 
@@ -140,7 +222,7 @@ External Literature Support (RAG retrieved academic context):
 {docs_text}
 
 Requirements:
-1. Executive Summary (Overview of the project goal and machine learning validation approach).
+1. Executive Summary (Overview of the project goal and machine learning validation approach; include key EDA takeaways when available).
 2. Business Interpretation of Top Features (Why do these features matter? Explain their real-world impact based on their importance).
 3. Literature Syntheses (How does external research validate or enhance our findings? Emphasize the strategies from the retrieved docs).
 4. Actionable Business Recommendations (Highly specific, practical intervention strategies the business can apply).
@@ -151,20 +233,20 @@ Please output professional, structured Markdown. PREVENT REPETITION: Do NOT say 
         return reply
 
     # Fallback
-    report = f"""# 商业洞察分析报告
+    report = f"""# Business Insight Analysis Report
 
-## 1. 执行摘要
-用户目标: {user_goal}
-模型验证结果: {model_summary}
+## 1. Executive Summary
+User goal: {user_goal}
+Model validation result: {model_summary}
 
-## 2. 核心特征的业务解读
-以下特征对预测目标影响最大:
+## 2. Business Interpretation of Key Features
+The following features have the strongest impact on the prediction target:
 {fi_text}
 
-## 3. 外部文献与行业参考 (RAG 增强)
+## 3. External Literature and Industry References (RAG Enhanced)
 {docs_text}
 
-## 4. 可执行商业建议
-（本节依赖 LLM 生成；本次调用未返回有效正文，故仅保留模板。请检查 `business_translator` 所用 API、配额或 `STUB_MODE`，并参考上文特征与文献做业务决策。）
+## 4. Actionable Business Recommendations
+This section depends on LLM generation. The current call did not return valid content, so only the fallback template is provided. Check the API, quota, or `STUB_MODE` used by `business_translator`, and use the feature and literature evidence above for decision-making.
 """
     return report

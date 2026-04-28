@@ -8,5 +8,7 @@ Current scripts:
   Checks whether the configured LLM endpoint can be called successfully.
 - `python tests/test_window4.py`
   Exercises selected helper functions from the manager and business translator modules.
+- `python -m unittest tests.test_manager_midlayer_eval`
+  Runs unit tests for manager summary/fusion evaluation metrics, failure attribution, and midlayer reporting helpers.
 
 These scripts are currently lightweight validation scripts rather than a full `pytest` test suite.
