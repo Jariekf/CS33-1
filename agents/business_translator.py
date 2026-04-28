@@ -27,6 +27,7 @@ def business_translator_node(state: GraphState) -> dict:
     user_goal = state["user_goal"]
     memory = state.get("memory", [])
     dataset_description = (state.get("dataset_description") or "").strip()
+    eda_summary = (state.get("eda_summary") or "").strip()
     logger.info("Business Translator node started.")
 
     # ------------------------------------------------------------------
@@ -62,6 +63,7 @@ def business_translator_node(state: GraphState) -> dict:
         top_features,
         retrieved_docs,
         dataset_description=dataset_description,
+        eda_summary=eda_summary,
     )
     logger.info("Business report generation complete.")
 
@@ -178,6 +180,7 @@ def _generate_business_report(
     retrieved_docs: list[dict],
     *,
     dataset_description: str = "",
+    eda_summary: str = "",
 ) -> str:
     """调用 LLM 生成最终商业报告。"""
     docs_text = "\n".join(
@@ -194,6 +197,7 @@ def _generate_business_report(
         if desc_text
         else "(not provided; base the report on the user goal and model outputs only.)"
     )
+    eda_block = eda_summary if eda_summary else "(not provided by feature engineering)"
 
     sys_prompt = "You are an elite Data Strategy Consultant and Business Analyst. Your role is to interpret machine learning results and synthesize them into a highly professional, expert-level business insight report. CRITICAL INSTRUCTION: Be concise, strictly avoid repeating any sentences, phrases, or ideas. DO NOT fall into an infinite generation loop."
 
@@ -205,6 +209,9 @@ User Goal: {user_goal}
 Dataset Description (authoritative; use this to interpret features and business context):
 {dataset_description_block}
 
+EDA Summary from Feature Engineering (markdown-like):
+{eda_block}
+
 Model Validation Summary:
 {model_summary}
 
@@ -215,7 +222,7 @@ External Literature Support (RAG retrieved academic context):
 {docs_text}
 
 Requirements:
-1. Executive Summary (Overview of the project goal and machine learning validation approach).
+1. Executive Summary (Overview of the project goal and machine learning validation approach; include key EDA takeaways when available).
 2. Business Interpretation of Top Features (Why do these features matter? Explain their real-world impact based on their importance).
 3. Literature Syntheses (How does external research validate or enhance our findings? Emphasize the strategies from the retrieved docs).
 4. Actionable Business Recommendations (Highly specific, practical intervention strategies the business can apply).

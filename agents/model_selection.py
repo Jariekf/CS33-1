@@ -8,13 +8,15 @@ Model Selection Agent (模型选择与构建智能体)
 from __future__ import annotations
 
 import json
+import pandas as pd
 from core.logger import get_agent_logger
 
 from core.state import GraphState
 from core.llm import call_llm, extract_code
 from tools.python_repl import execute_code
 from config import MAX_INNER_RETRY
-from agents.feature_engineering import FE_OUTPUT_PATH, _MODERN_SKLEARN_API_GUIDE
+from agents.feature_engineering import FE_OUTPUT_PATH, FE_TEST_OUTPUT_PATH, _MODERN_SKLEARN_API_GUIDE
+from agents.data_cleaning import TRAIN_DATA_PATH, TEST_DATA_PATH
 
 logger = get_agent_logger("model_selection")
 
@@ -33,20 +35,30 @@ You must implement model building, hyperparameter tuning, and cross-validation.
 _USER_PROMPT_GENERATE = """\
 # CONTEXT #
 Current phase: Model Selection
+User goal: {user_goal}
 
 # DATASET DESCRIPTION (authoritative) #
 {dataset_description_block}
+
+# EDA SUMMARY FROM FEATURE ENGINEERING (advisory) #
+{eda_summary_block}
 
 # PLAN #
 {plan}
 
 # CONSTRAINTS #
-1. Load data from: `{data_path}` using `pd.read_csv`.
-2. Assuming the target variable is known or inferable, if not mentioned, assume the last column is the target `y` and other numeric/categorical columns are features `X`.
-3. Do model selection and cross-validation as instructed by the Plan.
-4. Export the top feature importances to a dict, sorted by value descending, and save it to `./workspace/feature_importance.json`.
-5. Use `print()` to output the Best Model name, Cross-Validation score, and Top Feature Importances.
-6. Import all necessary libraries at the top of the code.
+1. Load training data from: `{data_path}` (feature-engineered 80% train split) using `pd.read_csv`.
+2. A held-out test set is available at: `{test_data_path}`. Use it ONLY for final model evaluation after training/CV is complete — never use it during training or cross-validation.
+3. Infer task type from plan + user goal + dataset context (classification/regression/time-series/clustering), then choose model family and metric accordingly.
+4. For supervised tasks, infer target conservatively from semantics (target/label/outcome/etc.) or explicit plan fields; do NOT blindly assume last column.
+5. If target is ambiguous, print a clear warning and stop rather than training on an unreliable target.
+   Before applying any label mapping or encoding to the target column, inspect its actual dtype and unique values (e.g. `print(df[target_col].dtype, df[target_col].unique())`). If the target is already numeric (int/float), use it directly — do NOT re-apply a string→int mapping, as that will produce all-NaN. Only convert string labels (e.g. 'yes'/'no', 'True'/'False') if the column genuinely contains non-numeric values.
+6. Do model selection and cross-validation as instructed by the Plan.
+7. Export the top feature importances to a dict, sorted by value descending, and save it to `./workspace/feature_importance.json`.
+8. Use `print()` to output inferred task type, Best Model name, Cross-Validation score, Top Feature Importances, and final test-set evaluation metrics.
+9. Import all necessary libraries at the top of the code.
+10. NEVER hardcode column names. Always discover feature columns dynamically from the loaded DataFrame (e.g. `numeric_cols = df.select_dtypes(include='number').columns.tolist()`; `cat_cols = df.select_dtypes(include='object').columns.tolist()`). The upstream feature engineering step may rename, add, or one-hot-encode columns unpredictably — hardcoded column lists will cause `ValueError: A given column is not a column of the dataframe`.
+11. Use EDA summary as guidance only. Before training, validate all key assumptions against the actually loaded DataFrame and prioritize runtime-verified facts when conflicts exist.
 
 {feedback_section}
 
@@ -64,9 +76,13 @@ Output the complete corrected code.
 _USER_PROMPT_FIX = """\
 # CONTEXT #
 Current phase: Model Selection
+User goal: {user_goal}
 
 # DATASET DESCRIPTION (authoritative) #
 {dataset_description_block}
+
+# EDA SUMMARY FROM FEATURE ENGINEERING (advisory) #
+{eda_summary_block}
 
 # PLAN #
 {plan}
@@ -84,6 +100,9 @@ Current phase: Model Selection
 2. Save feature importance to `./workspace/feature_importance.json`.
 3. Keep model selection, hyperparameter tuning, and cross-validation aligned with the plan.
 4. If the previous attempt failed functionally, fix the implementation gap rather than only fixing syntax.
+5. Before applying any label mapping or encoding to the target column, inspect its actual dtype and unique values. If the target is already numeric (int/float), use it directly — do NOT re-apply a string→int mapping, as that produces all-NaN and causes single-class errors.
+6. NEVER hardcode column names. Discover feature columns dynamically from the DataFrame (e.g. `select_dtypes`). Hardcoded column lists break when upstream feature engineering changes columns.
+7. Use EDA summary as guidance only; if EDA conflicts with loaded data facts, follow runtime-verified data facts.
 
 # RESPONSE: CORRECTED CODE #
 Provide the complete corrected code in a single ```python ... ``` code block.
@@ -102,30 +121,71 @@ def model_selection_node(state: GraphState) -> dict:
     data_path = FE_OUTPUT_PATH
     feedback = state.get("current_error", "")
     dataset_description = (state.get("dataset_description") or "").strip()
+    user_goal = (state.get("user_goal") or "").strip()
+    eda_summary = (state.get("eda_summary") or "").strip()
+    _restore_missing_target_columns(plan)
 
     # ------------------------------------------------------------------
     # Step 1: 生成模型训练 + 调参 + 评估代码
     # ------------------------------------------------------------------
-    code = _generate_model_code(plan, data_path, feedback, dataset_description)
+    code = _generate_model_code(
+        plan,
+        data_path,
+        FE_TEST_OUTPUT_PATH,
+        feedback,
+        dataset_description,
+        user_goal,
+        eda_summary,
+    )
     logger.info("Model selection code generation completed.")
 
     # ------------------------------------------------------------------
     # Step 2: 内部语法自救循环
     # ------------------------------------------------------------------
     stdout, stderr = "", ""
+    error_history = []
     for attempt in range(MAX_INNER_RETRY):
         stdout, stderr = execute_code(code)
         if not stderr:
             logger.info("Model selection code executed successfully.")
             break
-        # Use tail slice: the exception type + message (most diagnostic line)
-        # is always at the BOTTOM of a Python traceback, not the top.
-        logger.info("内部自救第 %d 次: %s", attempt + 1, stderr[-500:])
+        # Deterministic dependency fallback: if optional boosting libs are not
+        # installed in runtime, switch to the internal sklearn-only template
+        # instead of repeatedly asking the LLM to import unavailable modules.
+        missing_optional_lib = (
+            "No module named 'xgboost'" in stderr
+            or 'No module named "xgboost"' in stderr
+            or "No module named 'lightgbm'" in stderr
+            or 'No module named "lightgbm"' in stderr
+        )
+        if missing_optional_lib:
+            logger.warning(
+                "Optional dependency missing (xgboost/lightgbm). "
+                "Switching to sklearn-only fallback template."
+            )
+            code = _fallback_model_code(
+                plan,
+                data_path,
+                user_goal=user_goal,
+                dataset_description=dataset_description,
+            )
+            continue
+        error_history.append(f"Attempt {attempt + 1}: {stderr}")
+        # Show head (traceback origin) + tail (exception type & message) for diagnosis.
+        _snippet = stderr if len(stderr) <= 2000 else f"{stderr[:1000]}\n...[truncated {len(stderr)} chars total]...\n{stderr[-1000:]}"
+        logger.info("内部自救第 %d 次: %s", attempt + 1, _snippet)
         # On the final iteration there is no next execute_code, so calling
         # _fix_code would burn an LLM request whose output is never run.
         if attempt == MAX_INNER_RETRY - 1:
             break
-        code = _fix_code(code, stderr, plan, dataset_description)
+        code = _fix_code(
+            code,
+            "\n\n---\n\n".join(error_history),
+            plan,
+            dataset_description,
+            user_goal,
+            eda_summary,
+        )
 
     # ------------------------------------------------------------------
     # Step 3: 返回状态
@@ -159,6 +219,41 @@ def _dataset_description_block(desc: str) -> str:
     return "(not provided; infer cautiously from column names and sample rows)"
 
 
+def _restore_missing_target_columns(plan: dict) -> None:
+    """Best-effort recovery when FE accidentally drops the supervised target."""
+    target_col = str((plan or {}).get("target_column") or "").strip()
+    if not target_col:
+        return
+    try:
+        fe_train = pd.read_csv(FE_OUTPUT_PATH)
+        raw_train = pd.read_csv(TRAIN_DATA_PATH, usecols=[target_col])
+    except Exception:
+        return
+    if target_col not in fe_train.columns and len(fe_train) == len(raw_train):
+        fe_train[target_col] = raw_train[target_col].values
+        fe_train.to_csv(FE_OUTPUT_PATH, index=False)
+        logger.warning(
+            "Recovered missing target column '%s' into %s from %s.",
+            target_col,
+            FE_OUTPUT_PATH,
+            TRAIN_DATA_PATH,
+        )
+    try:
+        fe_test = pd.read_csv(FE_TEST_OUTPUT_PATH)
+        raw_test = pd.read_csv(TEST_DATA_PATH, usecols=[target_col])
+    except Exception:
+        return
+    if target_col not in fe_test.columns and len(fe_test) == len(raw_test):
+        fe_test[target_col] = raw_test[target_col].values
+        fe_test.to_csv(FE_TEST_OUTPUT_PATH, index=False)
+        logger.warning(
+            "Recovered missing target column '%s' into %s from %s.",
+            target_col,
+            FE_TEST_OUTPUT_PATH,
+            TEST_DATA_PATH,
+        )
+
+
 def _compress_supervisor_feedback(feedback: str, max_chars: int = 1200) -> str:
     """
     Trim overly long supervisor feedback before injecting it into the generate
@@ -184,7 +279,13 @@ def _compress_supervisor_feedback(feedback: str, max_chars: int = 1200) -> str:
 
 
 def _generate_model_code(
-    plan: dict, data_path: str, feedback: str, dataset_description: str = ""
+    plan: dict,
+    data_path: str,
+    test_data_path: str,
+    feedback: str,
+    dataset_description: str = "",
+    user_goal: str = "",
+    eda_summary: str = "",
 ) -> str:
     """
     调用 LLM 生成模型训练与调参代码。
@@ -203,8 +304,11 @@ def _generate_model_code(
     user_prompt = _USER_PROMPT_GENERATE.format(
         plan=json.dumps(plan, ensure_ascii=False, indent=2),
         data_path=data_path,
+        test_data_path=test_data_path,
         feedback_section=feedback_section,
         dataset_description_block=_dataset_description_block(dataset_description),
+        user_goal=user_goal or "(not provided)",
+        eda_summary_block=_eda_summary_block(eda_summary),
     )
 
     reply = call_llm(_SYSTEM_PROMPT_GENERATE, user_prompt, agent_name="model_selection")
@@ -214,16 +318,25 @@ def _generate_model_code(
             return code
 
     logger.warning("LLM 调用失败或未返回代码，使用桩代码模板。")
-    return _fallback_model_code(plan, data_path)
+    return _fallback_model_code(plan, data_path, user_goal=user_goal, dataset_description=dataset_description)
 
 
-def _fix_code(code: str, error: str, plan: dict, dataset_description: str = "") -> str:
+def _fix_code(
+    code: str,
+    error: str,
+    plan: dict,
+    dataset_description: str = "",
+    user_goal: str = "",
+    eda_summary: str = "",
+) -> str:
     """调用 LLM 修复代码。若失败则原样返回。"""
     user_prompt = _USER_PROMPT_FIX.format(
         code=code,
         error=error,
         plan=json.dumps(plan, ensure_ascii=False, indent=2),
         dataset_description_block=_dataset_description_block(dataset_description),
+        user_goal=user_goal or "(not provided)",
+        eda_summary_block=_eda_summary_block(eda_summary),
     )
     reply = call_llm(_SYSTEM_PROMPT_FIX, user_prompt, agent_name="model_selection")
     if reply:
@@ -235,31 +348,91 @@ def _fix_code(code: str, error: str, plan: dict, dataset_description: str = "") 
     return code
 
 
-def _fallback_model_code(plan: dict, data_path: str) -> str:
+def _infer_task_kind(plan: dict, user_goal: str, dataset_description: str = "") -> str:
+    text = " ".join(
+        [
+            json.dumps(plan or {}, ensure_ascii=False).lower(),
+            (user_goal or "").lower(),
+            (dataset_description or "").lower(),
+        ]
+    )
+    if any(k in text for k in ("cluster", "clustering", "segmentation", "kmeans", "dbscan")):
+        return "clustering"
+    if any(k in text for k in ("time series", "timeseries", "forecast", "forecasting", "tscv")):
+        return "time_series"
+    if any(k in text for k in ("regression", "rmse", "mae", "mse", "r2")):
+        return "regression"
+    if any(k in text for k in ("classification", "f1", "accuracy", "precision", "recall", "auc")):
+        return "classification"
+    return "regression"
+
+
+def _eda_summary_block(text: str) -> str:
+    summary = (text or "").strip()
+    if summary:
+        return summary
+    return "(not provided by feature engineering)"
+
+
+def _fallback_model_code(
+    plan: dict,
+    data_path: str,
+    *,
+    user_goal: str = "",
+    dataset_description: str = "",
+) -> str:
     """失败时的桩代码模板。"""
-    metric = plan.get("evaluation_metric", "f1")
+    task_kind = _infer_task_kind(plan, user_goal, dataset_description)
+    metric = str(plan.get("evaluation_metric") or "").strip()
+    if not metric:
+        metric = "neg_root_mean_squared_error" if task_kind in ("regression", "time_series") else "f1"
     path_lit = json.dumps(data_path)
+    explicit_target_col = str(plan.get("target_column") or "").strip()
+    model_class = "RandomForestRegressor" if task_kind in ("regression", "time_series") else "RandomForestClassifier"
+    split_block = (
+        "from sklearn.model_selection import TimeSeriesSplit\n"
+        "cv = TimeSeriesSplit(n_splits=5)\n"
+    ) if task_kind == "time_series" else "cv = 5\n"
     return f"""\
 import pandas as pd
 from sklearn.model_selection import cross_val_score
-from sklearn.ensemble import RandomForestClassifier
+from sklearn.ensemble import {model_class}
 import json
 import os
 
 df = pd.read_csv({path_lit})
-# 假设最后一列是目标变量
-X = df.iloc[:, :-1].select_dtypes(include='number').fillna(0)
-y = df.iloc[:, -1]
+explicit_target_col = {json.dumps(explicit_target_col)}
+target_col = explicit_target_col if explicit_target_col in df.columns else None
+if target_col is None:
+    semantic_exact = {{"target", "label", "labels", "outcome", "response", "dependent", "y", "class"}}
+    semantic_contains = ("target", "label", "outcome", "response", "dependent")
+    lowered = {{c: c.strip().lower().replace(" ", "_") for c in df.columns}}
+    exact_hits = [c for c, lc in lowered.items() if lc in semantic_exact]
+    contains_hits = [c for c, lc in lowered.items() if any(tok in lc for tok in semantic_contains)]
+    candidates = exact_hits or contains_hits
+    target_col = candidates[0] if candidates else None
+if target_col is None and len(df.columns) > 0:
+    target_col = df.columns[-1]
+if target_col is None:
+    raise ValueError("Fallback could not infer a reliable target column. Please set model_selection_plan.target_column explicitly.")
 
-model = RandomForestClassifier(n_estimators=100, random_state=42)
+X = df.drop(columns=[target_col]).select_dtypes(include='number').fillna(0)
+y = df[target_col]
+if X.shape[1] == 0:
+    raise ValueError("No numeric features available for fallback model training.")
+
+{split_block}
+model = {model_class}(n_estimators=200, random_state=42)
 metric_name = "{metric}"
-scores = cross_val_score(model, X, y, cv=5, scoring=metric_name)
+scores = cross_val_score(model, X, y, cv=cv, scoring=metric_name)
 model.fit(X, y)
 
-fi = dict(zip(X.columns, model.feature_importances_))
+fi = dict(zip(X.columns, getattr(model, "feature_importances_", [0.0] * len(X.columns))))
 fi_sorted = dict(sorted(fi.items(), key=lambda x: x[1], reverse=True))
 
-print(f"Best Model: RandomForest")
+print(f"Inferred Task Type: {task_kind}")
+print(f"Best Model: {model_class}")
+print(f"Target Column: {{target_col}}")
 print(f"CV {{metric_name}} Mean: {{scores.mean():.4f}} (+/- {{scores.std():.4f}})")
 print(f"Top 5 Feature Importance: {{dict(list(fi_sorted.items())[:5])}}")
 

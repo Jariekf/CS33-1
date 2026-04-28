@@ -10,7 +10,7 @@ import tempfile
 import os
 
 
-def execute_code(code: str, timeout: int = 120) -> tuple[str, str]:
+def execute_code(code: str, timeout: int = 300) -> tuple[str, str]:
     """
     将代码写入临时文件并在子进程中执行。
 
