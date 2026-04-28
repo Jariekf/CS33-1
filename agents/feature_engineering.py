@@ -74,15 +74,22 @@ def feature_engineering_node(state: GraphState) -> dict:
     stdout, stderr = "", ""
     error_history: list[str] = []
     for attempt in range(MAX_INNER_RETRY):
+        previous_signatures = {
+            FE_OUTPUT_PATH: _get_file_signature(FE_OUTPUT_PATH),
+            FE_TEST_OUTPUT_PATH: _get_file_signature(FE_TEST_OUTPUT_PATH),
+        }
         stdout, stderr = execute_code(code)
         if not stderr:
-            eda_summary = _extract_eda_summary(stdout)
-            logger.info("Feature engineering code executed successfully.")
-            break
+            validation_error = _validate_fe_artifacts(previous_signatures)
+            if not validation_error:
+                eda_summary = _extract_eda_summary(stdout)
+                logger.info("Feature engineering code executed successfully.")
+                break
+            stderr = f"[PostValidationFailed] {validation_error}"
         error_history.append(f"Attempt {attempt + 1}: {stderr}")
         # Show head (traceback origin) + tail (exception type & message) for diagnosis.
         _snippet = stderr if len(stderr) <= 2000 else f"{stderr[:1000]}\n...[truncated {len(stderr)} chars total]...\n{stderr[-1000:]}"
-        logger.info("内部自救第 %d 次: %s", attempt + 1, _snippet)
+        logger.info("Inner self-heal attempt %d: %s", attempt + 1, _snippet)
         if _is_target_related_error(stderr):
             logger.warning(
                 "Detected target-column-related FE failure. Switching to deterministic fallback template."
@@ -271,6 +278,72 @@ def _dataset_description_block(desc: str) -> str:
     return "(not provided; infer cautiously from column names and sample rows)"
 
 
+def _get_file_signature(file_path: str) -> tuple[int, int] | None:
+    """Return file signature (mtime_ns, size), or None if the file does not exist."""
+    import os
+
+    if not os.path.exists(file_path):
+        return None
+    stat = os.stat(file_path)
+    return stat.st_mtime_ns, stat.st_size
+
+
+def _validate_one_fe_csv(
+    output_path: str,
+    previous_signature: tuple[int, int] | None,
+) -> tuple[str, pd.DataFrame | None]:
+    """Validate one FE CSV artifact and return the loaded DataFrame when valid."""
+    import os
+
+    if not os.path.exists(output_path):
+        return f"feature-engineered output not found: {output_path}", None
+    if not os.path.isfile(output_path):
+        return f"feature-engineered output is not a file: {output_path}", None
+
+    current_signature = _get_file_signature(output_path)
+    if current_signature is None:
+        return f"failed to stat feature-engineered output: {output_path}", None
+    if current_signature[1] <= 0:
+        return f"feature-engineered output file is empty: {output_path}", None
+    if previous_signature is not None and current_signature == previous_signature:
+        return f"feature-engineered output file was not updated in current run: {output_path}", None
+
+    try:
+        df = pd.read_csv(output_path)
+    except Exception as e:
+        return f"feature-engineered CSV could not be read: {output_path}: {e}", None
+    if df.empty:
+        return f"feature-engineered CSV has no rows: {output_path}", None
+    if df.shape[1] == 0:
+        return f"feature-engineered CSV has no columns: {output_path}", None
+    return "", df
+
+
+def _validate_fe_artifacts(
+    previous_signatures: dict[str, tuple[int, int] | None],
+) -> str:
+    """Validate train/test FE artifacts before passing the phase to Supervisor."""
+    train_error, train_df = _validate_one_fe_csv(
+        FE_OUTPUT_PATH,
+        previous_signatures.get(FE_OUTPUT_PATH),
+    )
+    if train_error:
+        return train_error
+
+    test_error, test_df = _validate_one_fe_csv(
+        FE_TEST_OUTPUT_PATH,
+        previous_signatures.get(FE_TEST_OUTPUT_PATH),
+    )
+    if test_error:
+        return test_error
+
+    if train_df is None or test_df is None:
+        return "feature-engineered train/test artifacts could not be loaded"
+    if list(train_df.columns) != list(test_df.columns):
+        return "feature-engineered train/test outputs must have exactly the same columns"
+    return ""
+
+
 def _build_target_hint(data_path: str) -> str:
     """Inspect the runtime training CSV and provide conservative target guidance."""
     try:
@@ -369,7 +442,7 @@ def _generate_fe_code(
         plan=json.dumps(plan, ensure_ascii=False, indent=2),
         data_path=data_path,
         test_data_path=test_data_path,
-        previous_summary=previous_summary if previous_summary else "无上一阶段摘要",
+        previous_summary=previous_summary if previous_summary else "No previous-stage summary.",
         feedback_section=feedback_section,
         dataset_description_block=_dataset_description_block(dataset_description),
         target_hint=target_hint or "(no runtime target hint available)",
@@ -384,8 +457,8 @@ def _generate_fe_code(
         if code:
             return code
 
-    # 降级：返回桩代码模板
-    logger.warning("LLM 调用失败或未返回代码，使用桩代码模板。")
+    # Fallback: return template code.
+    logger.warning("LLM call failed or returned no code; using fallback code template.")
     return _deterministic_fallback_fe_code(plan, data_path, test_data_path, previous_summary)
 
 
@@ -406,7 +479,7 @@ def _fix_code(
         code=code,
         error=error,
         plan=json.dumps(plan, ensure_ascii=False, indent=2),
-        previous_summary=previous_summary if previous_summary else "无上一阶段摘要",
+        previous_summary=previous_summary if previous_summary else "No previous-stage summary.",
         dataset_description_block=_dataset_description_block(dataset_description),
         target_hint=target_hint or "(no runtime target hint available)",
     )
@@ -417,7 +490,7 @@ def _fix_code(
         if fixed_code:
             return fixed_code
 
-    logger.warning("LLM 修复调用失败，返回原代码。")
+    logger.warning("LLM fix call failed; returning original code.")
     return code
 
 
@@ -430,8 +503,8 @@ import numpy as np
 import json
 
 df = pd.read_csv({path_lit})
-# 特征工程计划: {plan.get('objectives', [])}
-# 上一阶段摘要: {previous_summary}
+# Feature engineering plan: {plan.get('objectives', [])}
+# Previous-stage summary: {previous_summary}
 
 # Work on a copy to keep transformations explicit.
 df = df.copy()

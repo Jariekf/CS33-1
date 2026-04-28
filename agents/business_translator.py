@@ -35,7 +35,7 @@ def business_translator_node(state: GraphState) -> dict:
     # ------------------------------------------------------------------
     fi_path = os.path.join(WORKSPACE_DIR, "feature_importance.json")
     feature_importance = _load_feature_importance(fi_path)
-    model_summary = memory[-1] if memory else "无模型阶段摘要"
+    model_summary = memory[-1] if memory else "No model-stage summary available."
     logger.info(f"Loaded feature importance for {len(feature_importance)} features.")
 
     # ------------------------------------------------------------------
@@ -185,11 +185,11 @@ def _generate_business_report(
     """调用 LLM 生成最终商业报告。"""
     docs_text = "\n".join(
         [f"- {d.get('title', 'N/A')}: {d.get('summary', '')[:150]}..." for d in retrieved_docs]
-    ) if retrieved_docs else "暂无外部文献支撑"
+    ) if retrieved_docs else "No external literature support available."
 
     fi_text = "\n".join(
         [f"  - {k}: {v:.4f}" for k, v in list(feature_importance.items())[:5]]
-    ) if feature_importance else "  暂无特征权重数据"
+    ) if feature_importance else "  No feature-importance data available."
 
     desc_text = dataset_description.strip() if dataset_description else ""
     dataset_description_block = (
@@ -202,7 +202,7 @@ def _generate_business_report(
     sys_prompt = "You are an elite Data Strategy Consultant and Business Analyst. Your role is to interpret machine learning results and synthesize them into a highly professional, expert-level business insight report. CRITICAL INSTRUCTION: Be concise, strictly avoid repeating any sentences, phrases, or ideas. DO NOT fall into an infinite generation loop."
 
     user_prompt = f"""
-Please generate a structured Business Strategy & Insight Report in Markdown format (always output in Chinese).
+Please generate a structured Business Strategy & Insight Report in Markdown format. Always output in English.
 
 User Goal: {user_goal}
 
@@ -233,20 +233,20 @@ Please output professional, structured Markdown. PREVENT REPETITION: Do NOT say 
         return reply
 
     # Fallback
-    report = f"""# 商业洞察分析报告
+    report = f"""# Business Insight Analysis Report
 
-## 1. 执行摘要
-用户目标: {user_goal}
-模型验证结果: {model_summary}
+## 1. Executive Summary
+User goal: {user_goal}
+Model validation result: {model_summary}
 
-## 2. 核心特征的业务解读
-以下特征对预测目标影响最大:
+## 2. Business Interpretation of Key Features
+The following features have the strongest impact on the prediction target:
 {fi_text}
 
-## 3. 外部文献与行业参考 (RAG 增强)
+## 3. External Literature and Industry References (RAG Enhanced)
 {docs_text}
 
-## 4. 可执行商业建议
-（本节依赖 LLM 生成；本次调用未返回有效正文，故仅保留模板。请检查 `business_translator` 所用 API、配额或 `STUB_MODE`，并参考上文特征与文献做业务决策。）
+## 4. Actionable Business Recommendations
+This section depends on LLM generation. The current call did not return valid content, so only the fallback template is provided. Check the API, quota, or `STUB_MODE` used by `business_translator`, and use the feature and literature evidence above for decision-making.
 """
     return report

@@ -69,7 +69,7 @@ def execute_code(code: str, timeout: int = 300) -> tuple[str, str]:
         return stdout, ""
 
     except subprocess.TimeoutExpired:
-        return "", f"[TimeoutError] 代码执行超过 {timeout} 秒限制"
+        return "", f"[TimeoutError] Code execution exceeded the {timeout}-second limit."
     except Exception as e:
         return "", f"[ExecutionError] {str(e)}"
     finally:

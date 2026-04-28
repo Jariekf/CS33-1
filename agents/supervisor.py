@@ -28,11 +28,11 @@ logger = get_agent_logger("supervisor")
 
 class ReviewReport(BaseModel):
     """Supervisor 产出的标准化审查报告。"""
-    score: int = Field(description="1-5 分的质量评分，3 分为及格线")
-    passed: bool = Field(description="是否允许通过当前阶段")
-    feedback_for_retry: str = Field(default="", description="不通过时给出的具体修改方向")
-    summary_for_memory: str = Field(default="", description="通过时写入全局 Memory 的精简摘要 (≤100字)")
-    detailed_report: str = Field(default="", description="通过时落盘的完整 Markdown 审查报告")
+    score: int = Field(description="Quality score from 1 to 5; 3 is the passing threshold.")
+    passed: bool = Field(description="Whether the current phase is allowed to pass.")
+    feedback_for_retry: str = Field(default="", description="Specific fix guidance when the phase does not pass.")
+    summary_for_memory: str = Field(default="", description="Concise memory summary written after pass, within 100 words.")
+    detailed_report: str = Field(default="", description="Detailed Markdown review report written after pass.")
 
     # LLMs often fill fields that are not meaningful in the current context with
     # null (e.g. setting ``feedback_for_retry`` to null when ``passed`` is true).
@@ -178,7 +178,7 @@ def supervisor_node(state: GraphState) -> dict:
         with open(report_path, "w", encoding="utf-8") as f:
             f.write(review.detailed_report)
 
-        memory_entry = f"[{phase}] {review.summary_for_memory} 详情见 {report_path}"
+        memory_entry = f"[{phase}] {review.summary_for_memory} Details: {report_path}"
         updates["memory"] = [memory_entry]
         updates["current_error"] = ""
         updates["retry_count"] = 0
