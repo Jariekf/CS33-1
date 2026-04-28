@@ -19,6 +19,7 @@ from agents.feature_engineering import FE_OUTPUT_PATH, FE_TEST_OUTPUT_PATH, _MOD
 from agents.data_cleaning import TRAIN_DATA_PATH, TEST_DATA_PATH
 
 logger = get_agent_logger("model_selection")
+FEATURE_IMPORTANCE_PATH = "./workspace/feature_importance.json"
 
 # ======================================================================
 # Prompt 模板
@@ -145,10 +146,17 @@ def model_selection_node(state: GraphState) -> dict:
     stdout, stderr = "", ""
     error_history = []
     for attempt in range(MAX_INNER_RETRY):
+        previous_signature = _get_file_signature(FEATURE_IMPORTANCE_PATH)
         stdout, stderr = execute_code(code)
         if not stderr:
-            logger.info("Model selection code executed successfully.")
-            break
+            validation_error = _validate_model_artifact(
+                FEATURE_IMPORTANCE_PATH,
+                previous_signature=previous_signature,
+            )
+            if not validation_error:
+                logger.info("Model selection code executed successfully.")
+                break
+            stderr = f"[PostValidationFailed] {validation_error}"
         # Deterministic dependency fallback: if optional boosting libs are not
         # installed in runtime, switch to the internal sklearn-only template
         # instead of repeatedly asking the LLM to import unavailable modules.
@@ -173,7 +181,7 @@ def model_selection_node(state: GraphState) -> dict:
         error_history.append(f"Attempt {attempt + 1}: {stderr}")
         # Show head (traceback origin) + tail (exception type & message) for diagnosis.
         _snippet = stderr if len(stderr) <= 2000 else f"{stderr[:1000]}\n...[truncated {len(stderr)} chars total]...\n{stderr[-1000:]}"
-        logger.info("内部自救第 %d 次: %s", attempt + 1, _snippet)
+        logger.info("Inner self-heal attempt %d: %s", attempt + 1, _snippet)
         # On the final iteration there is no next execute_code, so calling
         # _fix_code would burn an LLM request whose output is never run.
         if attempt == MAX_INNER_RETRY - 1:
@@ -217,6 +225,64 @@ def _dataset_description_block(desc: str) -> str:
     if text:
         return text
     return "(not provided; infer cautiously from column names and sample rows)"
+
+
+def _get_file_signature(file_path: str) -> tuple[int, int] | None:
+    """Return file signature (mtime_ns, size), or None if the file does not exist."""
+    import os
+
+    if not os.path.exists(file_path):
+        return None
+    stat = os.stat(file_path)
+    return stat.st_mtime_ns, stat.st_size
+
+
+def _validate_model_artifact(
+    output_path: str,
+    previous_signature: tuple[int, int] | None = None,
+) -> str:
+    """Validate feature-importance JSON before passing the phase to Supervisor."""
+    import os
+
+    if not os.path.exists(output_path):
+        return f"feature importance output not found: {output_path}"
+    if not os.path.isfile(output_path):
+        return f"feature importance output is not a file: {output_path}"
+
+    current_signature = _get_file_signature(output_path)
+    if current_signature is None:
+        return f"failed to stat feature importance output: {output_path}"
+    if current_signature[1] <= 0:
+        return "feature importance output file is empty"
+    if previous_signature is not None and current_signature == previous_signature:
+        return "feature importance output file was not updated in current run"
+
+    try:
+        with open(output_path, "r", encoding="utf-8") as f:
+            payload = json.load(f)
+    except Exception as e:
+        return f"feature importance JSON could not be read: {e}"
+
+    if not isinstance(payload, dict):
+        return "feature importance JSON must be a dict of feature_name -> numeric importance"
+    if not payload:
+        return "feature importance JSON is empty"
+
+    invalid_keys = []
+    for key, value in payload.items():
+        if not str(key).strip():
+            invalid_keys.append(key)
+            continue
+        try:
+            float(value)
+        except (TypeError, ValueError):
+            invalid_keys.append(key)
+    if invalid_keys:
+        shown = ", ".join(repr(k) for k in invalid_keys[:5])
+        more = f" (+{len(invalid_keys) - 5} more)" if len(invalid_keys) > 5 else ""
+        return f"feature importance JSON has non-numeric values for: {shown}{more}"
+
+    return ""
 
 
 def _restore_missing_target_columns(plan: dict) -> None:
@@ -317,7 +383,7 @@ def _generate_model_code(
         if code:
             return code
 
-    logger.warning("LLM 调用失败或未返回代码，使用桩代码模板。")
+    logger.warning("LLM call failed or returned no code; using fallback code template.")
     return _fallback_model_code(plan, data_path, user_goal=user_goal, dataset_description=dataset_description)
 
 
@@ -329,7 +395,7 @@ def _fix_code(
     user_goal: str = "",
     eda_summary: str = "",
 ) -> str:
-    """调用 LLM 修复代码。若失败则原样返回。"""
+    """Call the LLM to fix code. Return the original code if the fix call fails."""
     user_prompt = _USER_PROMPT_FIX.format(
         code=code,
         error=error,
@@ -344,7 +410,7 @@ def _fix_code(
         if fixed_code:
             return fixed_code
             
-    logger.warning("LLM 修复调用失败，返回原代码。")
+    logger.warning("LLM fix call failed; returning original code.")
     return code
 
 
@@ -381,7 +447,7 @@ def _fallback_model_code(
     user_goal: str = "",
     dataset_description: str = "",
 ) -> str:
-    """失败时的桩代码模板。"""
+    """Fallback template code when generation fails."""
     task_kind = _infer_task_kind(plan, user_goal, dataset_description)
     metric = str(plan.get("evaluation_metric") or "").strip()
     if not metric:
@@ -436,7 +502,7 @@ print(f"Target Column: {{target_col}}")
 print(f"CV {{metric_name}} Mean: {{scores.mean():.4f}} (+/- {{scores.std():.4f}})")
 print(f"Top 5 Feature Importance: {{dict(list(fi_sorted.items())[:5])}}")
 
-# 保存特征重要性
+# Save feature importance.
 os.makedirs("./workspace", exist_ok=True)
 with open("./workspace/feature_importance.json", "w") as f:
     json.dump(fi_sorted, f, indent=2)
