@@ -133,8 +133,31 @@ def supervisor_node(state: GraphState) -> dict:
     phase = state["current_phase"]
     code = state.get("current_code", "")
     execution_log = state.get("current_execution_log", "")
+    current_error = (state.get("current_error") or "").strip()
     logger.info(f"Supervisor node started for phase: {phase}.")
     plan = state.get("global_plan", {}).get(f"{phase}_plan", {})
+
+    # If the worker already exhausted its own retries and surfaced a runtime
+    # error, do not let the Supervisor's JSON/LLM degradation path mask that
+    # failure as a pass. Bounce the phase back immediately with the concrete
+    # worker error so the outer retry loop can react deterministically.
+    if current_error:
+        logger.warning(
+            "Worker phase %s entered Supervisor with current_error present; forcing review failure.",
+            phase,
+        )
+        review = ReviewReport(
+            score=1,
+            passed=False,
+            feedback_for_retry=current_error,
+            summary_for_memory="",
+            detailed_report="",
+        )
+        updates: dict = {"current_review": review.model_dump()}
+        updates["current_error"] = review.feedback_for_retry
+        updates["retry_count"] = state.get("retry_count", 0) + 1
+        updates["outer_retry_total"] = state.get("outer_retry_total", 0) + 1
+        return updates
 
     # ------------------------------------------------------------------
     # 调用 LLM 进行结构化审查
