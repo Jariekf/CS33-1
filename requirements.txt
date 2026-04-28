@@ -4,6 +4,10 @@
 langgraph>=0.2.0
 langchain-core>=0.3.0
 langchain-openai>=0.2.0
+langchain-community>=0.3.0
+langchain-text-splitters>=0.3.0
+langchain-milvus>=0.1.0
+pymilvus[milvus_lite]>=2.4.0
 
 # ---- 数据处理 ----
 numpy>=1.24.0
@@ -42,6 +46,9 @@ python-dotenv>=1.0.0
 
 # ---- 结构化输出 ----
 pydantic>=2.0.0
+
+# ---- RAG 重排序（可选但推荐） ----
+sentence-transformers>=3.0.0
 
 # ---- 可选：高级调参 ----
 # optuna>=3.0.0
