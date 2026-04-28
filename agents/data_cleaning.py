@@ -44,6 +44,45 @@ TRAIN_DATA_PATH = "./workspace/train_data.csv"
 TEST_DATA_PATH = "./workspace/test_data.csv"
 
 
+def _infer_target_column_name(
+    columns: list[str],
+    model_selection_plan: dict | None = None,
+) -> str | None:
+    """Infer a likely supervised target column conservatively."""
+    if not columns:
+        return None
+    explicit = ""
+    if isinstance(model_selection_plan, dict):
+        explicit = str(model_selection_plan.get("target_column") or "").strip()
+    if explicit and explicit in columns:
+        return explicit
+    semantic_exact = {"target", "label", "labels", "outcome", "response", "dependent", "y", "class"}
+    semantic_contains = ("target", "label", "outcome", "response", "dependent")
+    lowered = {c: str(c).strip().lower().replace(" ", "_") for c in columns}
+    exact_hits = [c for c, lc in lowered.items() if lc in semantic_exact]
+    contains_hits = [c for c, lc in lowered.items() if any(tok in lc for tok in semantic_contains)]
+    candidates = exact_hits or contains_hits
+    return candidates[0] if candidates else None
+
+
+def _move_target_column_to_end(csv_path: str, model_selection_plan: dict | None = None) -> str:
+    """Best-effort reorder so a reliable target column sits at the end."""
+    try:
+        import pandas as pd
+
+        df = pd.read_csv(csv_path)
+        target_col = _infer_target_column_name(df.columns.tolist(), model_selection_plan)
+        if not target_col or target_col == df.columns[-1]:
+            return ""
+        reordered = [c for c in df.columns if c != target_col] + [target_col]
+        df = df[reordered]
+        df.to_csv(csv_path, index=False)
+        logger.info("Moved inferred target column '%s' to the end of %s.", target_col, csv_path)
+        return ""
+    except Exception as exc:
+        return str(exc)
+
+
 def data_cleaning_node(state: GraphState) -> dict:
     """LangGraph node function for Data Cleaning."""
 
@@ -106,10 +145,20 @@ def data_cleaning_node(state: GraphState) -> dict:
             "current_error": f"[InnerRetryExhausted] {stderr}",
         }
 
+    reorder_error = _move_target_column_to_end(
+        output_path,
+        (_gp.get("model_selection_plan") if isinstance(_gp, dict) else None),
+    )
+    if reorder_error:
+        logger.warning("Target-column reorder skipped for cleaned CSV: %s", reorder_error)
+
     # ------------------------------------------------------------------
     # Step 3b: Split cleaned data into train (80%) / test (20%)
     # ------------------------------------------------------------------
-    split_error = _split_cleaned_data(output_path)
+    split_error = _split_cleaned_data(
+        output_path,
+        model_selection_plan=(_gp.get("model_selection_plan") if isinstance(_gp, dict) else None),
+    )
     if split_error:
         logger.error("Train/test split failed: %s", split_error)
         return {
@@ -512,7 +561,12 @@ def _validate_cleaning_contract(
     return ""
 
 
-def _split_cleaned_data(cleaned_csv_path: str, test_size: float = 0.2, random_state: int = 42) -> str:
+def _split_cleaned_data(
+    cleaned_csv_path: str,
+    test_size: float = 0.2,
+    random_state: int = 42,
+    model_selection_plan: dict | None = None,
+) -> str:
     """
     Split the cleaned CSV into train (80%) and test (20%) sets.
     Writes TRAIN_DATA_PATH and TEST_DATA_PATH.
@@ -524,6 +578,11 @@ def _split_cleaned_data(cleaned_csv_path: str, test_size: float = 0.2, random_st
 
         df = pd.read_csv(cleaned_csv_path)
         train_df, test_df = train_test_split(df, test_size=test_size, random_state=random_state)
+        target_col = _infer_target_column_name(train_df.columns.tolist(), model_selection_plan)
+        if target_col and target_col in train_df.columns and target_col in test_df.columns:
+            reordered = [c for c in train_df.columns if c != target_col] + [target_col]
+            train_df = train_df[reordered]
+            test_df = test_df[reordered]
         train_df.to_csv(TRAIN_DATA_PATH, index=False)
         test_df.to_csv(TEST_DATA_PATH, index=False)
         logger.info(
