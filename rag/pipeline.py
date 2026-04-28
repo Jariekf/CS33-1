@@ -3,10 +3,10 @@ from __future__ import annotations
 import logging
 from dataclasses import asdict
 
+from rag.chroma_vector import connect_chroma_store, create_chroma_store
 from rag.config import RAGConfig
 from rag.document_processor import build_embeddings, load_text_documents, chunk_documents
 from rag.reranker import CrossEncoderReranker
-from rag.vector_store import connect_milvus_store, create_milvus_store
 
 logger = logging.getLogger(__name__)
 
@@ -23,7 +23,7 @@ class RAGPipeline:
     End-to-end RAG pipeline:
     1) Load docs
     2) Chunk docs
-    3) Embed and upsert into Milvus
+    3) Embed and upsert into Chroma
     4) Retrieve top-k
     5) Optionally rerank
     """
@@ -32,9 +32,9 @@ class RAGPipeline:
         logger.info("Initializing RAG pipeline")
         self.config = config or RAGConfig()
         logger.info(
-            "RAG config loaded: milvus_uri=%s, collection=%s, chunk_size=%s, top_k=%s",
-            self.config.milvus_uri,
-            self.config.milvus_collection,
+            "RAG config loaded: chroma_dir=%s, collection=%s, chunk_size=%s, top_k=%s",
+            self.config.chroma_persist_directory,
+            self.config.chroma_collection,
             self.config.chunk_size,
             self.config.top_k,
         )
@@ -61,33 +61,33 @@ class RAGPipeline:
         logger.info("Split documents into %d chunk(s)", len(chunks))
 
         logger.info(
-            "Writing chunks to Milvus: uri=%s, collection=%s, drop_old=%s",
-            self.config.milvus_uri,
-            self.config.milvus_collection,
+            "Writing chunks to Chroma: persist_directory=%s, collection=%s, drop_old=%s",
+            self.config.chroma_persist_directory,
+            self.config.chroma_collection,
             drop_old,
         )
-        self.vector_store = create_milvus_store(
+        self.vector_store = create_chroma_store(
             documents=chunks,
             embeddings=self.embeddings,
             config=self.config,
             drop_old=drop_old,
         )
-        logger.info("Milvus ingestion completed")
+        logger.info("Chroma ingestion completed")
 
         return {
             "loaded_documents": len(documents),
             "chunk_count": len(chunks),
-            "collection": self.config.milvus_collection,
-            "milvus_uri": self.config.milvus_uri,
+            "collection": self.config.chroma_collection,
+            "persist_directory": self.config.chroma_persist_directory,
         }
 
     def query(self, query_text: str, top_k: int | None = None) -> dict:
         if self.vector_store is None:
             logger.info(
                 "Vector store not initialized in memory; connecting to collection=%s",
-                self.config.milvus_collection,
+                self.config.chroma_collection,
             )
-            self.vector_store = connect_milvus_store(self.embeddings, self.config)
+            self.vector_store = connect_chroma_store(self.embeddings, self.config)
 
         k = top_k or self.config.top_k
         fetch_k = max(k, self.config.retrieve_fetch_k)
