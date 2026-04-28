@@ -141,6 +141,7 @@ def run(
         "current_review": None,
         "outer_retry_total": 0,
         "memory": [],
+        "eda_summary": "",
         "final_business_report": "",
     }
 
