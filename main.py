@@ -164,7 +164,7 @@ def run(
     except Exception as e:
         sys_logger.warning("Manager prompt eval report generation skipped due to error: %s", e)
 
-    return final_state.get("final_business_report", "未生成报告")
+    return final_state.get("final_business_report", "No report generated.")
 
 
 if __name__ == "__main__":
@@ -182,7 +182,7 @@ if __name__ == "__main__":
     )
     parser.add_argument(
         "user_goal",
-        help='Business goal in natural language, e.g. "预测客户流失并给出挽留策略"',
+        help='Business goal in natural language, e.g. "Predict customer churn and provide retention strategies"',
     )
     parser.add_argument(
         "--desc",
@@ -225,12 +225,12 @@ if __name__ == "__main__":
     report_path = "./workspace/business_insight_report.md"
     with open(report_path, "w", encoding="utf-8") as f:
         f.write(report)
-    print(f"\n[+] 最终报告已成功生成并安全保存至: {report_path}")
+    print(f"\n[+] Final report has been generated and saved to: {report_path}")
 
     print("\n" + "=" * 60)
-    print("最终商业分析报告")
+    print("Final Business Analysis Report")
     print("=" * 60)
     try:
         print(report)
     except UnicodeEncodeError:
-        print("[!] 报告包含终端无法显示的特殊字符，请直接打开 workspace 里的文件查看！")
+        print("[!] The report contains characters that cannot be displayed in this terminal. Please open the file in workspace directly.")

@@ -20,7 +20,7 @@ def search_arxiv(query: str, max_results: int | None = None) -> list[dict]:
     """
     import os
     if os.getenv("STUB_MODE", "false").lower() == "true":
-        print(f"[Stub Mode] 桩模式跳过 arXiv 检索。Query: {query}")
+        print(f"[Stub Mode] Skipping arXiv retrieval. Query: {query}")
         return [{
             "title": "Stub Paper on " + query, 
             "summary": "This is a dummy paper for testing the pipeline early stage.", 
@@ -54,8 +54,8 @@ def search_arxiv(query: str, max_results: int | None = None) -> list[dict]:
         return results
 
     except ImportError:
-        print("[Warning] arxiv 库未安装，返回空结果。请运行: pip install arxiv")
+        print("[Warning] arxiv package is not installed; returning empty results. Run: pip install arxiv")
         return []
     except Exception as e:
-        print(f"[Warning] Arxiv 检索失败: {e}")
+        print(f"[Warning] arXiv retrieval failed: {e}")
         return []
