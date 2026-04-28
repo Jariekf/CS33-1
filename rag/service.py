@@ -21,13 +21,13 @@ def upload_knowledge_base(
     Upload local text files into the RAG knowledge base.
 
     This is the public ingestion API for other modules or agents. It handles
-    document loading, chunking, embedding generation, and Milvus storage.
+    document loading, chunking, embedding generation, and vector-store storage.
 
     Args:
         file_paths: A single file path string or an iterable of file path strings.
             Paths can be absolute paths, or relative paths based on the current
             process working directory.
-        drop_old: Whether to drop the existing Milvus collection before uploading.
+        drop_old: Whether to drop the existing vector-store collection before uploading.
             Use True when rebuilding the knowledge base from scratch. Use False
             when appending new documents to the existing collection.
         config: Optional RAGConfig instance. If omitted, configuration is loaded
@@ -37,8 +37,8 @@ def upload_knowledge_base(
         A dictionary with ingestion statistics:
             - loaded_documents: Number of source documents loaded.
             - chunk_count: Number of chunks written to the vector database.
-            - collection: Milvus collection name.
-            - milvus_uri: Milvus connection URI or local Milvus Lite database path.
+            - collection: Vector-store collection name.
+            - persist_directory: Local Chroma persistence directory.
 
     Example:
         upload_knowledge_base("docs/knowledge.txt", drop_old=True)
@@ -60,7 +60,7 @@ def retrieve_knowledge(
     Retrieve relevant contexts from the RAG knowledge base.
 
     This is the public retrieval API for other modules or agents. It handles
-    query embedding, Milvus vector retrieval, optional reranking, and returns
+    query embedding, vector-store retrieval, optional reranking, and returns
     the final context snippets.
 
     Args:

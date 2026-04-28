@@ -7,18 +7,6 @@ from dotenv import load_dotenv
 
 load_dotenv(override=True)
 
-_RESERVED_MILVUS_URI = os.getenv("MILVUS_URI", "").strip()
-if _RESERVED_MILVUS_URI and not _RESERVED_MILVUS_URI.startswith(("http://", "https://")):
-    os.environ.pop("MILVUS_URI", None)
-
-
-def _resolve_milvus_uri() -> str:
-    """
-    Resolve Milvus URI without leaking local Milvus Lite paths into pymilvus'
-    reserved MILVUS_URI environment variable.
-    """
-    return os.getenv("RAG_MILVUS_URI") or _RESERVED_MILVUS_URI or "./milvus_rag.db"
-
 
 def _env_bool(name: str, default: bool) -> bool:
     raw = os.getenv(name)
@@ -39,9 +27,9 @@ class RAGConfig:
     top_k: int = int(os.getenv("RAG_TOP_K", "4"))
     retrieve_fetch_k: int = int(os.getenv("RAG_FETCH_K", "10"))
 
-    # Milvus
-    milvus_uri: str = _resolve_milvus_uri()
-    milvus_collection: str = os.getenv("RAG_MILVUS_COLLECTION", "rag_collection")
+    # Chroma
+    chroma_persist_directory: str = os.getenv("RAG_CHROMA_DIR", "./workspace/chroma_rag")
+    chroma_collection: str = os.getenv("RAG_CHROMA_COLLECTION", "rag_collection")
 
     # Embedding model (OpenAI-compatible endpoint)
     embedding_model: str = os.getenv("RAG_EMBEDDING_MODEL", "text-embedding-3-small")

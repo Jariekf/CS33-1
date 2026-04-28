@@ -3,7 +3,7 @@
 This folder provides a lightweight Retrieval-Augmented Generation (RAG) service based on:
 
 - OpenAI-compatible embeddings
-- Milvus / Milvus Lite vector storage
+- Chroma vector storage
 - Optional CrossEncoder reranking
 
 Other modules and agents should use the public functions in `rag.service` instead of directly calling lower-level files.
@@ -24,7 +24,7 @@ RAG_FETCH_K=10
 - `RAG_CHUNK_SIZE`: Maximum size of each text chunk.
 - `RAG_CHUNK_OVERLAP`: Overlap between neighbouring chunks to preserve context.
 - `RAG_TOP_K`: Default number of final contexts returned by retrieval.
-- `RAG_FETCH_K`: Number of initial candidates fetched from Milvus before reranking.
+- `RAG_FETCH_K`: Number of initial candidates fetched from Chroma before reranking.
 
 ### Embedding Model
 
@@ -40,17 +40,17 @@ OPENAI_BASE_URL=https://api.openai.com/v1
 
 Currently, RAG embeddings reuse the existing OpenAI-compatible variables.
 
-### Milvus
+### Chroma
 
 ```env
-RAG_MILVUS_URI=./workspace/milvus_rag.db
-RAG_MILVUS_COLLECTION=rag_collection
+RAG_CHROMA_DIR=./workspace/chroma_rag
+RAG_CHROMA_COLLECTION=rag_collection
 ```
 
-- `RAG_MILVUS_URI`: Milvus connection URI. For local Milvus Lite, use a `.db` path.
-- `RAG_MILVUS_COLLECTION`: Collection name used to store RAG vectors.
+- `RAG_CHROMA_DIR`: Local directory used by Chroma to persist vector data.
+- `RAG_CHROMA_COLLECTION`: Collection name used to store RAG vectors.
 
-Do not use `MILVUS_URI=./xxx.db` for local files. `MILVUS_URI` is reserved by `pymilvus` and expects a remote HTTP(S) URI.
+Chroma is persistent in this project because `persist_directory` is configured. Uploaded vectors are stored under `RAG_CHROMA_DIR` and can be reused by later retrieval calls as long as the directory is kept.
 
 ### Reranker
 
@@ -74,7 +74,7 @@ from rag.service import upload_knowledge_base, retrieve_knowledge
 
 ### Upload Knowledge Base
 
-Use `upload_knowledge_base()` to load local text files, split them into chunks, embed them, and store them in Milvus.
+Use `upload_knowledge_base()` to load local text files, split them into chunks, embed them, and store them in Chroma.
 
 ```python
 upload_result = upload_knowledge_base(
@@ -98,7 +98,7 @@ upload_result = upload_knowledge_base(
 Parameters:
 
 - `file_paths`: A single path string or a list of path strings.
-- `drop_old`: If `True`, rebuild the Milvus collection from scratch. If `False`, append to the existing collection.
+- `drop_old`: If `True`, rebuild the Chroma collection from scratch. If `False`, append to the existing collection.
 - `config`: Optional `RAGConfig` object. Usually not needed.
 
 Return value example:
@@ -108,7 +108,7 @@ Return value example:
     "loaded_documents": 1,
     "chunk_count": 3,
     "collection": "rag_collection",
-    "milvus_uri": "./workspace/milvus_rag.db",
+    "persist_directory": "./workspace/chroma_rag",
 }
 ```
 
