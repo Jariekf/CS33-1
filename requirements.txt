@@ -41,6 +41,11 @@ duckduckgo-search>=6.0.0
 # 可选：Kaggle kernel 元数据检索（需 ~/.kaggle/kaggle.json）
 kaggle>=1.6.0
 
+# ---- McKinsey RAG 知识库准备 ----
+pyyaml>=6.0           # manifest.yaml / manifest.lock.yaml 解析
+requests>=2.31.0      # 通过 Jina Reader (r.jina.ai) 抓取 url
+pymupdf4llm>=0.0.17   # 本地 PDF -> Markdown（保留 H1-H4 与列表）
+
 # ---- 环境变量 ----
 python-dotenv>=1.0.0
 
