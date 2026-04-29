@@ -1,11 +1,12 @@
 from __future__ import annotations
 
 import logging
-from dataclasses import asdict
+from dataclasses import asdict, replace
+from typing import Mapping
 
 from rag.chroma_vector import connect_chroma_store, create_chroma_store
 from rag.config import RAGConfig
-from rag.document_processor import build_embeddings, load_text_documents, chunk_documents
+from rag.document_processor import build_embeddings, prepare_documents
 from rag.reranker import CrossEncoderReranker
 
 logger = logging.getLogger(__name__)
@@ -18,19 +19,36 @@ def _safe_config_dict(config: RAGConfig) -> dict:
     return config_dict
 
 
+def _resolve_config(config: RAGConfig | None, collection_name: str | None) -> RAGConfig:
+    """Build the effective RAGConfig honoring an optional collection override.
+
+    ``RAGConfig`` is a frozen dataclass; ``replace`` clones it with the new
+    collection name without mutating the caller's instance.
+    """
+    cfg = config or RAGConfig()
+    if collection_name and collection_name != cfg.chroma_collection:
+        cfg = replace(cfg, chroma_collection=collection_name)
+    return cfg
+
+
 class RAGPipeline:
     """
     End-to-end RAG pipeline:
-    1) Load docs
-    2) Chunk docs
+    1) Load docs (text or markdown-aware)
+    2) Chunk docs (with optional markdown header awareness + metadata)
     3) Embed and upsert into Chroma
-    4) Retrieve top-k
+    4) Retrieve top-k (with optional metadata filter)
     5) Optionally rerank
     """
 
-    def __init__(self, config: RAGConfig | None = None) -> None:
+    def __init__(
+        self,
+        config: RAGConfig | None = None,
+        *,
+        collection_name: str | None = None,
+    ) -> None:
         logger.info("Initializing RAG pipeline")
-        self.config = config or RAGConfig()
+        self.config = _resolve_config(config, collection_name)
         logger.info(
             "RAG config loaded: chroma_dir=%s, collection=%s, chunk_size=%s, top_k=%s",
             self.config.chroma_persist_directory,
@@ -53,12 +71,22 @@ class RAGPipeline:
         else:
             logger.warning("Reranker unavailable, retrieval will use original vector order")
 
-    def ingest_text_files(self, file_paths: list[str], drop_old: bool = False) -> dict:
+    def ingest_text_files(
+        self,
+        file_paths: list[str],
+        drop_old: bool = False,
+        *,
+        file_metadata: Mapping[str, Mapping[str, object]] | None = None,
+        markdown_aware: bool | None = None,
+    ) -> dict:
         logger.info("Starting ingestion for %d file(s): %s", len(file_paths), file_paths)
-        documents = load_text_documents(file_paths)
-        logger.info("Loaded %d document(s)", len(documents))
-        chunks = chunk_documents(documents=documents, config=self.config)
-        logger.info("Split documents into %d chunk(s)", len(chunks))
+        chunks = prepare_documents(
+            file_paths=file_paths,
+            config=self.config,
+            file_metadata=file_metadata,
+            markdown_aware=markdown_aware,
+        )
+        logger.info("Prepared %d chunk(s) ready for embedding", len(chunks))
 
         logger.info(
             "Writing chunks to Chroma: persist_directory=%s, collection=%s, drop_old=%s",
@@ -75,13 +103,19 @@ class RAGPipeline:
         logger.info("Chroma ingestion completed")
 
         return {
-            "loaded_documents": len(documents),
+            "loaded_documents": len(file_paths),
             "chunk_count": len(chunks),
             "collection": self.config.chroma_collection,
             "persist_directory": self.config.chroma_persist_directory,
         }
 
-    def query(self, query_text: str, top_k: int | None = None) -> dict:
+    def query(
+        self,
+        query_text: str,
+        top_k: int | None = None,
+        *,
+        metadata_filter: Mapping[str, object] | None = None,
+    ) -> dict:
         if self.vector_store is None:
             logger.info(
                 "Vector store not initialized in memory; connecting to collection=%s",
@@ -91,8 +125,17 @@ class RAGPipeline:
 
         k = top_k or self.config.top_k
         fetch_k = max(k, self.config.retrieve_fetch_k)
-        logger.info("Retrieving documents: query=%s, fetch_k=%d, final_top_k=%d", query_text, fetch_k, k)
-        retrieved_docs = self.vector_store.similarity_search(query=query_text, k=fetch_k)
+        logger.info(
+            "Retrieving documents: query=%s, fetch_k=%d, final_top_k=%d, filter=%s",
+            query_text,
+            fetch_k,
+            k,
+            metadata_filter,
+        )
+        search_kwargs = {"k": fetch_k}
+        if metadata_filter:
+            search_kwargs["filter"] = dict(metadata_filter)
+        retrieved_docs = self.vector_store.similarity_search(query=query_text, **search_kwargs)
         logger.info("Retrieved %d candidate document(s)", len(retrieved_docs))
 
         if self.reranker is not None:
@@ -108,4 +151,5 @@ class RAGPipeline:
             "retrieved_count": len(retrieved_docs),
             "final_count": len(final_docs),
             "contexts": [doc.page_content for doc in final_docs],
+            "documents": final_docs,
         }

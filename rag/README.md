@@ -30,15 +30,25 @@ RAG_FETCH_K=10
 
 ```env
 RAG_EMBEDDING_MODEL=text-embedding-3-small
-OPENAI_API_KEY=your_api_key
-OPENAI_BASE_URL=https://api.openai.com/v1
+RAG_EMBEDDING_API_KEY=your_api_key
+RAG_EMBEDDING_BASE_URL=https://api.openai.com/v1
 ```
 
 - `RAG_EMBEDDING_MODEL`: Embedding model used to convert documents and queries into vectors.
-- `OPENAI_API_KEY`: API key used by the embedding client.
-- `OPENAI_BASE_URL`: OpenAI-compatible base URL used by the embedding client.
+- `RAG_EMBEDDING_API_KEY`: API key for the embedding client. Falls back to
+  `OPENAI_API_KEY` when unset (backward compatible with earlier setups).
+- `RAG_EMBEDDING_BASE_URL`: OpenAI-compatible base URL. Falls back to
+  `OPENAI_BASE_URL` when unset.
 
-Currently, RAG embeddings reuse the existing OpenAI-compatible variables.
+Decoupling RAG from `OPENAI_*` lets you keep the main LLM routing (DeepSeek /
+Zhipu / Qwen / ... in `core/my_llm.py`) independent from the embedding
+provider. Common provider examples:
+
+| Provider | base URL | model |
+|---|---|---|
+| OpenAI | `https://api.openai.com/v1` | `text-embedding-3-small` |
+| DashScope (Qwen) | `https://dashscope.aliyuncs.com/compatible-mode/v1` | `text-embedding-v3` |
+| Zhipu | `https://open.bigmodel.cn/api/paas/v4` | `embedding-3` |
 
 ### Chroma
 
@@ -160,3 +170,88 @@ Run the service-level test from the project root:
 ```
 
 This uploads `tests/sample_knowledge.txt` and retrieves context for a sample query.
+
+---
+
+## McKinsey Knowledge Base Usage
+
+A specialised, isolated knowledge base for the BAT agent that learns to write
+McKinsey-style business reports. Lives in collection `mckinsey_kb`, separate
+from the generic `rag_collection`.
+
+### 1) Register your sources in `data/mckinsey_kb/manifest.yaml`
+
+Each entry must provide **exactly one** of the source fields:
+
+```yaml
+# Online webpage / online PDF -> fetched via Jina Reader
+- url: https://www.mckinsey.com/.../the-state-of-ai-in-2024
+  source_type: mckinsey
+  title: "The state of AI in 2024"
+  year: 2024
+
+# Local PDF -> converted via pymupdf4llm (no network)
+- local_pdf: data/mckinsey_kb/source_pdf/eq_msft_2024q3.pdf
+  source_type: equity_research
+  title: "Microsoft Q3 FY24 Earnings Review"
+  year: 2024
+
+# Already in markdown -> pass-through (no conversion)
+- local_path: data/mckinsey_kb/source_md/pyramid_principle.md
+  source_type: textbook
+  title: "The Pyramid Principle"
+  year: 1985
+```
+
+`source_type` must be one of `mckinsey | equity_research | textbook`.
+
+### 2) Prepare markdown (URL + PDF -> local md)
+
+```bash
+python scripts/prepare_mckinsey_md.py            # incremental
+python scripts/prepare_mckinsey_md.py --force    # rebuild every cached entry
+```
+
+Outputs:
+- `data/mckinsey_kb/raw/<slug>.md`
+- `data/mckinsey_kb/manifest.lock.yaml`
+- `data/mckinsey_kb/prepare_errors.log` (only on failure)
+
+Optional env: `JINA_API_KEY` (faster / higher quota for the Jina Reader path).
+
+### 3) Upload into Chroma collection `mckinsey_kb`
+
+```bash
+python scripts/upload_mckinsey_kb.py            # rebuild from scratch (drop_old=True)
+python scripts/upload_mckinsey_kb.py --append   # incremental upsert
+```
+
+Each chunk receives metadata: `source_type`, `title`, `year`, `section_path`
+(reconstructed from H1>H2>H3 of the original markdown).
+
+### 4) Query the collection programmatically
+
+```python
+from rag.service import retrieve_knowledge
+
+hits = retrieve_knowledge(
+    query="How should we frame strategic implications?",
+    top_k=3,
+    collection_name="mckinsey_kb",
+    metadata_filter={"source_type": "mckinsey"},
+)
+for h in hits:
+    print(h["metadata"].get("title"), "->", h["metadata"].get("section_path"))
+    print(h["content"][:200])
+```
+
+### Tunable env vars
+
+| Variable | Default | Effect |
+|---|---|---|
+| `RAG_MD_CHUNK_SIZE` | 1200 | Chunk size for markdown ingestion |
+| `RAG_MD_CHUNK_OVERLAP` | 200 | Overlap between markdown chunks |
+| `MCKINSEY_COLLECTION` | mckinsey_kb | Collection name BAT retrieves from |
+| `MCKINSEY_PER_BUCKET_TOP_K` | 3 | Hits per source_type bucket per query |
+| `MCKINSEY_MIN_HITS` | 4 | If aggregated McKinsey hits < N, BAT falls back to arxiv |
+| `JINA_API_KEY` | (none) | Optional, sent as Bearer token to Jina Reader |
