@@ -41,19 +41,14 @@ def write_manager_prompt_eval_report(
     csv_path = os.path.join(MANAGER_EVAL_HISTORY_DIR, f"{base_name}.csv")
     latest_md_path = os.path.join(MANAGER_EVAL_LATEST_DIR, "manager_prompt_eval_latest.md")
     latest_csv_path = os.path.join(MANAGER_EVAL_LATEST_DIR, "manager_prompt_eval_latest.csv")
-    legacy_latest_md_path = os.path.join(WORKSPACE_DIR, "manager_prompt_eval_latest.md")
-    legacy_latest_csv_path = os.path.join(WORKSPACE_DIR, "manager_prompt_eval_latest.csv")
 
     markdown = _render_markdown_report(metrics)
     csv_row = _csv_row(metrics)
 
     _write_text(md_path, markdown)
     _write_text(latest_md_path, markdown)
-    # Backward-compatible mirror while downstream scripts migrate.
-    _write_text(legacy_latest_md_path, markdown)
     _write_csv(csv_path, csv_row)
     _write_csv(latest_csv_path, csv_row)
-    _write_csv(legacy_latest_csv_path, csv_row)
 
 
 def _collect_metrics(initial_state: dict, final_state: dict, run_started_at: datetime) -> dict:
@@ -79,6 +74,11 @@ def _collect_metrics(initial_state: dict, final_state: dict, run_started_at: dat
     fusion_empty_rate = float(fusion_meta.get("empty_rate", 1.0))
     fusion_repetition_rate = float(fusion_meta.get("repetition_rate", 0.0))
     fusion_code_leakage_flag = bool(fusion_meta.get("code_leakage_flag", False))
+    fusion_rap_enabled = bool(fusion_meta.get("rap_enabled", False))
+    fusion_arxiv_raw_chars = int(fusion_meta.get("arxiv_raw_chars", 0))
+    fusion_web_raw_chars = int(fusion_meta.get("web_raw_chars", 0))
+    fusion_pwc_raw_chars = int(fusion_meta.get("pwc_raw_chars", 0))
+    fusion_kaggle_raw_chars = int(fusion_meta.get("kaggle_raw_chars", 0))
     failure_label, failure_owner, failure_reason = _infer_failure_attribution(
         json_parse_ok=bool(eval_meta.get("json_parse_ok", False)),
         schema_ok=bool(eval_meta.get("schema_ok", False)),
@@ -109,6 +109,11 @@ def _collect_metrics(initial_state: dict, final_state: dict, run_started_at: dat
         "fusion_empty_rate": fusion_empty_rate,
         "fusion_repetition_rate": fusion_repetition_rate,
         "fusion_code_leakage_flag": fusion_code_leakage_flag,
+        "fusion_rap_enabled": fusion_rap_enabled,
+        "fusion_arxiv_raw_chars": fusion_arxiv_raw_chars,
+        "fusion_web_raw_chars": fusion_web_raw_chars,
+        "fusion_pwc_raw_chars": fusion_pwc_raw_chars,
+        "fusion_kaggle_raw_chars": fusion_kaggle_raw_chars,
         "faithfulness_warning_count": int(summary_meta.get("faithfulness_warning_count", 0)),
         "failure_attribution_label": failure_label,
         "failure_owner": failure_owner,
@@ -151,6 +156,11 @@ def _render_markdown_report(metrics: dict) -> str:
         ("fusion_empty_rate", metrics["fusion_empty_rate"]),
         ("fusion_repetition_rate", metrics["fusion_repetition_rate"]),
         ("fusion_code_leakage_flag", metrics["fusion_code_leakage_flag"]),
+        ("fusion_rap_enabled", metrics["fusion_rap_enabled"]),
+        ("fusion_arxiv_raw_chars", metrics["fusion_arxiv_raw_chars"]),
+        ("fusion_web_raw_chars", metrics["fusion_web_raw_chars"]),
+        ("fusion_pwc_raw_chars", metrics["fusion_pwc_raw_chars"]),
+        ("fusion_kaggle_raw_chars", metrics["fusion_kaggle_raw_chars"]),
         ("faithfulness_warning_count", metrics["faithfulness_warning_count"]),
         ("failure_attribution_label", metrics["failure_attribution_label"]),
         ("failure_owner", metrics["failure_owner"]),
@@ -197,6 +207,8 @@ def _render_markdown_report(metrics: dict) -> str:
 | `fusion_empty_rate` | Whether fused RAP context is empty (1.0 empty, 0.0 non-empty). |
 | `fusion_repetition_rate` | Ratio of duplicated lines in fusion output (lower is better). |
 | `fusion_code_leakage_flag` | Whether fusion output leaks code-like content (e.g. fences/import/def/class). |
+| `fusion_rap_enabled` | Whether RAP retrieval was enabled for this run. |
+| `fusion_*_raw_chars` | Raw character counts gathered from arXiv, web, PapersWithCode, and Kaggle before fusion. |
 | `faithfulness_warning_count` | Warning count from lightweight faithfulness checks; for observation only. |
 | `failure_attribution_label` | Primary failure attribution label for this run. |
 | `failure_owner` | Suggested owner to triage the primary failure cause. |
@@ -244,6 +256,11 @@ def _csv_row(metrics: dict) -> list[dict[str, str]]:
             "fusion_empty_rate": str(metrics["fusion_empty_rate"]),
             "fusion_repetition_rate": str(metrics["fusion_repetition_rate"]),
             "fusion_code_leakage_flag": str(metrics["fusion_code_leakage_flag"]),
+            "fusion_rap_enabled": str(metrics["fusion_rap_enabled"]),
+            "fusion_arxiv_raw_chars": str(metrics["fusion_arxiv_raw_chars"]),
+            "fusion_web_raw_chars": str(metrics["fusion_web_raw_chars"]),
+            "fusion_pwc_raw_chars": str(metrics["fusion_pwc_raw_chars"]),
+            "fusion_kaggle_raw_chars": str(metrics["fusion_kaggle_raw_chars"]),
             "faithfulness_warning_count": str(metrics["faithfulness_warning_count"]),
             "failure_attribution_label": metrics["failure_attribution_label"],
             "failure_owner": metrics["failure_owner"],
@@ -345,6 +362,11 @@ def write_manager_midlayer_eval_report(
         "fusion_empty_rate": float(fusion_meta.get("empty_rate", 1.0)),
         "fusion_repetition_rate": float(fusion_meta.get("repetition_rate", 0.0)),
         "fusion_code_leakage_flag": bool(fusion_meta.get("code_leakage_flag", False)),
+        "fusion_rap_enabled": bool(fusion_meta.get("rap_enabled", False)),
+        "fusion_arxiv_raw_chars": int(fusion_meta.get("arxiv_raw_chars", 0)),
+        "fusion_web_raw_chars": int(fusion_meta.get("web_raw_chars", 0)),
+        "fusion_pwc_raw_chars": int(fusion_meta.get("pwc_raw_chars", 0)),
+        "fusion_kaggle_raw_chars": int(fusion_meta.get("kaggle_raw_chars", 0)),
         "faithfulness_warning_count": int(summary_meta.get("faithfulness_warning_count", 0)),
         "summary_preview": summary[:1000],
         "fusion_preview": fusion_text[:1200],
@@ -355,16 +377,12 @@ def write_manager_midlayer_eval_report(
     csv_path = os.path.join(MANAGER_EVAL_HISTORY_DIR, f"{base_name}.csv")
     latest_md_path = os.path.join(MANAGER_EVAL_LATEST_DIR, "manager_midlayer_eval_latest.md")
     latest_csv_path = os.path.join(MANAGER_EVAL_LATEST_DIR, "manager_midlayer_eval_latest.csv")
-    legacy_latest_md_path = os.path.join(WORKSPACE_DIR, "manager_midlayer_eval_latest.md")
-    legacy_latest_csv_path = os.path.join(WORKSPACE_DIR, "manager_midlayer_eval_latest.csv")
     markdown = _render_midlayer_markdown_report(metrics)
     csv_row = _csv_row_midlayer(metrics)
     _write_text(md_path, markdown)
     _write_text(latest_md_path, markdown)
-    _write_text(legacy_latest_md_path, markdown)
     _write_csv(csv_path, csv_row)
     _write_csv(latest_csv_path, csv_row)
-    _write_csv(legacy_latest_csv_path, csv_row)
     return metrics
 
 
@@ -377,6 +395,11 @@ def _render_midlayer_markdown_report(metrics: dict) -> str:
         ("fusion_empty_rate", metrics["fusion_empty_rate"]),
         ("fusion_repetition_rate", metrics["fusion_repetition_rate"]),
         ("fusion_code_leakage_flag", metrics["fusion_code_leakage_flag"]),
+        ("fusion_rap_enabled", metrics["fusion_rap_enabled"]),
+        ("fusion_arxiv_raw_chars", metrics["fusion_arxiv_raw_chars"]),
+        ("fusion_web_raw_chars", metrics["fusion_web_raw_chars"]),
+        ("fusion_pwc_raw_chars", metrics["fusion_pwc_raw_chars"]),
+        ("fusion_kaggle_raw_chars", metrics["fusion_kaggle_raw_chars"]),
         ("faithfulness_warning_count", metrics["faithfulness_warning_count"]),
     ]
     metric_table = "\n".join(f"| {k} | {v} |" for k, v in rows)
@@ -418,6 +441,11 @@ def _csv_row_midlayer(metrics: dict) -> list[dict[str, str]]:
             "fusion_empty_rate": str(metrics["fusion_empty_rate"]),
             "fusion_repetition_rate": str(metrics["fusion_repetition_rate"]),
             "fusion_code_leakage_flag": str(metrics["fusion_code_leakage_flag"]),
+            "fusion_rap_enabled": str(metrics["fusion_rap_enabled"]),
+            "fusion_arxiv_raw_chars": str(metrics["fusion_arxiv_raw_chars"]),
+            "fusion_web_raw_chars": str(metrics["fusion_web_raw_chars"]),
+            "fusion_pwc_raw_chars": str(metrics["fusion_pwc_raw_chars"]),
+            "fusion_kaggle_raw_chars": str(metrics["fusion_kaggle_raw_chars"]),
             "faithfulness_warning_count": str(metrics["faithfulness_warning_count"]),
         }
     ]

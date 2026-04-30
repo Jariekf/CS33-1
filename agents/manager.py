@@ -90,7 +90,7 @@ def manager_node(state: GraphState) -> dict:
     # Step 2 - RAP retrieval and fusion, separated from Step 1b for readability and testing.
     # ------------------------------------------------------------------
     rap_context, fusion_eval_meta = retrieve_and_fuse_rap_context_with_meta(req_summary, slots, user_goal)
-    logger.info("RAP context built (arXiv + optional web/PWC/Kaggle).")
+    logger.info("RAP context prepared for planning.")
 
     # ------------------------------------------------------------------
     # Step 3 - Structured global_plan generation (LLM).

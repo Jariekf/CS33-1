@@ -330,7 +330,14 @@ def _fuse_sources_with_meta(
     parts: dict[str, str],
 ) -> tuple[str, dict]:
     fused = _fuse_sources(user_requirement_summary, parts)
-    return fused, _build_fusion_eval_meta(fused)
+    return fused, _build_fusion_eval_meta(
+        fused,
+        rap_enabled=True,
+        arxiv_raw_chars=len(parts.get("arXiv (abstracts)", "")),
+        web_raw_chars=len(parts.get("Web search snippets", "")),
+        pwc_raw_chars=len(parts.get("PapersWithCode (local)", "")),
+        kaggle_raw_chars=len(parts.get("Kaggle kernels (titles)", "")),
+    )
 
 
 def retrieve_and_fuse_rap_context(
@@ -359,7 +366,7 @@ def retrieve_and_fuse_rap_context_with_meta(
     if not RAP_ENABLED:
         logger.info("RAP is disabled by RAP_ENABLED=false. Skipping external retrieval.")
         rap_context = "No external retrieval results; RAP is disabled, so planning uses only the user goal and data preview."
-        return rap_context, _build_fusion_eval_meta(rap_context)
+        return rap_context, _build_fusion_eval_meta(rap_context, rap_enabled=False)
 
     queries = _queries_from_slots(slots, user_goal)
 
@@ -377,7 +384,14 @@ def retrieve_and_fuse_rap_context_with_meta(
     rap_context, eval_meta = _fuse_sources_with_meta(user_requirement_summary, parts)
     if not rap_context.strip():
         rap_context = arxiv_raw or "No external retrieval results; planning uses only the user goal and data preview."
-        eval_meta = _build_fusion_eval_meta(rap_context)
+        eval_meta = _build_fusion_eval_meta(
+            rap_context,
+            rap_enabled=True,
+            arxiv_raw_chars=len(arxiv_raw),
+            web_raw_chars=len(web_raw),
+            pwc_raw_chars=len(pwc_raw),
+            kaggle_raw_chars=len(kaggle_raw),
+        )
 
     logger.info(
         "RAP gather | raw_chars: arxiv=%d web=%d pwc=%d kaggle=%d | flags: WEB=%s PWC=%s KAGGLE=%s | fused_chars=%d",
@@ -537,7 +551,15 @@ def _build_faithfulness_warnings(
     }
 
 
-def _build_fusion_eval_meta(text: str) -> dict:
+def _build_fusion_eval_meta(
+    text: str,
+    *,
+    rap_enabled: bool,
+    arxiv_raw_chars: int = 0,
+    web_raw_chars: int = 0,
+    pwc_raw_chars: int = 0,
+    kaggle_raw_chars: int = 0,
+) -> dict:
     content = (text or "").strip()
     if not content:
         return {
@@ -545,6 +567,11 @@ def _build_fusion_eval_meta(text: str) -> dict:
             "repetition_rate": 0.0,
             "code_leakage_flag": False,
             "raw_reply_preview": "",
+            "rap_enabled": rap_enabled,
+            "arxiv_raw_chars": arxiv_raw_chars,
+            "web_raw_chars": web_raw_chars,
+            "pwc_raw_chars": pwc_raw_chars,
+            "kaggle_raw_chars": kaggle_raw_chars,
         }
 
     lines = [line.strip().lower() for line in content.splitlines() if line.strip()]
@@ -558,4 +585,9 @@ def _build_fusion_eval_meta(text: str) -> dict:
         "repetition_rate": repetition_rate,
         "code_leakage_flag": code_leakage_flag,
         "raw_reply_preview": content[:1000],
+        "rap_enabled": rap_enabled,
+        "arxiv_raw_chars": arxiv_raw_chars,
+        "web_raw_chars": web_raw_chars,
+        "pwc_raw_chars": pwc_raw_chars,
+        "kaggle_raw_chars": kaggle_raw_chars,
     }

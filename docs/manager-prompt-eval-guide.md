@@ -2,9 +2,9 @@
 
 ## Purpose
 
-This guide explains the current automated prompt evaluation flow for the Manager agent.
+This guide explains the current automated evaluation flow for the Manager agent.
 
-The current version evaluates only `manager_plan` and keeps the metric set intentionally small.
+The canonical output location is `workspace/manager_eval/`, with `latest/` for the most recent run and `history/` for timestamped records.
 
 ## How To Use It
 
@@ -29,20 +29,11 @@ python main.py ./data/test_data.csv "Predict the target variable and generate bu
 
 Timestamped history files are saved under `workspace/manager_eval/history/`.
 
-For backward compatibility during migration, the same `*_latest` files are also mirrored to the `workspace/` root.
-
 ## Current Scope
 
-The current automated evaluation covers only `manager_plan`.
+The main pipeline report remains centered on `manager_plan`, while also including lightweight health metrics from `manager_summary` and `manager_fusion` as non-blocking warning signals.
 
-It does not yet generate dedicated evaluation records for:
-
-- `manager_summary`
-- `manager_fusion`
-
-The latest report now also includes lightweight health metrics for
-`manager_summary` and `manager_fusion` as daily warning signals.
-These signals are observational only and do not block pipeline flow.
+Dedicated midlayer-only evaluation is available through `run_manager_midlayer_eval.py` when you want to inspect summary and fusion quality without full pipeline noise.
 
 ## The 5 Core Metrics
 
@@ -94,6 +85,16 @@ The markdown report also includes an artifact status section.
 
 This is not treated as a core prompt metric anymore. It is only a supporting reference so you can quickly see which output files were produced during the run.
 
+The report also records RAP status details for interpretation:
+
+- `fusion_rap_enabled`
+- `fusion_arxiv_raw_chars`
+- `fusion_web_raw_chars`
+- `fusion_pwc_raw_chars`
+- `fusion_kaggle_raw_chars`
+
+These fields are diagnostic context only. They help explain whether a fusion preview came from a disabled RAP run, a retrieval-empty run, or a partially successful run.
+
 ## Midlayer-Only Evaluation Entry (Summary/Fusion)
 
 When downstream agents are still being tuned, evaluate the manager midlayer
@@ -108,8 +109,6 @@ This writes:
 - `workspace/manager_eval/latest/manager_midlayer_eval_latest.md`
 - `workspace/manager_eval/latest/manager_midlayer_eval_latest.csv`
 - timestamped history files under `workspace/manager_eval/history/`
-
-For backward compatibility during migration, `manager_midlayer_eval_latest.*` are also mirrored to `workspace/`.
 
 Use this mode to isolate summary/fusion quality from end-to-end pipeline noise.
 
@@ -156,9 +155,9 @@ If a prompt sounds more polished but increases fallback usage or makes the pipel
 
 ---
 
-## Future Extension: Testing `manager_summary`
+## Archived Extensions: Testing `manager_summary`
 
-`manager_summary` should later be evaluated separately.
+Heavier standalone benchmarking for `manager_summary` is intentionally deferred.
 
 Suggested future focus:
 
@@ -178,9 +177,9 @@ Suggested future workflow:
 
 ---
 
-## Future Extension: Testing `manager_fusion`
+## Archived Extensions: Testing `manager_fusion`
 
-`manager_fusion` should also later be evaluated separately.
+Heavier standalone benchmarking for `manager_fusion` is also intentionally deferred.
 
 Suggested future focus:
 
