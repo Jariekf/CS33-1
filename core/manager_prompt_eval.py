@@ -79,6 +79,7 @@ def _collect_metrics(initial_state: dict, final_state: dict, run_started_at: dat
     fusion_web_raw_chars = int(fusion_meta.get("web_raw_chars", 0))
     fusion_pwc_raw_chars = int(fusion_meta.get("pwc_raw_chars", 0))
     fusion_kaggle_raw_chars = int(fusion_meta.get("kaggle_raw_chars", 0))
+    failure_phase = _infer_failure_phase(final_state=final_state, artifacts=artifacts)
     failure_label, failure_owner, failure_reason = _infer_failure_attribution(
         json_parse_ok=bool(eval_meta.get("json_parse_ok", False)),
         schema_ok=bool(eval_meta.get("schema_ok", False)),
@@ -90,12 +91,17 @@ def _collect_metrics(initial_state: dict, final_state: dict, run_started_at: dat
         fusion_empty_rate=fusion_empty_rate,
         fusion_code_leakage_flag=fusion_code_leakage_flag,
     )
+    dataset_description = (initial_state.get("dataset_description", "") or "").strip()
 
     return {
         "run_timestamp": datetime.now().isoformat(timespec="seconds"),
         "data_path": initial_state.get("data_path", ""),
         "user_goal": initial_state.get("user_goal", ""),
         "manager_cleaning_hints": initial_state.get("manager_cleaning_hints", ""),
+        "dataset_description_status": "present" if dataset_description else "missing",
+        "dataset_description_chars": len(dataset_description),
+        "summary_preview": str(global_plan.get("_user_requirement_summary", "") or "")[:1200],
+        "fusion_preview": str(global_plan.get("_rap_context", "") or "")[:1500],
         "prompt_hash": eval_meta.get("prompt_hash", ""),
         "system_prompt": eval_meta.get("system_prompt", ""),
         "user_prompt_preview": eval_meta.get("user_prompt_preview", ""),
@@ -117,6 +123,7 @@ def _collect_metrics(initial_state: dict, final_state: dict, run_started_at: dat
         "faithfulness_warning_count": int(summary_meta.get("faithfulness_warning_count", 0)),
         "failure_attribution_label": failure_label,
         "failure_owner": failure_owner,
+        "failure_phase": failure_phase,
         "failure_reason": failure_reason,
         "pipeline_success": pipeline_success,
         "outer_retry_total": final_state.get("outer_retry_total", 0),
@@ -144,49 +151,64 @@ def _artifact_status(run_started_at: datetime) -> dict[str, bool]:
 
 
 def _render_markdown_report(metrics: dict) -> str:
-    metric_rows = [
-        ("run_timestamp", metrics["run_timestamp"]),
-        ("prompt_hash", metrics["prompt_hash"]),
-        ("json_parse_ok", metrics["json_parse_ok"]),
-        ("schema_ok", metrics["schema_ok"]),
+    health_rows = [
+        ("plan_json_parse_ok", metrics["json_parse_ok"]),
+        ("plan_schema_ok", metrics["schema_ok"]),
         ("used_fallback", metrics["used_fallback"]),
         ("summary_json_parse_ok", metrics["summary_json_parse_ok"]),
         ("summary_required_fields_ok", metrics["summary_required_fields_ok"]),
         ("summary_empty_rate", metrics["summary_empty_rate"]),
+        ("fusion_rap_enabled", metrics["fusion_rap_enabled"]),
         ("fusion_empty_rate", metrics["fusion_empty_rate"]),
         ("fusion_repetition_rate", metrics["fusion_repetition_rate"]),
         ("fusion_code_leakage_flag", metrics["fusion_code_leakage_flag"]),
-        ("fusion_rap_enabled", metrics["fusion_rap_enabled"]),
-        ("fusion_arxiv_raw_chars", metrics["fusion_arxiv_raw_chars"]),
-        ("fusion_web_raw_chars", metrics["fusion_web_raw_chars"]),
-        ("fusion_pwc_raw_chars", metrics["fusion_pwc_raw_chars"]),
-        ("fusion_kaggle_raw_chars", metrics["fusion_kaggle_raw_chars"]),
         ("faithfulness_warning_count", metrics["faithfulness_warning_count"]),
-        ("failure_attribution_label", metrics["failure_attribution_label"]),
-        ("failure_owner", metrics["failure_owner"]),
-        ("outer_retry_total", metrics["outer_retry_total"]),
-        ("pipeline_success", metrics["pipeline_success"]),
+        (
+            "fusion_raw_chars",
+            (
+                f"arxiv={metrics['fusion_arxiv_raw_chars']}, "
+                f"web={metrics['fusion_web_raw_chars']}, "
+                f"pwc={metrics['fusion_pwc_raw_chars']}, "
+                f"kaggle={metrics['fusion_kaggle_raw_chars']}"
+            ),
+        ),
     ]
 
-    metric_table = "\n".join(f"| {name} | {value} |" for name, value in metric_rows)
+    health_table = "\n".join(f"| {name} | {value} |" for name, value in health_rows)
     artifact_rows = "\n".join(
         f"| {name} | {status} |" for name, status in metrics["artifacts"].items()
     )
 
-    return f"""# Manager Prompt Eval Report
+    return f"""# Manager Diagnostic Report
+
+## Purpose
+
+Standalone diagnostic for manager planning health, retrieval slots, RAP fusion, and lightweight failure attribution.
+This report complements runtime logs and keeps CSV prompt metrics available for later comparison.
 
 ## Run Context
 
 - Data path: `{metrics["data_path"]}`
 - User goal: {metrics["user_goal"]}
 - Cleaning hints: {metrics["manager_cleaning_hints"] or "(none)"}
+- Dataset description: {metrics["dataset_description_status"]}, chars={metrics["dataset_description_chars"]}
 - Prompt hash: `{metrics["prompt_hash"]}`
+- Run timestamp: {metrics["run_timestamp"]}
 
-## Metric Record Table
+## Manager Health Summary
 
 | Metric | Value |
 | --- | --- |
-{metric_table}
+{health_table}
+
+## Failure Attribution
+
+- Label: `{metrics["failure_attribution_label"]}`
+- Owner: `{metrics["failure_owner"]}`
+- Failure phase: `{metrics["failure_phase"]}`
+- Reason: {metrics["failure_reason"]}
+- Outer retry total: {metrics["outer_retry_total"]}
+- Pipeline success: {metrics["pipeline_success"]}
 
 ## Artifact Status
 
@@ -212,20 +234,27 @@ def _render_markdown_report(metrics: dict) -> str:
 | `faithfulness_warning_count` | Warning count from lightweight faithfulness checks; for observation only. |
 | `failure_attribution_label` | Primary failure attribution label for this run. |
 | `failure_owner` | Suggested owner to triage the primary failure cause. |
+| `failure_phase` | Best-effort pipeline phase where the run appears to have failed. |
 | `outer_retry_total` | Total number of supervisor-triggered outer retries. Lower is better. |
 | `pipeline_success` | Whether the full workflow produced the expected intermediate artifacts and stage reports successfully. |
 | `artifact status` | A supporting reference only. It shows which output files were produced during this run. |
-
-## Failure Attribution
-
-- Label: `{metrics["failure_attribution_label"]}`
-- Owner: `{metrics["failure_owner"]}`
-- Reason: {metrics["failure_reason"]}
 
 ## Prompt Snapshot
 
 ```text
 {metrics["system_prompt"]}
+```
+
+## Summary Preview
+
+```text
+{metrics["summary_preview"] or "(empty summary)"}
+```
+
+## Fusion Preview
+
+```text
+{metrics["fusion_preview"] or "(empty fusion)"}
 ```
 
 ## Raw Reply Preview
@@ -264,6 +293,7 @@ def _csv_row(metrics: dict) -> list[dict[str, str]]:
             "faithfulness_warning_count": str(metrics["faithfulness_warning_count"]),
             "failure_attribution_label": metrics["failure_attribution_label"],
             "failure_owner": metrics["failure_owner"],
+            "failure_phase": metrics["failure_phase"],
             "outer_retry_total": str(metrics["outer_retry_total"]),
             "pipeline_success": str(metrics["pipeline_success"]),
         }
@@ -324,128 +354,28 @@ def _infer_failure_attribution(
     )
 
 
-def write_manager_midlayer_eval_report(
-    *,
-    data_path: str,
-    user_goal: str,
-    manager_cleaning_hints: str = "",
-) -> dict:
-    """Standalone summary/fusion evaluation entry independent from full pipeline."""
-    from agents.manager import _get_data_preview
-    from agents.manager_retrieval import (
-        retrieve_and_fuse_rap_context_with_meta,
-        summarize_and_extract_slots_with_meta,
-    )
+def _infer_failure_phase(*, final_state: dict, artifacts: dict[str, bool]) -> str:
+    """Infer the most useful failed phase without duplicating runtime logs."""
+    if final_state.get("final_business_report", ""):
+        return "none"
 
-    os.makedirs(WORKSPACE_DIR, exist_ok=True)
-    os.makedirs(MANAGER_EVAL_LATEST_DIR, exist_ok=True)
-    os.makedirs(MANAGER_EVAL_HISTORY_DIR, exist_ok=True)
-    df_preview = _get_data_preview(data_path)
-    summary, slots, summary_meta = summarize_and_extract_slots_with_meta(
-        user_goal=user_goal,
-        df_preview=df_preview,
-        cleaning_hints=manager_cleaning_hints,
-    )
-    fusion_text, fusion_meta = retrieve_and_fuse_rap_context_with_meta(
-        user_requirement_summary=summary,
-        slots=slots,
-        user_goal=user_goal,
-    )
-    metrics = {
-        "run_timestamp": datetime.now().isoformat(timespec="seconds"),
-        "data_path": data_path,
-        "user_goal": user_goal,
-        "manager_cleaning_hints": manager_cleaning_hints,
-        "summary_json_parse_ok": bool(summary_meta.get("json_parse_ok", False)),
-        "summary_required_fields_ok": bool(summary_meta.get("required_fields_ok", False)),
-        "summary_empty_rate": float(summary_meta.get("empty_rate", 1.0)),
-        "fusion_empty_rate": float(fusion_meta.get("empty_rate", 1.0)),
-        "fusion_repetition_rate": float(fusion_meta.get("repetition_rate", 0.0)),
-        "fusion_code_leakage_flag": bool(fusion_meta.get("code_leakage_flag", False)),
-        "fusion_rap_enabled": bool(fusion_meta.get("rap_enabled", False)),
-        "fusion_arxiv_raw_chars": int(fusion_meta.get("arxiv_raw_chars", 0)),
-        "fusion_web_raw_chars": int(fusion_meta.get("web_raw_chars", 0)),
-        "fusion_pwc_raw_chars": int(fusion_meta.get("pwc_raw_chars", 0)),
-        "fusion_kaggle_raw_chars": int(fusion_meta.get("kaggle_raw_chars", 0)),
-        "faithfulness_warning_count": int(summary_meta.get("faithfulness_warning_count", 0)),
-        "summary_preview": summary[:1000],
-        "fusion_preview": fusion_text[:1200],
-    }
-    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-    base_name = f"manager_midlayer_eval_{timestamp}"
-    md_path = os.path.join(MANAGER_EVAL_HISTORY_DIR, f"{base_name}.md")
-    csv_path = os.path.join(MANAGER_EVAL_HISTORY_DIR, f"{base_name}.csv")
-    latest_md_path = os.path.join(MANAGER_EVAL_LATEST_DIR, "manager_midlayer_eval_latest.md")
-    latest_csv_path = os.path.join(MANAGER_EVAL_LATEST_DIR, "manager_midlayer_eval_latest.csv")
-    markdown = _render_midlayer_markdown_report(metrics)
-    csv_row = _csv_row_midlayer(metrics)
-    _write_text(md_path, markdown)
-    _write_text(latest_md_path, markdown)
-    _write_csv(csv_path, csv_row)
-    _write_csv(latest_csv_path, csv_row)
-    return metrics
+    current_error = str(final_state.get("current_error", "") or "").lower()
+    current_phase = str(final_state.get("current_phase", "") or "").strip()
+    if "data cleaning" in current_error or "cleaned" in current_error:
+        return "data_cleaning"
+    if "feature engineering" in current_error or "fe_output" in current_error:
+        return "feature_engineering"
+    if "model selection" in current_error or "feature_importance" in current_error:
+        return "model_selection"
 
-
-def _render_midlayer_markdown_report(metrics: dict) -> str:
-    rows = [
-        ("run_timestamp", metrics["run_timestamp"]),
-        ("summary_json_parse_ok", metrics["summary_json_parse_ok"]),
-        ("summary_required_fields_ok", metrics["summary_required_fields_ok"]),
-        ("summary_empty_rate", metrics["summary_empty_rate"]),
-        ("fusion_empty_rate", metrics["fusion_empty_rate"]),
-        ("fusion_repetition_rate", metrics["fusion_repetition_rate"]),
-        ("fusion_code_leakage_flag", metrics["fusion_code_leakage_flag"]),
-        ("fusion_rap_enabled", metrics["fusion_rap_enabled"]),
-        ("fusion_arxiv_raw_chars", metrics["fusion_arxiv_raw_chars"]),
-        ("fusion_web_raw_chars", metrics["fusion_web_raw_chars"]),
-        ("fusion_pwc_raw_chars", metrics["fusion_pwc_raw_chars"]),
-        ("fusion_kaggle_raw_chars", metrics["fusion_kaggle_raw_chars"]),
-        ("faithfulness_warning_count", metrics["faithfulness_warning_count"]),
-    ]
-    metric_table = "\n".join(f"| {k} | {v} |" for k, v in rows)
-    return f"""# Manager Midlayer Eval Report
-
-## Run Context
-
-- Data path: `{metrics["data_path"]}`
-- User goal: {metrics["user_goal"]}
-- Cleaning hints: {metrics["manager_cleaning_hints"] or "(none)"}
-
-## Metric Record Table
-
-| Metric | Value |
-| --- | --- |
-{metric_table}
-
-## Summary Preview
-
-```text
-{metrics["summary_preview"] or "(empty summary)"}
-```
-
-## Fusion Preview
-
-```text
-{metrics["fusion_preview"] or "(empty fusion)"}
-```
-"""
-
-
-def _csv_row_midlayer(metrics: dict) -> list[dict[str, str]]:
-    return [
-        {
-            "run_timestamp": metrics["run_timestamp"],
-            "summary_json_parse_ok": str(metrics["summary_json_parse_ok"]),
-            "summary_required_fields_ok": str(metrics["summary_required_fields_ok"]),
-            "summary_empty_rate": str(metrics["summary_empty_rate"]),
-            "fusion_empty_rate": str(metrics["fusion_empty_rate"]),
-            "fusion_repetition_rate": str(metrics["fusion_repetition_rate"]),
-            "fusion_code_leakage_flag": str(metrics["fusion_code_leakage_flag"]),
-            "fusion_rap_enabled": str(metrics["fusion_rap_enabled"]),
-            "fusion_arxiv_raw_chars": str(metrics["fusion_arxiv_raw_chars"]),
-            "fusion_web_raw_chars": str(metrics["fusion_web_raw_chars"]),
-            "fusion_pwc_raw_chars": str(metrics["fusion_pwc_raw_chars"]),
-            "fusion_kaggle_raw_chars": str(metrics["fusion_kaggle_raw_chars"]),
-            "faithfulness_warning_count": str(metrics["faithfulness_warning_count"]),
-        }
-    ]
+    if current_phase:
+        return current_phase
+    if not artifacts.get("cleaned_data", False):
+        return "data_cleaning"
+    if not artifacts.get("fe_output", False):
+        return "feature_engineering"
+    if not artifacts.get("feature_importance", False):
+        return "model_selection"
+    if not artifacts.get("business_report", False):
+        return "business_translation"
+    return "unknown"
