@@ -15,7 +15,7 @@ from agents import manager_retrieval as mr
 from core import manager_prompt_eval as mpe
 
 
-class TestManagerMidlayerEval(unittest.TestCase):
+class TestManagerRetrievalMeta(unittest.TestCase):
     def test_summary_meta_fields_and_faithfulness_warning(self):
         reply = (
             '{"user_requirement_summary":"Predict churn from feature1 and feature2 while respecting deduplication constraints",'
@@ -38,7 +38,10 @@ class TestManagerMidlayerEval(unittest.TestCase):
         self.assertIn("faithfulness_warning_count", meta)
 
     def test_fusion_meta_contract(self):
-        with patch("agents.manager_retrieval.call_llm", return_value="- use robust scaling\n- use robust scaling"):
+        with (
+            patch.object(mr, "RAP_ENABLED", False),
+            patch("agents.manager_retrieval.call_llm", return_value="- use robust scaling\n- use robust scaling"),
+        ):
             context, meta = mr.retrieve_and_fuse_rap_context_with_meta(
                 user_requirement_summary="Predict churn from tabular data",
                 slots={
@@ -49,7 +52,6 @@ class TestManagerMidlayerEval(unittest.TestCase):
                 user_goal="Predict churn",
             )
         self.assertTrue(context)
-        # Fusion meta includes health metrics and RAP status fields.
         self.assertIn("empty_rate", meta)
         self.assertIn("repetition_rate", meta)
         self.assertIn("code_leakage_flag", meta)
@@ -66,6 +68,8 @@ class TestManagerMidlayerEval(unittest.TestCase):
         self.assertIn("disabled", disabled_text.lower())
         self.assertNotIn("disabled", empty_text.lower())
 
+
+class TestManagerPromptEvalReport(unittest.TestCase):
     def test_failure_attribution_prefers_manager_input_issue(self):
         label, owner, reason = mpe._infer_failure_attribution(
             json_parse_ok=False,
@@ -82,63 +86,6 @@ class TestManagerMidlayerEval(unittest.TestCase):
         self.assertEqual(owner, "manager")
         self.assertTrue(reason)
 
-    def test_midlayer_eval_writes_only_under_manager_eval_tree(self):
-        with tempfile.TemporaryDirectory() as tmpdir:
-            workspace_dir = os.fspath(Path(tmpdir))
-            latest_dir = os.fspath(Path(tmpdir) / "manager_eval" / "latest")
-            history_dir = os.fspath(Path(tmpdir) / "manager_eval" / "history")
-            with (
-                patch.object(mpe, "WORKSPACE_DIR", workspace_dir),
-                patch.object(mpe, "MANAGER_EVAL_DIR", os.fspath(Path(tmpdir) / "manager_eval")),
-                patch.object(mpe, "MANAGER_EVAL_LATEST_DIR", latest_dir),
-                patch.object(mpe, "MANAGER_EVAL_HISTORY_DIR", history_dir),
-                patch("agents.manager._get_data_preview", return_value="Columns (2): ['x', 'y']"),
-                patch(
-                    "agents.manager_retrieval.summarize_and_extract_slots_with_meta",
-                    return_value=(
-                        "Summary text",
-                        {
-                            "downstream_task": "classification",
-                            "application_domain": "banking",
-                            "area": "tabular classification",
-                        },
-                        {
-                            "json_parse_ok": True,
-                            "required_fields_ok": True,
-                            "empty_rate": 0.0,
-                            "faithfulness_warning_count": 0,
-                        },
-                    ),
-                ),
-                patch(
-                    "agents.manager_retrieval.retrieve_and_fuse_rap_context_with_meta",
-                    return_value=(
-                        "No external retrieval results; planning uses only the user goal and data preview.",
-                        {
-                            "empty_rate": 0.0,
-                            "repetition_rate": 0.0,
-                            "code_leakage_flag": False,
-                            "rap_enabled": True,
-                            "arxiv_raw_chars": 0,
-                            "web_raw_chars": 0,
-                            "pwc_raw_chars": 0,
-                            "kaggle_raw_chars": 0,
-                        },
-                    ),
-                ),
-            ):
-                mpe.write_manager_midlayer_eval_report(
-                    data_path="./data/test_data.csv",
-                    user_goal="Predict churn",
-                )
-
-            self.assertTrue(Path(latest_dir, "manager_midlayer_eval_latest.md").exists())
-            self.assertTrue(Path(latest_dir, "manager_midlayer_eval_latest.csv").exists())
-            self.assertFalse(Path(workspace_dir, "manager_midlayer_eval_latest.md").exists())
-            self.assertFalse(Path(workspace_dir, "manager_midlayer_eval_latest.csv").exists())
-
-
-class TestManagerPromptEvalReport(unittest.TestCase):
     def test_prompt_eval_report_writes_only_under_manager_eval_tree(self):
         with tempfile.TemporaryDirectory() as tmpdir:
             workspace_dir = os.fspath(Path(tmpdir))
@@ -155,9 +102,12 @@ class TestManagerPromptEvalReport(unittest.TestCase):
                         "data_path": "./data/test_data.csv",
                         "user_goal": "Predict churn",
                         "manager_cleaning_hints": "",
+                        "dataset_description": "small telecom churn dataset",
                     },
                     final_state={
                         "global_plan": {
+                            "_user_requirement_summary": "Predict churn from telecom customer records.",
+                            "_rap_context": "Use robust tabular classification practices.",
                             "_manager_plan_eval": {
                                 "prompt_hash": "abc123",
                                 "system_prompt": "prompt",
@@ -180,6 +130,8 @@ class TestManagerPromptEvalReport(unittest.TestCase):
                             },
                         },
                         "outer_retry_total": 0,
+                        "current_phase": "data_cleaning",
+                        "current_error": "[PostValidationFailed] cleaned CSV has only 5 rows",
                     },
                     run_started_at=datetime.now(),
                 )
@@ -188,6 +140,21 @@ class TestManagerPromptEvalReport(unittest.TestCase):
             self.assertTrue(Path(latest_dir, "manager_prompt_eval_latest.csv").exists())
             self.assertFalse(Path(workspace_dir, "manager_prompt_eval_latest.md").exists())
             self.assertFalse(Path(workspace_dir, "manager_prompt_eval_latest.csv").exists())
+
+            report = Path(latest_dir, "manager_prompt_eval_latest.md").read_text(encoding="utf-8")
+            self.assertIn("# Manager Diagnostic Report", report)
+            self.assertIn("Dataset description: present", report)
+            self.assertIn("## Manager Health Summary", report)
+            self.assertIn("## Failure Attribution", report)
+            self.assertIn("- Failure phase: `data_cleaning`", report)
+            self.assertIn("## Prompt Snapshot", report)
+            self.assertIn("## Summary Preview", report)
+            self.assertIn("Predict churn from telecom customer records.", report)
+            self.assertIn("## Fusion Preview", report)
+            self.assertIn("Use robust tabular classification practices.", report)
+
+    def test_midlayer_report_writer_is_removed(self):
+        self.assertFalse(hasattr(mpe, "write_manager_midlayer_eval_report"))
 
 
 if __name__ == "__main__":

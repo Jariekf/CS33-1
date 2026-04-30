@@ -60,10 +60,11 @@ def manager_node(state: GraphState) -> dict:
     dataset_description = (state.get("dataset_description") or "").strip()
 
     logger.info(
-        "Starting manager_node with user_goal: '%s', data_path: '%s', dataset_description: %s",
+        "Starting manager_node with user_goal: '%s', data_path: '%s', dataset_description: %s, chars=%s",
         user_goal,
         data_path,
-        f"{len(dataset_description)} chars" if dataset_description else "none",
+        "present" if dataset_description else "missing",
+        len(dataset_description),
     )
 
     # ------------------------------------------------------------------
