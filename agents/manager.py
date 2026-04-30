@@ -1,12 +1,12 @@
 """
 Manager Agent (coordination and planning agent)
 Responsibilities:
-  1. Parse the user goal and optional cleaning hints, then generate a
-     user_requirement_summary with an LLM.
+  1. Read the user goal plus optional hints / dataset description, then
+     generate a user_requirement_summary with an LLM.
   2. Build a RAP (Retrieval-Augmented Planning) context through lightweight
      multi-source retrieval and fusion.
-  3. Combine the summary, RAP context, and data preview into a structured
-     global execution plan.
+  3. Combine the summary, dataset description, RAP context, and data preview
+     into a structured global execution plan.
   4. Initialize the global state and start the workflow.
 
 Execution order inside manager_node:
@@ -47,15 +47,24 @@ _MANAGER_PLAN_ALLOWED_TOP_LEVEL_KEYS = {
 def manager_node(state: GraphState) -> dict:
     """
     LangGraph node function for the Manager Agent.
-    Input: initial state containing data_path and user_goal.
-    Output: updated global_plan, current_phase, current_data_path, and related fields.
+    Input: initial state with ``data_path``, ``user_goal``, and optional
+    Manager-side context such as ``manager_cleaning_hints`` /
+    ``dataset_description``.
+    Output: updated ``global_plan`` plus runtime fields for the first worker
+    phase.
     """
 
     user_goal = state["user_goal"]
     data_path = state["data_path"]
     cleaning_hints = (state["manager_cleaning_hints"] or "").strip()
+    dataset_description = (state.get("dataset_description") or "").strip()
 
-    logger.info(f"Starting manager_node with user_goal: '{user_goal}' and data_path: '{data_path}'")
+    logger.info(
+        "Starting manager_node with user_goal: '%s', data_path: '%s', dataset_description: %s",
+        user_goal,
+        data_path,
+        f"{len(dataset_description)} chars" if dataset_description else "none",
+    )
 
     # ------------------------------------------------------------------
     # Step 1a - Data profile (non-LLM).
@@ -66,13 +75,14 @@ def manager_node(state: GraphState) -> dict:
 
     # ------------------------------------------------------------------
     # Step 1b - Requirement summary and retrieval slots (LLM).
-    # manager_cleaning_hints is optional input context used only by this summary prompt.
-    # The output is a narrative summary plus slots; rules/cleaning_contract are generated in Step 3.
+    # This step consumes optional hints / dataset description and produces the
+    # narrative summary plus retrieval slots used downstream.
     # ------------------------------------------------------------------
     req_summary, slots, summary_eval_meta = summarize_and_extract_slots_with_meta(
         user_goal,
         df_preview,
         cleaning_hints,
+        dataset_description,
     )
     logger.info("User requirement summary and retrieval slots ready.")
 
@@ -80,7 +90,7 @@ def manager_node(state: GraphState) -> dict:
     # Step 2 - RAP retrieval and fusion, separated from Step 1b for readability and testing.
     # ------------------------------------------------------------------
     rap_context, fusion_eval_meta = retrieve_and_fuse_rap_context_with_meta(req_summary, slots, user_goal)
-    logger.info("RAP context built (arXiv + optional web/PWC/Kaggle).")
+    logger.info("RAP context prepared for planning.")
 
     # ------------------------------------------------------------------
     # Step 3 - Structured global_plan generation (LLM).
@@ -90,6 +100,7 @@ def manager_node(state: GraphState) -> dict:
         df_preview,
         rap_context,
         user_requirement_summary=req_summary,
+        dataset_description=dataset_description,
     )
     global_plan["_manager_summary_eval"] = summary_eval_meta
     global_plan["_manager_fusion_eval"] = fusion_eval_meta
@@ -147,12 +158,14 @@ def _generate_global_plan(
     rap_context: str,
     *,
     user_requirement_summary: str = "",
+    dataset_description: str = "",
 ) -> dict:
     plan, _ = _generate_global_plan_with_meta(
         user_goal,
         df_preview,
         rap_context,
         user_requirement_summary=user_requirement_summary,
+        dataset_description=dataset_description,
     )
     return plan
 
@@ -163,6 +176,7 @@ def _build_global_plan_prompts(
     rap_context: str,
     *,
     user_requirement_summary: str = "",
+    dataset_description: str = "",
 ) -> tuple[str, str, str, str]:
     """Build prompts for structured execution plan generation (JSON).
 
@@ -171,9 +185,9 @@ def _build_global_plan_prompts(
     - Now, `retrieve_and_fuse_rap_context` produces `rap_context` first, and this function consumes that string.
     - `plan["_rap_context"]` stores the RAP text injected into the planning prompt for audit and reproduction.
 
-    `user_requirement_sum` and `manager_cleaning_hints`:
-    - Hints are written into the Step 1b summary prompt only.
-    - Planning sees `user_goal`, the summary block, `df_preview`, and `rap_context`; each has a distinct role.
+    Planning sees `user_goal`, the summary block, optional
+    `dataset_description`, `df_preview`, and `rap_context`; each serves a
+    different role.
 
     `data_cleaning_plan.cleaning_contract` - Minimal general mode (keys are optional; default or `{}` indicates no validation):
 
@@ -189,12 +203,21 @@ def _build_global_plan_prompts(
     """
     summary_block = user_requirement_summary.strip() or user_goal
     docs_context = rap_context.strip() if rap_context.strip() else "No retrieval results"
+    desc_text = dataset_description.strip() if dataset_description else ""
+    dataset_description_block = (
+        desc_text
+        if desc_text
+        else "(not provided; infer cautiously from column names and sample rows)"
+    )
 
     sys_prompt = """You are a Data Science Engineering Director generating an execution plan."""
     user_prompt = f"""
 User Goal: {user_goal}
 User requirement summary (for alignment):
 {summary_block}
+
+Dataset Description (authoritative; use this over guesses from column names):
+{dataset_description_block}
 
 Data Preview:
 {df_preview}
@@ -240,12 +263,14 @@ def _generate_global_plan_with_meta(
     rap_context: str,
     *,
     user_requirement_summary: str = "",
+    dataset_description: str = "",
 ) -> tuple[dict, dict]:
     sys_prompt, user_prompt, summary_block, docs_context = _build_global_plan_prompts(
         user_goal,
         df_preview,
         rap_context,
         user_requirement_summary=user_requirement_summary,
+        dataset_description=dataset_description,
     )
     reply = call_llm(sys_prompt, user_prompt, agent_name="manager_plan")
     parsed_obj: dict | None = None
