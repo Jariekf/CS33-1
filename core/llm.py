@@ -86,26 +86,29 @@ LLM configuration mapping table.
 Here you can define the llm models corresponding to different agents
 """
 
-AGENT_PROFILE_MAP: dict[str, str] = {
-    "manager": "deepseek", # Simply change the model name to the one you require
-    "manager_summary": "deepseek",
-    "manager_fusion": "deepseek",
-    "manager_plan": "deepseek",
-    "data_cleaning": "qwen",
-    "feature_engineering": "deepseek",
-    "model_selection": "openai",
-    "business_translator": "gemini",
-    "supervisor": "openai",
-}
-
-# AGENT_PROFILE_MAP = {
-#     "manager": "gemini_flash",
-#     "data_cleaning": "gemini_flash",
-#     "feature_engineering": "gemini_flash",
-#     "model_selection": "gemini_flash",
-#     "business_translator": "gemini_flash",
-#     "supervisor": "gemini_flash",
+# AGENT_PROFILE_MAP: dict[str, str] = {
+#     "manager": "openai", # Simply change the model name to the one you require
+#     "manager_summary": "openai",
+#     "manager_fusion": "openai",
+#     "manager_plan": "openai",
+#     "data_cleaning": "openai",
+#     "feature_engineering": "openai",
+#     "model_selection": "openai",
+#     "business_translator": "openai",
+#     "supervisor": "openai",
 # }
+
+AGENT_PROFILE_MAP = {
+    "manager": "gemini_flash",
+    "manager_summary": "gemini_flash",
+    "manager_fusion": "gemini_flash",
+    "manager_plan": "gemini_flash",
+    "data_cleaning": "gemini_flash",
+    "feature_engineering": "gemini_flash",
+    "model_selection": "gemini_flash",
+    "business_translator": "gemini_flash",
+    "supervisor": "gemini_flash",
+}
 
 
 def _resolve_profile(agent_name: str | None = None) -> str:
@@ -152,7 +155,7 @@ def get_llm(agent_name: str | None = None):
             data={"agent_name": agent_name or "", "stub_mode": True},
         )
         # endregion
-        raise Exception("STUB_MODE 开启，强制生成带异常的 LLM 对象触发降级")
+        raise Exception("STUB_MODE is enabled; forcing LLM object failure to trigger fallback.")
 
     resolved_profile = _resolve_profile(agent_name=agent_name)
     llm = PROFILE_LLM_MAP.get(resolved_profile)
@@ -171,7 +174,7 @@ def get_llm(agent_name: str | None = None):
     # endregion
     if llm is None:
         logger.warning(
-            "未识别的 profile '%s'，自动回退到默认 profile '%s'。",
+            "Unknown profile '%s'; falling back to default profile '%s'.",
             resolved_profile,
             DEFAULT_PROFILE,
         )
@@ -192,7 +195,7 @@ def call_llm(
     发起一次 LLM 调用。
     """
     if os.getenv("STUB_MODE", "false").lower() == "true":
-        logger.info("STUB_MODE 开启，跳过 LLM 调用，直接返回 None 触发降级。")
+        logger.info("STUB_MODE is enabled; skipping LLM call and returning None to trigger fallback.")
         # region agent log
         _write_debug_trace(
             run_id="pre-fix",
@@ -260,7 +263,7 @@ def call_llm(
             },
         )
         # endregion
-        logger.error("LLM 调用失败: %s", e)
+        logger.error("LLM call failed: %s", e)
         return None
 
 
@@ -284,7 +287,7 @@ def extract_code(reply: str) -> str | None:
     matches = re.findall(pattern, reply, re.DOTALL)
 
     if not matches:
-        logger.warning("LLM 回复中未找到 ```python ... ``` 代码块。")
+        logger.warning("No ```python ... ``` code block found in LLM reply.")
         return None
 
     # 多段代码拼接 (与 AutoKaggle 一致)

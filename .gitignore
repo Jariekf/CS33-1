@@ -11,3 +11,5 @@ docs/rules.md
 workspace/
 !workspace/.gitkeep
 debug-*.log
+
+.DS_Store

@@ -1,9 +1,10 @@
 """
-Lightweight Manager RAP retrieval layer, aligned with AutoML-style retrieve_knowledge
-without PDF parsing or BM25.
+Lightweight Manager RAP retrieval layer, aligned with AutoML-style
+retrieve_knowledge without PDF parsing or BM25.
 
-- One LLM call generates user_requirement_sum plus structured retrieval slots
-  such as task, domain, and area. Optional cleaning hints are included.
+- One LLM call generates `user_requirement_summary` plus structured retrieval
+  slots such as task, domain, and area.
+- Optional `cleaning_hints` and `dataset_description` shape this summary step.
 - Multiple sources collect summary-level text only: arXiv abstracts,
   DuckDuckGo snippets, local PapersWithCode JSON, and Kaggle kernel metadata.
 - One LLM call fuses the sources into planning-ready knowledge text.
@@ -14,11 +15,13 @@ credentials are optional. PWC participates only when `datasets.json` and
 is equivalent to disabling that source.
 
 Data flow connected to manager.py:
-  user_goal, df_preview, cleaning_hints
-      -> summarize_and_extract_slots -> (user_requirement_sum, slots)
+  user_goal, df_preview, cleaning_hints, dataset_description
+      -> summarize_and_extract_slots -> (user_requirement_summary, slots)
       -> retrieve_and_fuse_rap_context(summary, slots, user_goal) -> rap_context: str
-      -> manager._generate_global_plan(..., rap_context, user_requirement_summary=...)
-      -> global_plan with business JSON and metadata _rap_context / _user_requirement_summary
+      -> manager._generate_global_plan(..., rap_context,
+           user_requirement_summary=..., dataset_description=...)
+      -> global_plan with planning metadata such as _rap_context /
+         _user_requirement_summary
 
 This module does not read or write LangGraph GraphState. It is called by
 manager_node, and the returned values remain local to manager before being
@@ -67,14 +70,19 @@ def summarize_and_extract_slots(
     user_goal: str,
     df_preview: str,
     cleaning_hints: str,
+    dataset_description: str = "",
 ) -> tuple[str, dict[str, str]]:
     """
-    Generate user_requirement_sum and extract downstream_task, application_domain, and area.
+    Generate user_requirement_summary and extract downstream_task, application_domain, and area.
+
+    `cleaning_hints` narrows the summary toward cleaning constraints.
+    `dataset_description` provides authoritative dataset context when available.
     """
     summary, slots, _ = summarize_and_extract_slots_with_meta(
         user_goal=user_goal,
         df_preview=df_preview,
         cleaning_hints=cleaning_hints,
+        dataset_description=dataset_description,
     )
     return summary, slots
 
@@ -83,13 +91,26 @@ def summarize_and_extract_slots_with_meta(
     user_goal: str,
     df_preview: str,
     cleaning_hints: str,
+    dataset_description: str = "",
 ) -> tuple[str, dict[str, str], dict]:
-    """Generate summary/slots with lightweight health + faithfulness metrics."""
+    """
+    Generate summary/slots with lightweight health and faithfulness metrics.
+
+    This is the only step that consumes raw `cleaning_hints`; later planning
+    sees the resulting summary instead. `dataset_description` is treated as
+    authoritative context when present.
+    """
     hints_block = ""
     if cleaning_hints and cleaning_hints.strip():
         hints_block = f"""
 Additional cleaning / contract hints from the team (must be reflected in the summary and kept consistent for retrieval):
 {cleaning_hints.strip()}
+"""
+    desc_block = ""
+    if dataset_description and dataset_description.strip():
+        desc_block = f"""
+Authoritative dataset documentation (treat as ground truth; prefer this over guesses inferred from column names):
+{dataset_description.strip()}
 """
     sys_prompt = "You are a senior data science project manager. Output only valid JSON, no markdown."
     user_prompt = f"""
@@ -98,7 +119,7 @@ User goal:
 
 Data preview:
 {df_preview}
-{hints_block}
+{desc_block}{hints_block}
 
 Return a single JSON object with exactly these string fields:
 - "user_requirement_summary": one concise paragraph (English or Chinese matching the user goal) describing the ML task, data, and objectives; if cleaning hints were given, weave them in as constraints.
@@ -309,7 +330,14 @@ def _fuse_sources_with_meta(
     parts: dict[str, str],
 ) -> tuple[str, dict]:
     fused = _fuse_sources(user_requirement_summary, parts)
-    return fused, _build_fusion_eval_meta(fused)
+    return fused, _build_fusion_eval_meta(
+        fused,
+        rap_enabled=True,
+        arxiv_raw_chars=len(parts.get("arXiv (abstracts)", "")),
+        web_raw_chars=len(parts.get("Web search snippets", "")),
+        pwc_raw_chars=len(parts.get("PapersWithCode (local)", "")),
+        kaggle_raw_chars=len(parts.get("Kaggle kernels (titles)", "")),
+    )
 
 
 def retrieve_and_fuse_rap_context(
@@ -338,7 +366,7 @@ def retrieve_and_fuse_rap_context_with_meta(
     if not RAP_ENABLED:
         logger.info("RAP is disabled by RAP_ENABLED=false. Skipping external retrieval.")
         rap_context = "No external retrieval results; RAP is disabled, so planning uses only the user goal and data preview."
-        return rap_context, _build_fusion_eval_meta(rap_context)
+        return rap_context, _build_fusion_eval_meta(rap_context, rap_enabled=False)
 
     queries = _queries_from_slots(slots, user_goal)
 
@@ -356,7 +384,14 @@ def retrieve_and_fuse_rap_context_with_meta(
     rap_context, eval_meta = _fuse_sources_with_meta(user_requirement_summary, parts)
     if not rap_context.strip():
         rap_context = arxiv_raw or "No external retrieval results; planning uses only the user goal and data preview."
-        eval_meta = _build_fusion_eval_meta(rap_context)
+        eval_meta = _build_fusion_eval_meta(
+            rap_context,
+            rap_enabled=True,
+            arxiv_raw_chars=len(arxiv_raw),
+            web_raw_chars=len(web_raw),
+            pwc_raw_chars=len(pwc_raw),
+            kaggle_raw_chars=len(kaggle_raw),
+        )
 
     logger.info(
         "RAP gather | raw_chars: arxiv=%d web=%d pwc=%d kaggle=%d | flags: WEB=%s PWC=%s KAGGLE=%s | fused_chars=%d",
@@ -378,15 +413,19 @@ def build_rap_context(
     df_preview: str,
     *,
     cleaning_hints: str = "",
+    dataset_description: str = "",
 ) -> tuple[str, str]:
     """
     Convenience wrapper that runs Step 1b (summary + slots) and Step 2 (retrieval + fusion).
 
     Returns:
         user_requirement_summary: reusable by logs, later nodes, or another retrieval pass.
-        rap_context: fused RAP text that can be injected directly into _generate_global_plan.
+        rap_context: fused RAP text that can be injected directly into
+            ``manager._generate_global_plan``.
     """
-    summary, slots = summarize_and_extract_slots(user_goal, df_preview, cleaning_hints)
+    summary, slots = summarize_and_extract_slots(
+        user_goal, df_preview, cleaning_hints, dataset_description=dataset_description
+    )
     rap_context = retrieve_and_fuse_rap_context(summary, slots, user_goal)
     return summary, rap_context
 
@@ -512,7 +551,15 @@ def _build_faithfulness_warnings(
     }
 
 
-def _build_fusion_eval_meta(text: str) -> dict:
+def _build_fusion_eval_meta(
+    text: str,
+    *,
+    rap_enabled: bool,
+    arxiv_raw_chars: int = 0,
+    web_raw_chars: int = 0,
+    pwc_raw_chars: int = 0,
+    kaggle_raw_chars: int = 0,
+) -> dict:
     content = (text or "").strip()
     if not content:
         return {
@@ -520,6 +567,11 @@ def _build_fusion_eval_meta(text: str) -> dict:
             "repetition_rate": 0.0,
             "code_leakage_flag": False,
             "raw_reply_preview": "",
+            "rap_enabled": rap_enabled,
+            "arxiv_raw_chars": arxiv_raw_chars,
+            "web_raw_chars": web_raw_chars,
+            "pwc_raw_chars": pwc_raw_chars,
+            "kaggle_raw_chars": kaggle_raw_chars,
         }
 
     lines = [line.strip().lower() for line in content.splitlines() if line.strip()]
@@ -533,4 +585,9 @@ def _build_fusion_eval_meta(text: str) -> dict:
         "repetition_rate": repetition_rate,
         "code_leakage_flag": code_leakage_flag,
         "raw_reply_preview": content[:1000],
+        "rap_enabled": rap_enabled,
+        "arxiv_raw_chars": arxiv_raw_chars,
+        "web_raw_chars": web_raw_chars,
+        "pwc_raw_chars": pwc_raw_chars,
+        "kaggle_raw_chars": kaggle_raw_chars,
     }
