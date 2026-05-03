@@ -141,7 +141,7 @@ def _artifact_status(run_started_at: datetime) -> dict[str, bool]:
         "cleaned_data": _fresh(os.path.join(WORKSPACE_DIR, "cleaned_data.csv")),
         "fe_output": _fresh(os.path.join(WORKSPACE_DIR, "fe_output.csv")),
         "feature_importance": _fresh(os.path.join(WORKSPACE_DIR, "feature_importance.json")),
-        "business_report": _fresh(os.path.join(WORKSPACE_DIR, "business_insight_report.md")),
+        "business_report": _fresh(os.path.join(WORKSPACE_DIR, "business_insight_report.qmd")),
         "data_cleaning_report": _fresh(os.path.join(WORKSPACE_DIR, "data_cleaning_report.md")),
         "feature_engineering_report": _fresh(
             os.path.join(WORKSPACE_DIR, "feature_engineering_report.md")
