@@ -8,6 +8,7 @@ from core.logger import get_agent_logger
 from core.state import GraphState
 from agents.manager import manager_node
 from agents.data_cleaning import data_cleaning_node
+from agents.eda_analysis import eda_analysis_node
 from agents.feature_engineering import feature_engineering_node
 from agents.model_selection import model_selection_node
 from agents.supervisor import supervisor_node, supervisor_router
@@ -42,6 +43,7 @@ def build_graph() -> StateGraph:
     workflow.add_node("data_cleaning", data_cleaning_node)
     workflow.add_node("supervisor_dc", supervisor_node)
 
+    workflow.add_node("eda_analysis", eda_analysis_node)
     workflow.add_node("feature_engineering", feature_engineering_node)
     workflow.add_node("supervisor_fe", supervisor_node)
 
@@ -60,13 +62,15 @@ def build_graph() -> StateGraph:
     workflow.add_edge("data_cleaning", "supervisor_dc")
     workflow.add_conditional_edges(
         "supervisor_dc",
-        _make_supervisor_routing(next_phase="feature_engineering"),
+        _make_supervisor_routing(next_phase="eda_analysis"),
         {
             "retry": "data_cleaning",
-            "pass": "feature_engineering",
+            "pass": "eda_analysis",
             "error": END,
         },
     )
+
+    workflow.add_edge("eda_analysis", "feature_engineering")
 
     # Feature Engineering → Supervisor(FE)
     workflow.add_edge("feature_engineering", "supervisor_fe")

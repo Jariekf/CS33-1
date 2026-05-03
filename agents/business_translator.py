@@ -50,6 +50,7 @@ def business_translator_node(state: GraphState) -> dict:
     memory = state.get("memory", [])
     dataset_description = (state.get("dataset_description") or "").strip()
     eda_summary = (state.get("eda_summary") or "").strip()
+    eda_charts: list[dict] = state.get("eda_charts") or []
     logger.info("Business Translator node started.")
 
     # ------------------------------------------------------------------
@@ -114,6 +115,7 @@ def business_translator_node(state: GraphState) -> dict:
         style_skeletons=style_skeletons,
         dataset_description=dataset_description,
         eda_summary=eda_summary,
+        eda_charts=eda_charts,
     )
     logger.info("Business report generation complete.")
 
@@ -286,6 +288,20 @@ def _format_mckinsey_bucket(label: str, items: list[dict]) -> str:
     return "\n\n".join(blocks) + "\n"
 
 
+def _format_eda_charts_block(charts: list[dict]) -> str:
+    if not charts:
+        return (
+            "(no static EDA chart files; generation may have been skipped or failed — "
+            "do not invent image paths.)"
+        )
+    lines: list[str] = []
+    for c in charts:
+        rel = (c.get("rel_path") or "").strip()
+        desc = (c.get("desc") or c.get("name") or "chart").strip()
+        lines.append(f"- `{rel}` — {desc}  (when relevant: `![{desc}]({rel})`)")
+    return "\n".join(lines)
+
+
 def _generate_business_report(
     user_goal: str,
     model_summary: str,
@@ -297,6 +313,7 @@ def _generate_business_report(
     style_skeletons: str = "",
     dataset_description: str = "",
     eda_summary: str = "",
+    eda_charts: list[dict] | None = None,
 ) -> str:
     """调用 LLM 生成最终商业报告（McKinsey 风格）。"""
     mckinsey_buckets = mckinsey_buckets or {}
@@ -315,7 +332,8 @@ def _generate_business_report(
         if desc_text
         else "(not provided; base the report on the user goal and model outputs only.)"
     )
-    eda_block = eda_summary if eda_summary else "(not provided by feature engineering)"
+    eda_block = eda_summary if eda_summary else "(not provided by EDA stage)"
+    eda_charts_block = _format_eda_charts_block(eda_charts or [])
 
     mck_block = _format_mckinsey_bucket("McKinsey Reports", mckinsey_buckets.get("mckinsey", []))
     eq_block = _format_mckinsey_bucket("Equity Research & Strategy", mckinsey_buckets.get("equity_research", []))
@@ -327,11 +345,27 @@ def _generate_business_report(
         "Apply the Pyramid Principle (top-down, answer-first), open with SCQA (Situation - Complication - Question - Answer), "
         "structure findings into 3-5 MECE themes, and close with concrete sequenced actions. "
         "CRITICAL: be concise; do NOT repeat any sentence, phrase, or idea; do NOT enter generation loops; "
-        "ground every claim in either the model evidence or the retrieved external context."
+        "ground every claim in either the model evidence or the retrieved external context. "
+        "Your output is a Quarto (.qmd) source document: it MUST start with a YAML front matter block "
+        "(see user instructions), then Markdown body. Image paths must reference only files listed under EDA chart files."
     )
 
     user_prompt = f"""
-Produce a Business Strategy & Insight Report in Markdown, English only.
+Produce a Business Strategy & Insight Report as a Quarto (.qmd) document: YAML front matter first, then Markdown body, English only.
+
+# Document shell (required)
+Your response MUST begin with this YAML front matter (adjust title only if needed):
+---
+title: "Business Strategy & Insight Report"
+format:
+  html:
+    toc: true
+    theme: cosmo
+  pdf:
+    documentclass: article
+---
+
+After the closing `---`, write the report sections in Markdown.
 
 # User Goal
 {user_goal}
@@ -339,8 +373,13 @@ Produce a Business Strategy & Insight Report in Markdown, English only.
 # Dataset Description (authoritative business context for feature interpretation)
 {dataset_description_block}
 
-# EDA Summary from Feature Engineering
+# EDA Summary (static analysis + chart manifest)
 {eda_block}
+
+# EDA chart files (embed when they support a claim; paths relative to project root / Quarto file location)
+{eda_charts_block}
+
+Use `![short caption](./eda_figs/<filename>.png)` in **Situation & Complication** and/or **Key Findings** where an image strengthens the narrative (typically 1--3 images). Do not reference images that are not listed above.
 
 # Model Validation Summary
 {model_summary}

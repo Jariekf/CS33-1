@@ -53,5 +53,6 @@ class GraphState(TypedDict):
     #   "[data_cleaning] 移除15%缺失值, 详情见 ./workspace/clean_report.md"
 
     # ---- 最终交付 ----
-    eda_summary: str               # Feature Engineering 阶段提取的 EDA 摘要 (markdown-like)
+    eda_summary: str               # EDA 节点生成的摘要 + 静态图表说明 (markdown-like)
+    eda_charts: list[dict]          # [{"name","rel_path","desc"}, ...] 相对 workspace
     final_business_report: str      # Business Action Translator 产出的商业分析报告

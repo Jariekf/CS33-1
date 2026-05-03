@@ -4,6 +4,8 @@ Feature Engineering Agent (特征工程智能体)
   根据 Manager 的全局计划中的 feature_engineering_plan，
   生成 Python 特征工程代码并在沙盒中执行（含内部自救机制）。
 
+  EDA 图表与文字摘要由 ``agents.eda_analysis`` 在清洗 Supervisor 通过后单独生成，本阶段不再负责 EDA。
+
 设计参照 AutoKaggle Developer Agent 的核心模式：
   - 结构化 Prompt (CONTEXT + PLAN + CONSTRAINTS + TASK)
   - 上一阶段摘要注入上下文 (previous_summary)
@@ -67,7 +69,6 @@ def feature_engineering_node(state: GraphState) -> dict:
     )
     logger.info("Feature engineering code generation completed.")
 
-    eda_summary = ""
     # ------------------------------------------------------------------
     # Step 2: 内部语法自救循环
     # ------------------------------------------------------------------
@@ -82,7 +83,6 @@ def feature_engineering_node(state: GraphState) -> dict:
         if not stderr:
             validation_error = _validate_fe_artifacts(previous_signatures)
             if not validation_error:
-                eda_summary = _extract_eda_summary(stdout)
                 logger.info("Feature engineering code executed successfully.")
                 break
             stderr = f"[PostValidationFailed] {validation_error}"
@@ -119,7 +119,6 @@ def feature_engineering_node(state: GraphState) -> dict:
             "current_code": code,
             "current_execution_log": stdout,
             "current_error": f"[InnerRetryExhausted] {stderr}",
-            "eda_summary": "",
         }
 
     # Note: we intentionally do NOT set ``current_data_path`` here.
@@ -131,7 +130,6 @@ def feature_engineering_node(state: GraphState) -> dict:
         "current_code": code,
         "current_execution_log": stdout,
         "current_error": "",
-        "eda_summary": eda_summary,
     }
 
 
@@ -193,12 +191,7 @@ Current phase: Feature Engineering
    Both files MUST have exactly the same columns. Fit all encoders/scalers on the training set only, then transform both train and test sets with the fitted objects.
 3. Always work on a copy of the DataFrame, not the original.
 4. Apply consistent modifications (e.g., scaling, encoding) to ensure reproducibility.
-5. Before feature engineering, perform concise EDA on the training set (shape, dtypes, missingness, class balance if target exists, notable outliers/skewness).
-6. Output an EDA summary in markdown-like text enclosed between exact markers:
-   `{eda_start}`
-   ...your EDA summary...
-   `{eda_end}`
-7. Use `print()` to output a summary (feature count before/after, new features created, etc.).
+5. Use `print()` to output a brief summary (feature count before/after, new features created, etc.).
 6. Import all necessary libraries at the top of the code.
 7. Common feature engineering operations to consider:
    - Derived features (interaction, polynomial, aggregation)
@@ -213,9 +206,9 @@ Current phase: Feature Engineering
 10. Before using any column in transformations, grouping, sorting, lagging, rolling, or encoding, validate that the column exists in `df.columns`.
 11. If the dataset does not contain reliable datetime or grouping columns, do not force time-series or hierarchical feature engineering. Fall back to safe row-level or column-level features that are supported by the actual schema.
 12. Do not raise an exception only because an expected column is missing. Skip unsupported feature families and still produce a valid `./workspace/fe_output.csv`.
-13. If obvious class imbalance is detected in the training target column, include at least one mitigation strategy in produced features or metadata (e.g., class_weight hint, resampling note) and mention it in EDA summary.
+13. If obvious class imbalance is detected in the training target column, include at least one mitigation strategy in produced features or metadata (e.g., class_weight hint, resampling note) and mention it in the printed summary.
 14. For supervised tasks, preserve the target column in both output CSVs. Do not drop, scale, one-hot encode, or otherwise transform the target column; keep its original column name and values unchanged.
-15. NEVER hardcode `train_df['y']` or any target reference before checking `df.columns`. If no reliable target is found at runtime, skip target-specific EDA and continue with generic feature engineering.
+15. NEVER hardcode `train_df['y']` or any target reference before checking `df.columns`. If no reliable target is found at runtime, skip target-specific logic and continue with generic feature engineering.
 
 {feedback_section}
 
@@ -263,7 +256,7 @@ Current phase: Feature Engineering
 4. If the previous attempt was rejected, fix the implementation gap rather than only fixing syntax.
 5. Do not use or reference columns that are not present in the loaded dataframe.
 6. If sort/group/time columns are missing, skip those advanced features and continue with simpler valid transformations.
-7. Never raise an exception only because a target column cannot be confidently identified. If no reliable target is found, skip target-specific EDA and preserve generic features only.
+7. Never raise an exception only because a target column cannot be confidently identified. If no reliable target is found, skip target-specific transformations and preserve generic features only.
 
 # RESPONSE: CORRECTED CODE #
 Provide the complete corrected code in a single ```python ... ``` code block.
@@ -372,11 +365,11 @@ def _build_target_hint(data_path: str) -> str:
         return (
             f"No reliable semantic target column was detected. As a conservative fallback, "
             f"treat the last column `{cols[-1]}` as the likely target only if target-specific "
-            "logic is unavoidable; otherwise skip target-specific EDA."
+            "logic is unavoidable; otherwise skip target-specific logic."
         )
     return (
         "No reliable target column was detected from a small runtime sample. "
-        "Do not invent one. Skip target-specific EDA if absent and still produce FE outputs."
+        "Do not invent one. Skip target-specific logic if absent and still produce FE outputs."
     )
 
 
@@ -446,8 +439,6 @@ def _generate_fe_code(
         feedback_section=feedback_section,
         dataset_description_block=_dataset_description_block(dataset_description),
         target_hint=target_hint or "(no runtime target hint available)",
-        eda_start=EDA_SUMMARY_START,
-        eda_end=EDA_SUMMARY_END,
     )
 
     reply = call_llm(_SYSTEM_PROMPT_GENERATE, user_prompt, agent_name="feature_engineering")
@@ -510,12 +501,11 @@ df = pd.read_csv({path_lit})
 df = df.copy()
 original_cols = list(df.columns)
 created_features = []
-eda_lines = []
 
 # Preserve a likely supervised target column unchanged if one is present.
-semantic_exact = {"target", "label", "labels", "outcome", "response", "dependent", "y", "class"}
+semantic_exact = {{"target", "label", "labels", "outcome", "response", "dependent", "y", "class"}}
 semantic_contains = ("target", "label", "outcome", "response", "dependent")
-lowered = {c: str(c).strip().lower().replace(" ", "_") for c in df.columns}
+lowered = {{c: str(c).strip().lower().replace(" ", "_") for c in df.columns}}
 exact_hits = [c for c, lc in lowered.items() if lc in semantic_exact]
 contains_hits = [c for c, lc in lowered.items() if any(tok in lc for tok in semantic_contains)]
 target_col = (exact_hits or contains_hits or [None])[0]
@@ -538,12 +528,6 @@ for col in datetime_candidates:
 
 # 2. Safe numeric features: fill missing values and add log1p / sqrt transforms for non-negative columns.
 numeric_cols = [c for c in df.select_dtypes(include=[np.number]).columns.tolist() if c != target_col]
-eda_lines.append(f"- shape: {{df.shape}}")
-eda_lines.append(f"- numeric_cols: {{len(numeric_cols)}}")
-eda_lines.append(f"- missing_cells_total: {{int(df.isna().sum().sum())}}")
-if numeric_cols:
-    skew = df[numeric_cols].skew(numeric_only=True).sort_values(ascending=False).head(5)
-    eda_lines.append("- top_skew_numeric: " + ", ".join([f"{{k}}={{v:.2f}}" for k, v in skew.items()]))
 for col in numeric_cols:
     if df[col].isna().any():
         df[col] = df[col].fillna(df[col].median())
@@ -586,11 +570,6 @@ if low_card_cols:
 df = df.dropna(axis=1, how="all")
 output_path = "./workspace/fe_output.csv"
 df.to_csv(output_path, index=False)
-print("{EDA_SUMMARY_START}")
-print("## EDA Summary (Feature Engineering)")
-for line in eda_lines:
-    print(line)
-print("{EDA_SUMMARY_END}")
 print(f"Feature engineering complete. Original cols: {{len(original_cols)}}; final cols: {{df.shape[1]}}; created features: {{len(created_features)}}; saved to {{output_path}}")
 """
 
@@ -634,10 +613,6 @@ test_features = test_df.drop(columns=[target_col]) if target_col else test_df.co
 
 original_cols = list(train_features.columns)
 created_features = []
-eda_lines = []
-eda_lines.append(f"- detected_target_col: {{target_col if target_col else 'none'}}")
-eda_lines.append(f"- train_shape_before_fe: {{train_features.shape}}")
-eda_lines.append(f"- missing_cells_total: {{int(train_features.isna().sum().sum())}}")
 
 datetime_candidates = []
 for col in train_features.columns:
@@ -658,10 +633,6 @@ for col in datetime_candidates:
             created_features.append(new_col)
 
 numeric_cols = train_features.select_dtypes(include=[np.number]).columns.tolist()
-eda_lines.append(f"- numeric_cols: {{len(numeric_cols)}}")
-if numeric_cols:
-    skew = train_features[numeric_cols].skew(numeric_only=True).sort_values(ascending=False).head(5)
-    eda_lines.append("- top_skew_numeric: " + ", ".join([f"{{k}}={{v:.2f}}" for k, v in skew.items()]))
 
 for col in numeric_cols:
     median = pd.to_numeric(train_features[col], errors="coerce").median()
@@ -711,22 +682,17 @@ test_features = test_features.reindex(columns=train_features.columns, fill_value
 if target_col:
     train_features[target_col] = target_train.values
     test_features[target_col] = target_test.values
-    eda_lines.append(f"- target_sample_values: {{target_train.dropna().astype(str).str.strip().str.lower().unique().tolist()[:10]}}")
 
 train_output_path = "./workspace/fe_output.csv"
 test_output_path = "./workspace/fe_test_output.csv"
 train_features.to_csv(train_output_path, index=False)
 test_features.to_csv(test_output_path, index=False)
-print("{EDA_SUMMARY_START}")
-print("## EDA Summary (Feature Engineering)")
-for line in eda_lines:
-    print(line)
-print("{EDA_SUMMARY_END}")
 print(f"Feature engineering complete. Original cols: {{len(original_cols)}}; final train cols: {{train_features.shape[1]}}; created features: {{len(created_features)}}; saved to {{train_output_path}} and {{test_output_path}}")
 """
 
 
 def _extract_eda_summary(stdout: str) -> str:
+    """Deprecated: EDA text now comes from ``agents.eda_analysis``. Kept for compatibility."""
     text = (stdout or "").strip()
     if not text:
         return ""

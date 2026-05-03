@@ -53,16 +53,18 @@ The current pipeline is organised as the following sequence:
    Generates and executes cleaning code for the raw input dataset, then writes the cleaned artifact to a fixed workspace path for downstream reuse.
 3. `Supervisor Agent`
    Reviews code and execution logs through a structured JSON report, and either passes the stage or requests a retry.
-4. `Feature Engineering Agent`
+4. `EDA Analysis` (deterministic)
+   After cleaning passes, reads the train split CSV and writes static matplotlib/seaborn charts plus a short markdown summary under `workspace/eda_figs/`.
+5. `Feature Engineering Agent`
    Generates and executes feature engineering code based on the manager plan and prior stage summary, reading the cleaned train split from a fixed upstream path and applying aligned transformations to both train and test artifacts.
-5. `Supervisor Agent`
+6. `Supervisor Agent`
    Performs another review checkpoint.
-6. `Model Agent`
+7. `Model Agent`
    Generates model selection and validation code, then exports feature importance.
-7. `Supervisor Agent`
+8. `Supervisor Agent`
    Validates the modelling stage.
-8. `Business Action Translator Agent`
-   Combines the model-stage summary, feature importance, dataset context, and arXiv retrieval results to produce a business insight report.
+9. `Business Action Translator Agent`
+   Combines the model-stage summary, EDA summary and chart paths, feature importance, dataset context, and RAG retrieval results to produce a **Quarto (`.qmd`)** business insight report. If the [Quarto](https://quarto.org) CLI is on `PATH`, `main.py` will also run `quarto render` to produce HTML. PDF output is optional (install a TeX distribution or `quarto install tinytex`).
 
 ### Core Design Highlights
 
@@ -101,7 +103,7 @@ CS33-1/
 ### Directory Notes
 
 - [agents](https://github.sydney.edu.au/CS33-1/CS33-1/tree/main/agents)
-  Contains `manager`, `data_cleaning`, `feature_engineering`, `model_selection`, `supervisor`, and `business_translator`.
+  Contains `manager`, `data_cleaning`, `eda_analysis`, `feature_engineering`, `model_selection`, `supervisor`, and `business_translator`.
 - [core](https://github.sydney.edu.au/CS33-1/CS33-1/tree/main/core)
   Defines the workflow graph, shared state, and the common LLM access layer.
 - [tools](https://github.sydney.edu.au/CS33-1/CS33-1/tree/main/tools)

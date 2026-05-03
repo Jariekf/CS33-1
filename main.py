@@ -7,6 +7,7 @@ import os
 from datetime import datetime
 
 from config import WORKSPACE_DIR
+from tools.eda_charts import purge_eda_figs_dir
 from core.graph import build_graph
 from core.manager_prompt_eval import write_manager_prompt_eval_report
 from core.state import GraphState
@@ -41,8 +42,8 @@ _TRANSIENT_ARTIFACTS: tuple[str, ...] = (
     "data_cleaning_report.md",
     "feature_engineering_report.md",
     "model_selection_report.md",
-    # Final business report
-    "business_insight_report.md",
+    # Final business report (Quarto source)
+    "business_insight_report.qmd",
 )
 
 
@@ -53,6 +54,16 @@ def _purge_stale_transient_artifacts() -> None:
     on a fresh checkout, and a permission error should not block the pipeline.
     """
     os.makedirs(WORKSPACE_DIR, exist_ok=True)
+    purge_eda_figs_dir(WORKSPACE_DIR)
+    # Legacy filename before Quarto switch
+    for legacy in ("business_insight_report.md",):
+        try:
+            os.remove(os.path.join(WORKSPACE_DIR, legacy))
+        except FileNotFoundError:
+            pass
+        except OSError as e:
+            sys_logger.warning("Failed to remove legacy artifact %s: %s", legacy, e)
+
     removed: list[str] = []
     for name in _TRANSIENT_ARTIFACTS:
         path = os.path.join(WORKSPACE_DIR, name)
@@ -142,6 +153,7 @@ def run(
         "outer_retry_total": 0,
         "memory": [],
         "eda_summary": "",
+        "eda_charts": [],
         "final_business_report": "",
     }
 
@@ -222,10 +234,36 @@ if __name__ == "__main__":
     # 【修复】先落盘保存，防止终端打印遇到 Unicode 报错导致没保存上
     import os
     os.makedirs("./workspace", exist_ok=True)
-    report_path = "./workspace/business_insight_report.md"
+    report_path = "./workspace/business_insight_report.qmd"
     with open(report_path, "w", encoding="utf-8") as f:
         f.write(report)
     print(f"\n[+] Final report has been generated and saved to: {report_path}")
+
+    import shutil
+    import subprocess
+
+    quarto_bin = shutil.which("quarto")
+    if quarto_bin:
+        try:
+            repo_root = os.path.dirname(os.path.abspath(__file__))
+            proc = subprocess.run(
+                [quarto_bin, "render", report_path, "--to", "html"],
+                capture_output=True,
+                text=True,
+                cwd=repo_root,
+            )
+            if proc.returncode == 0:
+                print("[+] Quarto: rendered HTML from business_insight_report.qmd")
+            else:
+                sys_logger.warning(
+                    "Quarto render failed (exit %s): %s",
+                    proc.returncode,
+                    (proc.stderr or proc.stdout or "")[:2000],
+                )
+        except OSError as e:
+            sys_logger.warning("Quarto render raised: %s", e)
+    else:
+        sys_logger.info("Quarto CLI not found on PATH; skip HTML render. Install from https://quarto.org")
 
     print("\n" + "=" * 60)
     print("Final Business Analysis Report")
