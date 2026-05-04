@@ -55,4 +55,5 @@ class GraphState(TypedDict):
     # ---- 最终交付 ----
     eda_summary: str               # EDA 节点生成的摘要 + 静态图表说明 (markdown-like)
     eda_charts: list[dict]          # [{"name","rel_path","desc"}, ...] 相对 workspace
+    eda_conclusions: dict           # 深度 EDA 结论: task_type, candidate_models, recommended_metrics, warnings
     final_business_report: str      # Business Action Translator 产出的商业分析报告

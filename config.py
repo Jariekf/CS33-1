@@ -32,6 +32,8 @@ SUPERVISOR_PASS_THRESHOLD = 3
 # ============================================================
 WORKSPACE_DIR = os.path.join(os.path.dirname(__file__), "workspace")
 LOG_DIR = os.path.join(os.path.dirname(__file__), "logs")
+# EDA 阶段落盘的 Markdown 报告（与 tools.eda_charts / agents.eda_analysis 一致）
+EDA_REPORT_PATH = os.path.join(WORKSPACE_DIR, "eda_report.md")
 
 # ============================================================
 # Arxiv 检索配置

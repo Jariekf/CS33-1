@@ -53,8 +53,8 @@ The current pipeline is organised as the following sequence:
    Generates and executes cleaning code for the raw input dataset, then writes the cleaned artifact to a fixed workspace path for downstream reuse.
 3. `Supervisor Agent`
    Reviews code and execution logs through a structured JSON report, and either passes the stage or requests a retry.
-4. `EDA Analysis` (deterministic)
-   After cleaning passes, reads the train split CSV and writes static matplotlib/seaborn charts plus a short markdown summary under `workspace/eda_figs/`.
+4. `EDA Analysis`
+   After cleaning passes, reads the train split CSV; runs **deterministic statistics** (correlations, collinearity, quick RF importance, optional train/test drift) and **static charts** under `workspace/eda_figs/`; calls an LLM for structured conclusions (with heuristic fallback); writes **`workspace/eda_report.md`** (four sections: descriptive / correlation / diagnosis / conclusions) and stores **`eda_conclusions`** in `GraphState` for model selection.
 5. `Feature Engineering Agent`
    Generates and executes feature engineering code based on the manager plan and prior stage summary, reading the cleaned train split from a fixed upstream path and applying aligned transformations to both train and test artifacts.
 6. `Supervisor Agent`
