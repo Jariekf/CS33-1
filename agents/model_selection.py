@@ -41,8 +41,11 @@ User goal: {user_goal}
 # DATASET DESCRIPTION (authoritative) #
 {dataset_description_block}
 
-# EDA SUMMARY FROM FEATURE ENGINEERING (advisory) #
+# EDA SUMMARY (full narrative + charts reference; advisory) #
 {eda_summary_block}
+
+# EDA CONCLUSIONS (structured: task type, metrics, models from deep EDA) #
+{eda_conclusions_block}
 
 # PLAN #
 {plan}
@@ -50,7 +53,7 @@ User goal: {user_goal}
 # CONSTRAINTS #
 1. Load training data from: `{data_path}` (feature-engineered 80% train split) using `pd.read_csv`.
 2. A held-out test set is available at: `{test_data_path}`. Use it ONLY for final model evaluation after training/CV is complete — never use it during training or cross-validation.
-3. Infer task type from plan + user goal + dataset context (classification/regression/time-series/clustering), then choose model family and metric accordingly.
+3. Infer task type primarily from **EDA CONCLUSIONS** below when consistent with the loaded DataFrame; otherwise combine plan + user goal + dataset context (classification/regression/time-series/clustering). Align evaluation metrics with EDA CONCLUSIONS when applicable.
 4. For supervised tasks, infer target conservatively from semantics (target/label/outcome/etc.) or explicit plan fields; do NOT blindly assume last column.
 5. If target is ambiguous, print a clear warning and stop rather than training on an unreliable target.
    Before applying any label mapping or encoding to the target column, inspect its actual dtype and unique values (e.g. `print(df[target_col].dtype, df[target_col].unique())`). If the target is already numeric (int/float), use it directly — do NOT re-apply a string→int mapping, as that will produce all-NaN. Only convert string labels (e.g. 'yes'/'no', 'True'/'False') if the column genuinely contains non-numeric values.
@@ -82,8 +85,11 @@ User goal: {user_goal}
 # DATASET DESCRIPTION (authoritative) #
 {dataset_description_block}
 
-# EDA SUMMARY FROM FEATURE ENGINEERING (advisory) #
+# EDA SUMMARY (full narrative; advisory) #
 {eda_summary_block}
+
+# EDA CONCLUSIONS (structured) #
+{eda_conclusions_block}
 
 # PLAN #
 {plan}
@@ -124,6 +130,7 @@ def model_selection_node(state: GraphState) -> dict:
     dataset_description = (state.get("dataset_description") or "").strip()
     user_goal = (state.get("user_goal") or "").strip()
     eda_summary = (state.get("eda_summary") or "").strip()
+    eda_conclusions = state.get("eda_conclusions") or {}
     _restore_missing_target_columns(plan)
 
     # ------------------------------------------------------------------
@@ -137,6 +144,7 @@ def model_selection_node(state: GraphState) -> dict:
         dataset_description,
         user_goal,
         eda_summary,
+        eda_conclusions=eda_conclusions,
     )
     logger.info("Model selection code generation completed.")
 
@@ -193,6 +201,7 @@ def model_selection_node(state: GraphState) -> dict:
             dataset_description,
             user_goal,
             eda_summary,
+            eda_conclusions=eda_conclusions,
         )
 
     # ------------------------------------------------------------------
@@ -344,6 +353,30 @@ def _compress_supervisor_feedback(feedback: str, max_chars: int = 1200) -> str:
     )
 
 
+def _eda_conclusions_block(ec: dict) -> str:
+    if not isinstance(ec, dict) or not ec:
+        return "(not provided; infer task type and metrics from plan + loaded data.)"
+    lines = []
+    tt = ec.get("task_type") or "unknown"
+    lines.append(f"- **task_type (EDA):** `{tt}`")
+    mm = ec.get("recommended_metrics") or {}
+    if isinstance(mm, dict):
+        if mm.get("primary"):
+            lines.append(f"- **primary metric (EDA):** {mm.get('primary')}")
+        if mm.get("secondary"):
+            lines.append(f"- **secondary metric (EDA):** {mm.get('secondary')}")
+    models = ec.get("candidate_models") or []
+    if isinstance(models, list) and models:
+        lines.append("- **candidate model families (EDA):** " + "; ".join(str(m) for m in models[:6]))
+    warns = ec.get("warnings") or []
+    if isinstance(warns, list) and warns:
+        lines.append("- **warnings:** " + " | ".join(str(w) for w in warns[:5]))
+    src = ec.get("source") or ""
+    if src:
+        lines.append(f"- **conclusions source:** {src}")
+    return "\n".join(lines)
+
+
 def _generate_model_code(
     plan: dict,
     data_path: str,
@@ -352,6 +385,7 @@ def _generate_model_code(
     dataset_description: str = "",
     user_goal: str = "",
     eda_summary: str = "",
+    eda_conclusions: dict | None = None,
 ) -> str:
     """
     调用 LLM 生成模型训练与调参代码。
@@ -367,6 +401,7 @@ def _generate_model_code(
             f"{compressed}"
         )
 
+    ec = eda_conclusions if isinstance(eda_conclusions, dict) else {}
     user_prompt = _USER_PROMPT_GENERATE.format(
         plan=json.dumps(plan, ensure_ascii=False, indent=2),
         data_path=data_path,
@@ -375,6 +410,7 @@ def _generate_model_code(
         dataset_description_block=_dataset_description_block(dataset_description),
         user_goal=user_goal or "(not provided)",
         eda_summary_block=_eda_summary_block(eda_summary),
+        eda_conclusions_block=_eda_conclusions_block(ec),
     )
 
     reply = call_llm(_SYSTEM_PROMPT_GENERATE, user_prompt, agent_name="model_selection")
@@ -394,8 +430,10 @@ def _fix_code(
     dataset_description: str = "",
     user_goal: str = "",
     eda_summary: str = "",
+    eda_conclusions: dict | None = None,
 ) -> str:
     """Call the LLM to fix code. Return the original code if the fix call fails."""
+    ec = eda_conclusions if isinstance(eda_conclusions, dict) else {}
     user_prompt = _USER_PROMPT_FIX.format(
         code=code,
         error=error,
@@ -403,6 +441,7 @@ def _fix_code(
         dataset_description_block=_dataset_description_block(dataset_description),
         user_goal=user_goal or "(not provided)",
         eda_summary_block=_eda_summary_block(eda_summary),
+        eda_conclusions_block=_eda_conclusions_block(ec),
     )
     reply = call_llm(_SYSTEM_PROMPT_FIX, user_prompt, agent_name="model_selection")
     if reply:

@@ -40,6 +40,8 @@ _TRANSIENT_ARTIFACTS: tuple[str, ...] = (
     "feature_importance.json",
     # Supervisor detailed reports written per-phase
     "data_cleaning_report.md",
+    # EDA markdown report (agents.eda_analysis)
+    "eda_report.md",
     "feature_engineering_report.md",
     "model_selection_report.md",
     # Final business report (Quarto source)
@@ -154,6 +156,7 @@ def run(
         "memory": [],
         "eda_summary": "",
         "eda_charts": [],
+        "eda_conclusions": {},
         "final_business_report": "",
     }
 

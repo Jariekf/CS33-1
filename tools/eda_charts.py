@@ -3,6 +3,9 @@ Static EDA chart generation (matplotlib + seaborn).
 
 Produces PNG files under ``workspace/eda_figs/`` and a markdown-like text summary.
 Designed to be deterministic and resilient: one failed chart does not block others.
+
+Statistics used for optional charts (feature-target correlation, RF importance)
+should be supplied via ``precomputed_stats`` from ``tools.eda_statistics.compute_eda_statistics``.
 """
 from __future__ import annotations
 
@@ -18,6 +21,8 @@ import matplotlib.pyplot as plt  # noqa: E402
 import numpy as np  # noqa: E402
 import pandas as pd  # noqa: E402
 import seaborn as sns  # noqa: E402
+
+from tools.eda_statistics import compute_eda_statistics, infer_target_column
 
 logger = logging.getLogger(__name__)
 
@@ -39,35 +44,11 @@ def _setup_plot_style() -> None:
             continue
 
 
-def infer_target_column(df: pd.DataFrame) -> str | None:
-    """Heuristic target detection aligned with feature_engineering."""
-    if df.empty or df.shape[1] == 0:
-        return None
-    semantic_exact = {
-        "target",
-        "label",
-        "labels",
-        "outcome",
-        "response",
-        "dependent",
-        "y",
-        "class",
-    }
-    semantic_contains = ("target", "label", "outcome", "response", "dependent")
-    lowered = {c: str(c).strip().lower().replace(" ", "_") for c in df.columns}
-    exact_hits = [c for c, lc in lowered.items() if lc in semantic_exact]
-    contains_hits = [c for c, lc in lowered.items() if any(tok in lc for tok in semantic_contains)]
-    if exact_hits:
-        return exact_hits[0]
-    if contains_hits:
-        return contains_hits[0]
-    return str(df.columns[-1])
-
-
 def generate_eda_charts(
     data_path: str,
     output_dir: str | None = None,
     target_col: str | None = None,
+    precomputed_stats: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
     """
     Read cleaned train CSV, write standard EDA PNGs, return chart metadata and summary text.
@@ -278,6 +259,50 @@ def generate_eda_charts(
         "Boxplots for standardized numeric features (sample)",
         _box_plot,
     )
+
+    # 6) Feature–target correlation (from pre-computed EDA stats)
+    if precomputed_stats:
+        tc_list = (precomputed_stats.get("target_correlation") or [])[:15]
+        if tc_list:
+
+            def _ftarget_plot() -> None:
+                plt.figure(figsize=(9, max(4, 0.4 * len(tc_list))))
+                feats = [str(d.get("feature", "")) for d in tc_list]
+                vals = [float(d.get("pearson_with_target", 0)) for d in tc_list]
+                y_pos = np.arange(len(feats))
+                colors = ["coral" if v < 0 else "steelblue" for v in vals]
+                plt.barh(y_pos, vals, color=colors)
+                plt.yticks(y_pos, [f[:35] for f in feats], fontsize=8)
+                plt.xlabel("Pearson correlation with target")
+                plt.title("Top feature–target linear correlation")
+                plt.axvline(0, color="gray", lw=0.6)
+                plt.tight_layout()
+
+            _save_chart(
+                "feature_target_corr.png",
+                "Top feature–target Pearson correlation (train)",
+                _ftarget_plot,
+            )
+
+        rf_list = (precomputed_stats.get("rf_importance_top15") or [])[:15]
+        if rf_list:
+
+            def _rf_plot() -> None:
+                plt.figure(figsize=(9, max(4, 0.4 * len(rf_list))))
+                feats = [str(d.get("feature", "")) for d in rf_list]
+                imp = [float(d.get("importance", 0)) for d in rf_list]
+                y_pos = np.arange(len(feats))
+                plt.barh(y_pos, imp, color="seagreen")
+                plt.yticks(y_pos, [f[:35] for f in feats], fontsize=8)
+                plt.xlabel("Importance")
+                plt.title("RandomForest feature importance (quick n_estimators=50)")
+                plt.tight_layout()
+
+            _save_chart(
+                "rf_importance.png",
+                "RandomForest quick feature importance (train)",
+                _rf_plot,
+            )
 
     summary_lines.append("\n### Generated charts\n")
     if charts:

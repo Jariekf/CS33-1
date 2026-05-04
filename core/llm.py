@@ -105,6 +105,7 @@ AGENT_PROFILE_MAP = {
     "manager_plan": "gemini_flash",
     "data_cleaning": "gemini_flash",
     "feature_engineering": "gemini_flash",
+    "eda_analysis": "gemini_flash",
     "model_selection": "gemini_flash",
     "business_translator": "gemini_flash",
     "supervisor": "gemini_flash",
@@ -139,6 +140,11 @@ def _resolve_profile(agent_name: str | None = None) -> str:
         # endregion
         if env_profile:
             return env_profile
+        # EDA deep analysis: default to same model as feature_engineering if set
+        if normalized == "eda_analysis":
+            fe = os.getenv("FEATURE_ENGINEERING_PROFILE", "").strip().lower()
+            if fe:
+                return fe
         return AGENT_PROFILE_MAP.get(normalized, DEFAULT_PROFILE)
     return DEFAULT_PROFILE
 
