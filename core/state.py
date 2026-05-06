@@ -1,7 +1,8 @@
 """
-全局状态定义 (GraphState)
-所有 LangGraph 节点共享的状态字典。
-采用 Annotated + operator.add 实现 Memory 的 Append-Only 机制。
+Global state definition (`GraphState`).
+
+Shared dictionary for all LangGraph nodes. Uses `Annotated` plus `operator.add`
+for append-only `memory`.
 """
 from __future__ import annotations
 
@@ -10,50 +11,63 @@ from typing import Annotated, Any, TypedDict
 
 
 class GraphState(TypedDict):
-    """LangGraph 全局状态，贯穿整个工作流。"""
+    """Global LangGraph state for the workflow."""
 
-    # ---- 用户输入 ----
-    data_path: str                  # 用户上传数据集的路径
-    user_goal: str                  # 用户的自然语言业务目标
-    # Manager 检索/规划前可选：队友或用户提供的清洗规则、contract 等文字，会并入 user_requirement_summary
+    # ---- User input ----
+    data_path: str                  # Path to user-uploaded dataset
+    user_goal: str                  # Natural-language business goal
+    # Optional hints for Manager retrieval/planning: cleaning rules / contract text, merged into user_requirement_summary
     manager_cleaning_hints: str
-    # 数据集背景说明（README / data dictionary / 论文等统一加载后的纯文本），所有阶段共用的语义锚
+    # Authoritative dataset context (README, data dictionary, paper text, …), shared semantic anchor across agents
     dataset_description: str
+    # Optional path to a user-held-out test CSV.
+    #   - Empty string → single-CSV flow: ``data_path`` is the full dataset; data_cleaning does random 80/20 split.
+    #   - Non-empty → pre-split flow: ``data_path`` is the train CSV; this field holds the separate test CSV;
+    #     data_cleaning merges both with a hidden marker column, runs cleaning once, splits back into
+    #     ``train_data.csv`` / ``test_data.csv``.
+    # Only ``agents/data_cleaning.py`` reads this; other agents consume ``TRAIN_DATA_PATH`` / ``TEST_DATA_PATH`` in workspace.
+    test_data_path: str
+    # Supervised target column name (single source of truth).
+    #   - Empty string = undetermined / unsupervised / Manager could not infer
+    #   - Resolution order: user CLI --target > Manager inference > last column of data preview (CSV header)
+    #   - Filled in ``agents/manager.py`` ``manager_node``; data_cleaning / feature_engineering / model_selection
+    #     use ``state.get("target_column")`` so they stay aligned (no per-agent semantic guessing).
+    target_column: str
 
-    # ---- Manager 产出 ----
-    global_plan: dict               # Manager 通过 RAP 生成的结构化执行计划
-    #   结构示例:
+    # ---- Manager output ----
+    global_plan: dict               # Structured plan from Manager (RAP-assisted)
+    #   Example shape:
     #   {
     #     "data_cleaning_plan": {...},
     #     "feature_engineering_plan": {...},
     #     "model_selection_plan": {...}
     #   }
 
-    # ---- 流水线运行时状态 ----
-    current_phase: str              # 当前阶段名 ("data_cleaning" / "feature_engineering" / "model_selection")
+    # ---- Runtime pipeline state ----
+    current_phase: str              # e.g. "data_cleaning" / "feature_engineering" / "model_selection"
     current_data_path: str          # Raw input path for data_cleaning (first phase only).
     #   Downstream feature_engineering / model_selection always read their upstream's
     #   fixed output path (CLEANED_OUTPUT_PATH / FE_OUTPUT_PATH), so that a Supervisor
     #   retry does not re-feed a worker's own previous output back into itself.
     #   Worker nodes no longer mutate this field.
-    current_code: str               # Worker 最近一次生成的代码
-    current_execution_log: str      # Worker 代码执行后的 Stdout
-    current_error: str              # Supervisor 打回时附带的反馈 / 内部自救时的 Stderr
-    retry_count: int                # 当前阶段 Supervisor 打回的累计次数
+    current_code: str               # Latest worker-generated code
+    current_execution_log: str      # Stdout after worker execution
+    current_error: str              # Supervisor feedback on reject / stderr from inner retries
+    retry_count: int                # Accumulated Supervisor retries this phase
 
-    # ---- Supervisor 审查产出 ----
-    current_review: dict | None     # Supervisor 最新一次的结构化审查报告 (ReviewReport)
+    # ---- Supervisor output ----
+    current_review: dict | None     # Latest structured ReviewReport from Supervisor
 
-    # ---- 运行评测指标 ----
-    outer_retry_total: int          # Supervisor 打回导致的累计外部重试次数
+    # ---- Run-level metrics ----
+    outer_retry_total: int          # Total outer retries triggered by Supervisor
 
-    # ---- 全局记忆 (Append-Only) ----
+    # ---- Global memory (append-only) ----
     memory: Annotated[list[str], operator.add]
-    #   每一项是一段精简摘要 + 落盘文件路径指针，如:
-    #   "[data_cleaning] 移除15%缺失值, 详情见 ./workspace/clean_report.md"
+    #   Each item: short summary + path pointer, e.g.
+    #   "[data_cleaning] Handled high missing-rate columns; details in ./workspace/clean_report.md"
 
-    # ---- 最终交付 ----
-    eda_summary: str               # EDA 节点生成的摘要 + 静态图表说明 (markdown-like)
-    eda_charts: list[dict]          # [{"name","rel_path","desc"}, ...] 相对 workspace
-    eda_conclusions: dict           # 深度 EDA 结论: task_type, candidate_models, recommended_metrics, warnings
-    final_business_report: str      # Business Action Translator 产出的商业分析报告
+    # ---- Final deliverables ----
+    eda_summary: str               # EDA narrative + chart references (markdown-like)
+    eda_charts: list[dict]          # [{"name","rel_path","desc"}, ...] relative to workspace
+    eda_conclusions: dict           # Deep EDA: task_type, candidate_models, recommended_metrics, warnings
+    final_business_report: str       # Quarto/report output from Business Action Translator
