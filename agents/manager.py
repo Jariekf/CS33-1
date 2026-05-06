@@ -108,12 +108,56 @@ def manager_node(state: GraphState) -> dict:
     logger.info("Global structured plan generated successfully.")
 
     # ------------------------------------------------------------------
-    # Step 4 - Initialize runtime state and return.
+    # Step 4 - Resolve the supervised target column once for the whole pipeline.
+    # ------------------------------------------------------------------
+    # Single-source-of-truth for the target column name. Three-tier resolution:
+    #   1. User CLI ``--target`` (state["target_column"] non-empty on entry)
+    #   2. Manager LLM's ``target_column`` field in the plan
+    #   3. Deterministic last-column fallback from the input CSV header
+    # The resolved value is written back to state so every downstream agent can
+    # do ``state.get("target_column")`` instead of re-deriving it locally with
+    # inconsistent heuristics. The plan field (if present) is also overwritten
+    # to the resolved name so any code path that still reads
+    # ``plan["target_column"]`` agrees with state.
+    user_provided_target = (state.get("target_column") or "").strip()
+    plan_provided_target = ""
+    if isinstance(global_plan, dict):
+        raw_plan_target = global_plan.get("target_column")
+        if isinstance(raw_plan_target, str):
+            plan_provided_target = raw_plan_target.strip()
+    columns = _get_data_columns(data_path)
+    resolved_target, target_source = _resolve_target_column(
+        user_provided=user_provided_target,
+        plan_provided=plan_provided_target,
+        columns=columns,
+    )
+    if resolved_target:
+        logger.info(
+            "Resolved supervised target column: %r (source: %s).",
+            resolved_target,
+            target_source,
+        )
+    else:
+        logger.warning(
+            "Could not resolve a supervised target column "
+            "(user_provided=%r, plan_provided=%r, columns_readable=%s). "
+            "Pipeline will continue but downstream supervised-learning steps "
+            "may fail.",
+            user_provided_target,
+            plan_provided_target,
+            bool(columns),
+        )
+    if isinstance(global_plan, dict):
+        global_plan["target_column"] = resolved_target
+
+    # ------------------------------------------------------------------
+    # Step 5 - Initialize runtime state and return.
     # ------------------------------------------------------------------
     os.makedirs(WORKSPACE_DIR, exist_ok=True)
 
     return {
         "global_plan": global_plan,
+        "target_column": resolved_target,
         "current_phase": "data_cleaning",
         "current_data_path": data_path,
         "current_code": "",
@@ -146,6 +190,70 @@ def _get_data_preview(data_path: str) -> str:
         return info
     except Exception as e:
         return f"[Warning] Unable to preview data: {e}"
+
+
+def _get_data_columns(data_path: str) -> list[str]:
+    """Return the column list of the input CSV, or [] on read failure.
+
+    Used by the target-column resolution step to validate that the name
+    Manager / the user proposed actually exists in the data, and to derive
+    the deterministic last-column fallback. Cheap (reads only the header).
+    """
+    try:
+        return pd.read_csv(data_path, nrows=0).columns.tolist()
+    except Exception:
+        return []
+
+
+def _resolve_target_column(
+    *,
+    user_provided: str,
+    plan_provided: str,
+    columns: list[str],
+) -> tuple[str, str]:
+    """
+    Three-tier resolution for the supervised target column name. Returns
+    ``(resolved_name, source_label)``.
+
+    Order:
+      1. ``user_provided`` (CLI ``--target``) wins if it names a real column.
+      2. ``plan_provided`` (Manager LLM's identification) wins if it names a
+         real column.
+      3. Last column of ``columns`` as a deterministic fallback. This is the
+         convention for the vast majority of Kaggle / UCI datasets and is
+         what the cleaning stage already implicitly relied on.
+      4. Empty string when even the input header could not be read (caller
+         logs and keeps going as if unsupervised).
+    """
+    user_provided = (user_provided or "").strip()
+    plan_provided = (plan_provided or "").strip()
+
+    if user_provided:
+        if user_provided in columns:
+            return user_provided, "user-provided (--target)"
+        # User typo'd; fall through, but report it.
+        logger.warning(
+            "User-provided --target %r is not in input columns %r; ignoring and "
+            "deferring to Manager / fallback.",
+            user_provided,
+            columns,
+        )
+
+    if plan_provided and plan_provided in columns:
+        return plan_provided, "Manager LLM"
+
+    if plan_provided:
+        # Manager hallucinated a name not in the data. Surface and fall through.
+        logger.warning(
+            "Manager-identified target_column %r is not in input columns; "
+            "falling back to last-column heuristic.",
+            plan_provided,
+        )
+
+    if columns:
+        return columns[-1], "last-column fallback"
+
+    return "", "unresolved"
 
 
 def _generate_search_queries(user_goal: str, df_preview: str) -> list[str]:
@@ -229,6 +337,7 @@ Literature / external knowledge (RAP):
 Please formulate a high-level Data Science global execution plan tailored to the objective. 
 You must output ONLY a valid JSON object with EXACTLY the following structure (no markdown fences around it if possible, or strictly enclosed in ```json...```):
 {{
+    "target_column": "<exact column name from Data Preview, or null for unsupervised tasks>",
     "data_cleaning_plan": {{
         "objectives": ["obj1", "obj2"],
         "constraints": "string constraint",
@@ -245,6 +354,12 @@ You must output ONLY a valid JSON object with EXACTLY the following structure (n
     }}
 }}
 
+Notes for target_column (REQUIRED):
+- Identify the supervised target by combining: (a) what `User Goal` asks the model to predict, (b) any explicit declaration in `Dataset Description`, (c) the columns visible in `Data Preview`. The value MUST be the EXACT case-sensitive column name as it appears in the Data Preview's column list — copy the string verbatim from the column list, do not normalise spelling, casing, or whitespace.
+- Procedure: parse the predicate of the user goal ("predict X" / "classify Y" / "estimate Z"), then map X/Y/Z onto the closest column in the Data Preview. The mapping may be lexical (goal mentions the column name directly) or semantic (goal describes a behaviour or outcome and the column records it). When the Dataset Description is provided, prefer its declaration over column-name inference.
+- Do NOT invent or paraphrase. If the goal is genuinely unsupervised (clustering, anomaly detection without ground-truth labels) OR you cannot identify a target, return null and explain in `data_cleaning_plan.objectives`. The pipeline will fall back to the last column of the input as a deterministic guess.
+- This single field is the authoritative target identity for the entire pipeline. Downstream agents (data_cleaning / feature_engineering / model_selection) all read `state["target_column"]` from it. Getting it wrong here cascades into target leakage and wrong evaluation downstream.
+
 Notes for data_cleaning_plan:
 - "rules": procedural steps to perform (what to run). Optional list of objects like {{"rule": "drop_duplicates", "params": {{}}}}. Use [] if none. Not validated as bounds.
 - "cleaning_contract": post-execution guardrails. Prefer {{}} or only "max_row_drop_ratio". Do not list "protected_columns" or imply all columns must survive cleaning - dropping columns is allowed.
@@ -254,6 +369,11 @@ Notes for feature_engineering_plan:
 - Ground all objectives in columns that are visible in the Data Preview.
 - Do not mention invented fields such as `product_id`, `country`, `period`, `date`, or forecast targets unless the preview clearly supports them.
 - If time columns or grouping keys are unclear, prefer simple safe feature engineering over grouped time-series designs.
+- Do NOT list target-side transformations in `objectives`: no log / Box-Cox / Yeo-Johnson / scaling / binning / quantiling applied to the supervised target (the column named in `target_column`). The Feature Engineering worker keeps that column passthrough in its CSV outputs. Adding extra columns derived from the target (e.g. `<target>_log` as a feature next to the original target) is treated as label leakage downstream. Fitting models on a transformed target and inverting for metrics belongs in Model Selection, where train-time CV and test-time prediction symmetry are explicit — put that under `model_selection_plan.objectives` instead.
+
+Notes for model_selection_plan:
+- Align `objectives` and `evaluation_metric` with the task type (classification / regression / etc.) implied by `User Goal`, `Dataset Description`, and `Data Preview`.
+- For regression with a strongly skewed target, you MAY include objectives such as training on a monotonic transform of the target series (e.g. log1p) and inverting predictions before computing reported errors — express that here, never under `feature_engineering_plan`.
 """
     return sys_prompt, user_prompt, summary_block, docs_context
 
@@ -304,6 +424,10 @@ def _generate_global_plan_with_meta(
 
     # Fallback
     fallback_plan = {
+        # Left blank intentionally — the manager_node's three-tier resolver
+        # will fill it from CLI / last-column even when the LLM call itself
+        # failed and we are taking this fallback path.
+        "target_column": "",
         "data_cleaning_plan": {
             "objectives": ["Check and handle missing values", "Remove duplicate rows", "Correct data types"],
             "constraints": "Do not remove more than 5% of total rows",
