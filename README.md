@@ -48,19 +48,19 @@ The system is designed to:
 The current pipeline is organised as the following sequence:
 
 1. `Manager Agent`
-   Serves as the main planning entry point: interprets the user goal, optional cleaning hints, and optional authoritative dataset description, previews the dataset, generates a requirement summary and retrieval slots, optionally builds RAP context from external sources, produces a structured global plan, and initializes shared workflow state.
+   Serves as the main planning entry point: interprets the user goal, optional cleaning hints, and optional authoritative dataset description, previews the dataset, generates a requirement summary and retrieval slots, optionally builds RAP context from external sources, produces a structured global plan (including a **`target_column`** field for supervised tasks), **resolves the supervised target column once** (optional CLI override → planner inference → deterministic last-column fallback), writes it into **`GraphState["target_column"]`**, and initializes shared workflow state.
 2. `Data Cleaning Agent`
-   Generates and executes cleaning code for the raw input dataset, then writes the cleaned artifact to a fixed workspace path for downstream reuse.
+   Generates and executes cleaning code for the raw input dataset, then writes the cleaned artifact to a fixed workspace path for downstream reuse. In **pre-split mode** (when a separate test CSV is supplied at the CLI), train and test are concatenated with a hidden row marker column for a single cleaning pass, then split back into fixed workspace paths, including support for **asymmetric schemas** between train and test.
 3. `Supervisor Agent`
    Reviews code and execution logs through a structured JSON report, and either passes the stage or requests a retry.
 4. `EDA Analysis`
    After cleaning passes, reads the train split CSV; runs **deterministic statistics** (correlations, collinearity, quick RF importance, optional train/test drift) and **static charts** under `workspace/eda_figs/`; calls an LLM for structured conclusions (with heuristic fallback); writes **`workspace/eda_report.md`** (four sections: descriptive / correlation / diagnosis / conclusions) and stores **`eda_conclusions`** in `GraphState` for model selection.
 5. `Feature Engineering Agent`
-   Generates and executes feature engineering code based on the manager plan and prior stage summary, reading the cleaned train split from a fixed upstream path and applying aligned transformations to both train and test artifacts.
+   Generates and executes feature engineering code based on the manager plan and prior stage summary, reading the cleaned train split from a fixed upstream path and applying aligned transformations to both train and test artifacts. Feature engineering treats **`state["target_column"]`** as authoritative: keep the label column intact for modelling, avoid target-derived leakage features, and leave target-scale transforms for the modelling stage when appropriate.
 6. `Supervisor Agent`
    Performs another review checkpoint.
 7. `Model Agent`
-   Generates model selection and validation code, then exports feature importance.
+   Generates model selection and validation code aligned with **`state["target_column"]`**, exports feature importance, and **always writes** `workspace/test_predictions.csv` when a held-out test feature matrix exists. Test-set labelled metrics run only when the test split actually contains usable target values (typical competition-style test files without labels are supported predict-only runs).
 8. `Supervisor Agent`
    Validates the modelling stage.
 9. `Business Action Translator Agent`
@@ -82,6 +82,8 @@ The current pipeline is organised as the following sequence:
   Manager-side RAP supports arXiv abstracts plus optional web search, PapersWithCode metadata, and Kaggle kernel metadata. The Business Action Translator uses arXiv-style retrieval to support business interpretation.
 - **Workspace-based artifact generation**
   Intermediate outputs and reports are stored under `workspace/`; transient per-run artifacts are purged at startup to reduce stale-output reuse.
+- **Supervised-target single source of truth**
+  Resolved once in the Manager step and propagated through cleaning, feature engineering, and modelling so stages agree on label identity without fragile per-agent guessing.
 
 ## Repository Structure
 
@@ -109,9 +111,9 @@ CS33-1/
 - [tools](https://github.sydney.edu.au/CS33-1/CS33-1/tree/main/tools)
   Contains support utilities such as `arxiv_tool`, `python_repl`, and `file_reader`.
 - [workspace](https://github.sydney.edu.au/CS33-1/CS33-1/tree/main/workspace)
-  Stores generated CSV outputs, feature importance files, and markdown reports.
+  Stores generated CSV outputs (including **`test_predictions.csv`** when modelling completes), feature importance files, EDA figures, and Quarto (`.qmd`) / markdown-style reports.
 - [docs](https://github.sydney.edu.au/CS33-1/CS33-1/tree/main/docs)
-  Stores repository documentation such as the GitHub commit guide.
+  Project documentation: [Quick Start](docs/quick-start.md), LLM configuration, testing notes, etc. A working summary of recent pipeline deltas is kept in [docs/local-vs-remote-changes.md](docs/local-vs-remote-changes.md).
 
 ## Tech Stack
 
@@ -136,6 +138,11 @@ CS33-1/
 
 The current repository exposes the following prototype capabilities:
 
+- optional **`--test`** pre-split test CSV: train and test are cleaned together then restored to fixed `workspace/` train/test paths; train/test column sets may differ
+- optional **`--target COLUMN`**: pin the supervised label column (otherwise Manager resolves it once and stores it in shared state, with a deterministic last-column fallback)
+- resolved **`target_column`** propagated through `GraphState` for consistent cleaning, feature engineering, and modelling prompts
+- **predict-only test sets** (no labels on held-out test): model selection still writes `workspace/test_predictions.csv`; labelled test metrics only when valid `y` exists
+- supervisor run-context support for pre-split label handling, plus memory sanitisation so internal split-marker column names do not leak into downstream prompts
 - dataset preview and initial goal-aware planning
 - optional `--desc/-d` dataset-description loading (file or directory) plus optional `--hints` input for narrower cleaning constraints
 - shared dataset-description injection across Manager and worker prompts for more semantically stable runs on the same dataset
@@ -145,7 +152,7 @@ The current repository exposes the following prototype capabilities:
 - LLM-assisted model selection and feature-importance export
 - fixed-path artifact handoff across cleaning -> feature engineering -> model selection, improving retry semantics
 - supervisor review and retry routing, with structured JSON parsing hardening and degraded-pass placeholders on parse failure
-- business report generation in markdown
+- business report generation as **Quarto (`.qmd`)** primary output (optional HTML render when Quarto CLI is available)
 - manager-side prompt and midlayer evaluation reports with health metrics, faithfulness warnings, failure attribution labels, and artifact status checks
 - structured workflow outputs that support traceability, including run logs, stage review records, manager evaluation artifacts, and workspace-level execution artifacts
 - an initial business-report generation chain that connects Manager outputs, model-stage artifacts, feature importance, and BAT-oriented reporting
@@ -164,13 +171,16 @@ The current repository exposes the following prototype capabilities:
 
 ## Quick Start
 
-For setup and first run, see [Quick Start](docs/quick-start.md). The current CLI supports:
+For setup and first run, see [Quick Start](docs/quick-start.md). The CLI accepts two positional arguments (CSV path and natural-language goal) plus optional flags:
 
 ```bash
-python main.py <data_path> "<user_goal>" [--desc PATH] [--hints TEXT]
+python main.py <data_path> "<user_goal>" [--desc PATH] [--hints TEXT] [--test PATH] [--target COLUMN]
 ```
 
-Use `--desc` for authoritative dataset context such as a README, data dictionary, or docs folder; use `--hints` for short cleaning-specific constraints.
+- **`--desc`**: authoritative dataset context (README, data dictionary, or folder).
+- **`--hints`**: short cleaning-focused constraints for the Manager summary step.
+- **`--test`**: separate held-out CSV; positional `data_path` is treated as training data; cleaning uses one combined pass then restores the split.
+- **`--target`**: supervised label column name (exact match); otherwise the pipeline resolves it once and shares via `GraphState`.
 
 For model setup and agent-to-LLM mapping, see [LLM Model Configuration Guide](docs/llm-model-config-guide.md).
 
