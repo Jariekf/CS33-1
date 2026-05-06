@@ -1,19 +1,21 @@
 """
-Feature Engineering Agent (特征工程智能体)
-职责：
-  根据 Manager 的全局计划中的 feature_engineering_plan，
-  生成 Python 特征工程代码并在沙盒中执行（含内部自救机制）。
+Feature Engineering agent.
 
-  EDA 图表与文字摘要由 ``agents.eda_analysis`` 在清洗 Supervisor 通过后单独生成，本阶段不再负责 EDA。
+Responsibilities:
+  Read ``feature_engineering_plan`` from the Manager's global plan, generate Python
+  feature code, and execute it in the sandbox (with inner self-heal).
 
-设计参照 AutoKaggle Developer Agent 的核心模式：
-  - 结构化 Prompt (CONTEXT + PLAN + CONSTRAINTS + TASK)
-  - 上一阶段摘要注入上下文 (previous_summary)
-  - 代码提取 (regex ```python...```)
+  EDA charts and narrative are produced by ``agents.eda_analysis`` after the data_cleaning
+  supervisor passes; this stage does not own EDA.
 
-The column names in the output CSV should be readable by the downstream "Feature Importance / Business Report": retain the business column names, and use meaningful names for new features;
+Design follows the AutoKaggle Developer pattern:
+  - Structured prompt (CONTEXT + PLAN + CONSTRAINTS + TASK)
+  - Prior-stage summary in context (``previous_summary``)
+  - Code extraction via ```python``` regex
 
-It is forbidden to change them to anonymous column names such as x0, x1, feature_0, etc. without justification (enforced by the agent's Prompt constraints).
+Output CSV column names should stay interpretable for feature importance / business reports:
+keep business-meaningful names; avoid anonymous ``x0`` / ``feature_0`` renames without justification
+(enforced via prompt constraints).
 """
 from __future__ import annotations
 
@@ -40,10 +42,10 @@ EDA_SUMMARY_END = "===EDA_SUMMARY_END==="
 
 
 def feature_engineering_node(state: GraphState) -> dict:
-    """Feature Engineering 的 LangGraph 节点函数。"""
+    """LangGraph node for feature engineering."""
 
     logger.info("Feature Engineering node started.")
-    # 【边界控制】只抽取属于自己的子计划
+    # Scope: only this phase's sub-plan
     plan = state["global_plan"].get("feature_engineering_plan", {})
     # Always read from the train split produced by data_cleaning, NOT from
     # ``state["current_data_path"]`` — on a Supervisor retry the latter may
@@ -51,12 +53,16 @@ def feature_engineering_node(state: GraphState) -> dict:
     data_path = TRAIN_DATA_PATH
     feedback = state.get("current_error", "")
     dataset_description = (state.get("dataset_description") or "").strip()
-    # 只读取最近的 Memory 摘要 (上一阶段清洗成果)
+    # Latest memory entry (prior stage, e.g. cleaning)
     previous_summary = state["memory"][-1] if state.get("memory") else ""
-    target_hint = _build_target_hint(data_path)
+    # Authoritative target column from state (Manager's three-tier resolver:
+    # CLI --target > Manager LLM > last-column fallback). Empty string only
+    # for genuinely unsupervised tasks or when the input header was unreadable.
+    state_target_col = (state.get("target_column") or "").strip()
+    target_hint = _build_target_hint(data_path, target_col_override=state_target_col)
 
     # ------------------------------------------------------------------
-    # Step 1: 生成特征工程代码
+    # Step 1: generate feature code
     # ------------------------------------------------------------------
     code = _generate_fe_code(
         plan,
@@ -70,7 +76,7 @@ def feature_engineering_node(state: GraphState) -> dict:
     logger.info("Feature engineering code generation completed.")
 
     # ------------------------------------------------------------------
-    # Step 2: 内部语法自救循环
+    # Step 2: inner self-heal loop
     # ------------------------------------------------------------------
     stdout, stderr = "", ""
     error_history: list[str] = []
@@ -110,7 +116,7 @@ def feature_engineering_node(state: GraphState) -> dict:
         )
 
     # ------------------------------------------------------------------
-    # Step 3: 返回状态更新
+    # Step 3: return state updates
     # ------------------------------------------------------------------
     if stderr:
         logger.error(f"Feature engineering failed after {MAX_INNER_RETRY} attempts: {stderr}")
@@ -134,10 +140,10 @@ def feature_engineering_node(state: GraphState) -> dict:
 
 
 # ======================================================================
-# 私有辅助函数
+# Private helpers
 # ======================================================================
 
-# ---------- Prompt 模板 (参照 AutoKaggle PROMPT_DEVELOPER 结构) ----------
+# ---------- Prompt templates (AutoKaggle PROMPT_DEVELOPER style) ----------
 
 _MODERN_SKLEARN_API_GUIDE = """\
 # TARGET LIBRARY VERSIONS (IMPORTANT) #
@@ -153,6 +159,11 @@ Do NOT use deprecated or removed APIs. In particular:
   - pandas `DataFrame.append` is REMOVED; use `pd.concat([...])`.
   - pandas `df.iteritems()` is REMOVED; use `df.items()`.
   - numpy `np.int`/`np.float`/`np.bool` are REMOVED; use built-in `int`/`float`/`bool` or `np.int64`/`np.float64`.
+
+# COMMON RUNTIME FOOT-GUNS (must be avoided) #
+- `get_feature_names_out` REQUIRES a fitted estimator. NEVER call it on a freshly-constructed `OneHotEncoder` / `OrdinalEncoder` / `ColumnTransformer` / `Pipeline` — that raises `NotFittedError`. The correct order is always: build the encoder/pipeline → `fit` (or `fit_transform`) it on the training data → THEN extract feature names. For a `Pipeline` whose preprocessing step is named (e.g. `"prep"`), use `pipeline.named_steps["prep"].get_feature_names_out()` AFTER `pipeline.fit(...)`. If you only need a column-name list at that exact moment, call `fit_transform` first and ignore the matrix.
+- numpy scalars (`np.int32`, `np.int64`, `np.float32`, `np.float64`, `np.bool_`) are NOT JSON-serializable by stdlib `json`. Before `json.dump` / `json.dumps`, convert them. The robust pattern is `json.dump(obj, f, indent=2, default=lambda x: x.item() if hasattr(x, "item") else x)`. Equivalently, build the dict from native Python types up front: `{str(k): float(v) for k, v in importances.items()}` for floats, or `{str(k): int(v) for k, v in counts.items()}` for ints. Do NOT just write `json.dump(sorted_feature_importances, f)` when the values came out of pandas/numpy/sklearn — that fails with `TypeError: Object of type int32 is not JSON serializable`.
+
 If you are unsure whether a kwarg still exists, omit it and rely on defaults rather than guessing."""
 
 
@@ -337,39 +348,93 @@ def _validate_fe_artifacts(
     return ""
 
 
-def _build_target_hint(data_path: str) -> str:
-    """Inspect the runtime training CSV and provide conservative target guidance."""
+def _build_target_hint(data_path: str, target_col_override: str = "") -> str:
+    """
+    Render a hard-edged target-passthrough hint for the FE LLM.
+
+    Resolution order for the column name:
+      1. ``target_col_override`` from ``state["target_column"]`` (Manager's
+         three-tier resolver — CLI / Manager LLM / last-column fallback).
+         This is the authoritative answer for the whole pipeline.
+      2. Local semantic-name match (kept as emergency fallback for callers
+         that do not pass the override, e.g. legacy unit tests).
+      3. Last-column heuristic if the override is missing AND no semantic hit.
+
+    The hint deliberately separates two ideas the previous wording conflated:
+      (a) FE must NOT add a target-derived **feature column** to the output
+          CSV (e.g. ``{target}_log`` as an extra column next to the real
+          ``{target}`` column) — this is the leakage source we keep tripping on.
+      (b) Whether to apply ``log(y)`` / Box-Cox / etc. to the **target** for
+          training is a Model Selection decision, not a FE concern. FE just
+          passes the original target values through unchanged so MS sees the
+          true labels.
+    """
     try:
         df = pd.read_csv(data_path, nrows=50)
     except Exception as exc:
         return f"(runtime target hint unavailable: {exc})"
     cols = list(df.columns)
-    candidate = None
-    semantic_exact = {"target", "label", "labels", "outcome", "response", "dependent", "y", "class"}
-    semantic_contains = ("target", "label", "outcome", "response", "dependent")
-    lowered = {c: str(c).strip().lower().replace(" ", "_") for c in cols}
-    exact_hits = [c for c, lc in lowered.items() if lc in semantic_exact]
-    contains_hits = [c for c, lc in lowered.items() if any(tok in lc for tok in semantic_contains)]
-    if exact_hits:
-        candidate = exact_hits[0]
-    elif contains_hits:
-        candidate = contains_hits[0]
-    if candidate:
-        uniques = df[candidate].dropna().astype(str).str.strip().str.lower().unique().tolist()[:10]
+    if not cols:
         return (
-            f"Candidate target column detected from actual training CSV: `{candidate}`. "
-            f"Observed sample values: {uniques}. Preserve this column unchanged if present. "
-            "Do not fail if later transformations operate on a feature-only dataframe."
+            "No columns could be read from the training CSV. Skip target-specific "
+            "logic if absent and still produce FE outputs."
         )
-    if cols:
-        return (
-            f"No reliable semantic target column was detected. As a conservative fallback, "
-            f"treat the last column `{cols[-1]}` as the likely target only if target-specific "
-            "logic is unavoidable; otherwise skip target-specific logic."
-        )
+
+    candidate: str | None = None
+    source: str = ""
+    override = (target_col_override or "").strip()
+    if override and override in cols:
+        candidate = override
+        source = "Manager-resolved (state['target_column'])"
+
+    if candidate is None:
+        semantic_exact = {"target", "label", "labels", "outcome", "response", "dependent", "y", "class"}
+        semantic_contains = ("target", "label", "outcome", "response", "dependent")
+        lowered = {c: str(c).strip().lower().replace(" ", "_") for c in cols}
+        exact_hits = [c for c, lc in lowered.items() if lc in semantic_exact]
+        contains_hits = [c for c, lc in lowered.items() if any(tok in lc for tok in semantic_contains)]
+        if exact_hits:
+            candidate = exact_hits[0]
+            source = "semantic name match (exact)"
+        elif contains_hits:
+            candidate = contains_hits[0]
+            source = "semantic name match (contains)"
+
+    if candidate is None:
+        candidate = cols[-1]
+        source = "last-column fallback"
+
+    uniques = df[candidate].dropna().astype(str).str.strip().str.lower().unique().tolist()[:10]
     return (
-        "No reliable target column was detected from a small runtime sample. "
-        "Do not invent one. Skip target-specific logic if absent and still produce FE outputs."
+        f"Supervised target column for this run is `{candidate}` "
+        f"(resolved via {source}). Observed sample values: {uniques}.\n"
+        "\n"
+        f"You MUST handle `{candidate}` carefully:\n"
+        f"  - DO copy `{candidate}` straight from the input into "
+        "`./workspace/fe_output.csv` with its original values intact. The "
+        "downstream Model Selection node reads this column as `y`.\n"
+        f"  - DO NOT include `{candidate}` in any list of feature columns "
+        "passed to a transformer (e.g. exclude it from `numeric_cols`, "
+        "`categorical_cols`, `ColumnTransformer` selectors, or any feature-side "
+        "scaling/encoding/imputation step).\n"
+        f"  - DO NOT add NEW columns to the output CSV that are derived from "
+        f"`{candidate}` (e.g. `{candidate}_log`, `log_{candidate}`, "
+        f"`{candidate}_squared`, `{candidate}_bin`, "
+        f"`scaled_{candidate}`, etc.). Such columns become target-leakage "
+        "features at Model Selection — the model learns to predict the target "
+        "from a near-copy of itself, producing fake high scores that "
+        "Supervisor will reject.\n"
+        "\n"
+        f"Note: applying log / Box-Cox / Yeo-Johnson to the target series "
+        "for training (e.g. for log-RMSE on a skewed regression target) is "
+        "perfectly fine — but that is a Model Selection responsibility. MS "
+        "reads the same authoritative target column name from state and can "
+        "transform `y_train` internally before model training, then invert "
+        "before reporting. FE's job here is just to keep the target column "
+        f"values pristine and out of the feature transformer pipeline.\n"
+        "\n"
+        f"In the test set: if `{candidate}` is missing or all-NaN (held-out "
+        "predict-only mode), do NOT synthesise values — preserve NaN as-is."
     )
 
 
@@ -417,9 +482,9 @@ def _generate_fe_code(
     target_hint: str = "",
 ) -> str:
     """
-    调用 LLM 生成特征工程代码。
-    参照 AutoKaggle Developer._execute 的 Prompt 构建逻辑，注入上一阶段摘要。
-    若 LLM 调用失败则降级返回桩代码模板。
+    Ask the LLM to generate feature engineering code.
+    Mirrors AutoKaggle Developer-style prompt construction with the prior-stage summary injected.
+    On LLM failure, falls back to a stub template.
     """
     feedback_section = ""
     if feedback:
@@ -462,9 +527,9 @@ def _fix_code(
     target_hint: str = "",
 ) -> str:
     """
-    调用 LLM 根据报错修复代码。
-    参照 AutoKaggle PROMPT_DEVELOPER_DEBUG_FIX 的简化版。
-    若 LLM 不可用则返回原代码。
+    Ask the LLM to fix code given the traceback.
+    Simplified analogue of AutoKaggle PROMPT_DEVELOPER_DEBUG_FIX.
+    If the LLM is unavailable, returns the original code unchanged.
     """
     user_prompt = _USER_PROMPT_FIX.format(
         code=code,
@@ -486,7 +551,7 @@ def _fix_code(
 
 
 def _fallback_fe_code(plan: dict, data_path: str, previous_summary: str) -> str:
-    """LLM 不可用时的降级桩代码模板。"""
+    """Fallback stub template when the LLM is unavailable."""
     path_lit = json.dumps(data_path)
     return f"""\
 import pandas as pd

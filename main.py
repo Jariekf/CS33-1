@@ -1,6 +1,7 @@
 """
-多智能体数据分析系统 - 主入口
-基于 LangGraph 构建的全流水线自动化数据分析与商业洞察系统。
+Multi-agent data analytics pipeline — main entrypoint.
+
+Automated DS workflow orchestrated by LangGraph, from cleaning through business reporting.
 """
 import json
 import os
@@ -35,7 +36,15 @@ sys_logger = get_agent_logger("sys")
 _TRANSIENT_ARTIFACTS: tuple[str, ...] = (
     # Per-stage CSV outputs (agents read these by fixed path)
     "cleaned_data.csv",
+    # Pre-split mode internal scratch file (train+test concat with marker column).
+    # Always per-run; we never want a stale concat from a previous run silently
+    # picked up as input to LLM cleaning.
+    "_concat_for_cleaning.csv",
     "fe_output.csv",
+    # Test-set predictions written unconditionally by Model Selection.
+    # Always per-run; a stale predictions file from a previous run would
+    # silently feed the Business Translator wrong numbers.
+    "test_predictions.csv",
     # Feature importance consumed by business_translator
     "feature_importance.json",
     # Supervisor detailed reports written per-phase
@@ -117,33 +126,45 @@ def run(
     user_goal: str,
     manager_cleaning_hints: str = "",
     dataset_description: str = "",
+    test_data_path: str = "",
+    target_column: str = "",
 ) -> str:
     """
-    启动多智能体分析流水线。
+    Run the multi-agent analytics pipeline.
 
     Args:
-        data_path: 数据集文件路径
-        user_goal: 用户的自然语言业务目标
-        manager_cleaning_hints: 可选；清洗规则/contract 等文字，写入检索摘要并与规划对齐
-        dataset_description: 可选；数据集权威说明（README / 数据字典 / 论文等文本），
-            由 ``tools.description_loader.load_dataset_description`` 从文件/目录加载后传入。
-            所有 Agent prompt 都会注入此文本作为语义锚。
+        data_path: Path to the input CSV (train file if ``test_data_path`` is set).
+        user_goal: Natural-language business objective.
+        manager_cleaning_hints: Optional narrow cleaning hints text (merged into Manager summary/RAP).
+        dataset_description: Optional authoritative context from ``tools.description_loader.load_dataset_description``,
+            injected into all agent prompts.
+        test_data_path: Optional path to a held-out test CSV; when set, ``data_path`` is treated as train
+            (pre-split handling in data_cleaning). Empty → legacy random 80/20 from a single CSV. See ``core/state.py``.
+        target_column: Optional supervised label column (CLI ``--target``). Non-empty skips Manager inference;
+            resolved value always written to ``state["target_column"]`` for downstream agents.
 
     Returns:
-        最终的商业洞察分析报告文本
+        Final business insight report text (e.g. Quarto source payload).
     """
     run_started_at = datetime.now()
-    # 构建 LangGraph 工作流
-    sys_logger.info(f"Main execution started with data_path: '{data_path}', goal: '{user_goal}'")
+    # Build LangGraph workflow
+    sys_logger.info(
+        "Main execution started with data_path: '%s', goal: '%s', test_data_path: '%s'",
+        data_path,
+        user_goal,
+        test_data_path or "(none)",
+    )
     _purge_stale_transient_artifacts()
     app = build_graph()
 
-    # 初始化输入状态
+    # Initial graph state
     initial_state: GraphState = {
         "data_path": data_path,
         "user_goal": user_goal,
         "manager_cleaning_hints": manager_cleaning_hints,
         "dataset_description": dataset_description,
+        "test_data_path": test_data_path,
+        "target_column": target_column,
         "global_plan": {},
         "current_phase": "",
         "current_data_path": data_path,
@@ -160,7 +181,7 @@ def run(
         "final_business_report": "",
     }
 
-    # 执行工作流
+    # Invoke graph
     sys_logger.info("Starting graph invocation...")
     final_state = app.invoke(initial_state)
     sys_logger.info("Graph invocation finished successfully.")
@@ -213,6 +234,25 @@ if __name__ == "__main__":
         default="",
         help="Optional narrow cleaning hints text (prefer --desc for general context).",
     )
+    parser.add_argument(
+        "--test",
+        default="",
+        metavar="PATH",
+        help="Optional path to a held-out test CSV. When set, the positional "
+             "data_path is treated as the train CSV; otherwise data_path is the "
+             "full dataset and is auto-split 80/20 inside data_cleaning.",
+    )
+    parser.add_argument(
+        "--target",
+        default="",
+        metavar="COLUMN",
+        help="Optional supervised target column name (case-sensitive). When set, "
+             "Manager skips intent inference and uses this directly. When omitted, "
+             "Manager identifies the target from user_goal + --desc + data preview "
+             "with last-column-of-input as the deterministic fallback. Either way "
+             "the resolved name is stored in state['target_column'] and read by all "
+             "downstream agents (data_cleaning, feature_engineering, model_selection).",
+    )
     args = parser.parse_args()
 
     try:
@@ -227,14 +267,24 @@ if __name__ == "__main__":
             args.desc,
         )
 
+    test_data_path = args.test.strip()
+    if test_data_path and not os.path.isfile(test_data_path):
+        print(
+            f"[!] --test path does not exist or is not a file: {test_data_path}",
+            file=sys.stderr,
+        )
+        sys.exit(1)
+
     report = run(
         args.data_path,
         args.user_goal,
         manager_cleaning_hints=args.hints,
         dataset_description=dataset_description,
+        test_data_path=test_data_path,
+        target_column=args.target.strip(),
     )
 
-    # 【修复】先落盘保存，防止终端打印遇到 Unicode 报错导致没保存上
+    # Persist report before stdout print (avoid losing file on Unicode console errors).
     import os
     os.makedirs("./workspace", exist_ok=True)
     report_path = "./workspace/business_insight_report.qmd"

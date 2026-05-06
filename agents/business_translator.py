@@ -1,11 +1,13 @@
 """
-Business Action Translator Agent (商业建议转化智能体)
-职责：
-  1. 从模型阶段的落盘报告中提取核心指标与特征重要性
-  2. 检索麦肯锡风格知识库（mckinsey_kb）作为主要外部素材
-     - 按 source_type 分三桶：mckinsey / equity_research / textbook
-     - 命中数不足时回退到 arxiv 学术检索
-  3. 结合内部数据表征 + 外部素材，按 McKinsey Pyramid Principle 输出商业洞察报告
+Business Action Translator Agent
+
+Responsibilities:
+  1. Pull core metrics and feature importance from the model stage's on-disk artefacts.
+  2. Retrieve McKinsey-flavoured corpus material (``mckinsey_kb``) as primary external context.
+     Buckets by ``source_type``: mckinsey / equity_research / textbook.
+     When hit count is low, fall back to ArXiv search.
+  3. Blend internal data signals with external snippets and draft a business insight
+     report following McKinsey-style pyramid structure.
 """
 from __future__ import annotations
 
@@ -22,6 +24,12 @@ from config import WORKSPACE_DIR
 from core.logger import get_agent_logger
 
 logger = get_agent_logger("business_translator")
+
+# Where Model Selection unconditionally drops test-set predictions.
+# Mirrors ``agents.model_selection.TEST_PREDICTIONS_PATH``; we re-declare the
+# string here instead of importing to avoid pulling sklearn / pandas at module
+# import time for environments that only run business_translator.
+TEST_PREDICTIONS_FILENAME = "test_predictions.csv"
 
 # Independent collection so the McKinsey corpus does not pollute the generic
 # rag_collection used by future RAG consumers.
@@ -44,8 +52,7 @@ STYLE_SKELETONS_PATH = os.path.join(
 
 
 def business_translator_node(state: GraphState) -> dict:
-    """Business Action Translator 的 LangGraph 节点函数。"""
-
+    """LangGraph node for business report generation."""
     user_goal = state["user_goal"]
     memory = state.get("memory", [])
     dataset_description = (state.get("dataset_description") or "").strip()
@@ -54,22 +61,43 @@ def business_translator_node(state: GraphState) -> dict:
     logger.info("Business Translator node started.")
 
     # ------------------------------------------------------------------
-    # Step 1: 提取模型核心结论 (从落盘文件中按需读取)
+    # Step 1: extract model artefacts (lazy reads where needed)
     # ------------------------------------------------------------------
     fi_path = os.path.join(WORKSPACE_DIR, "feature_importance.json")
     feature_importance = _load_feature_importance(fi_path)
     model_summary = memory[-1] if memory else "No model-stage summary available."
     logger.info(f"Loaded feature importance for {len(feature_importance)} features.")
 
+    # Test-set predictions are written unconditionally by Model Selection (see
+    # agents/model_selection.py constraint #12). Surfacing a brief summary
+    # gives the report something concrete to say when the test set carried no
+    # ground-truth labels and there are no test metrics
+    # in the model summary to talk about. When labels were present the summary
+    # is still useful as a sanity check on prediction distribution.
+    predictions_summary = _summarise_test_predictions(
+        os.path.join(WORKSPACE_DIR, TEST_PREDICTIONS_FILENAME)
+    )
+    if predictions_summary["available"]:
+        logger.info(
+            "Loaded test predictions summary: %d rows, target_pred_col=%r, has_proba=%s",
+            predictions_summary["n_rows"],
+            predictions_summary.get("pred_col"),
+            predictions_summary.get("has_proba"),
+        )
+    else:
+        logger.info(
+            "No test_predictions.csv found at expected path; report will omit prediction distribution block."
+        )
+
     # ------------------------------------------------------------------
-    # Step 2: 构造 RAG 检索查询词
+    # Step 2: build retrieval queries for RAG
     # ------------------------------------------------------------------
     top_features = list(feature_importance.keys())[:5] if feature_importance else []
     search_queries = _build_rag_queries(user_goal, top_features)
     logger.info(f"Generated {len(search_queries)} RAG queries for external strategy literature.")
 
     # ------------------------------------------------------------------
-    # Step 3: McKinsey RAG 检索（主路径）
+    # Step 3: McKinsey corpus RAG retrieval (happy path)
     # ------------------------------------------------------------------
     mckinsey_buckets = _retrieve_mckinsey_context(search_queries)
     total_mckinsey_hits = sum(len(v) for v in mckinsey_buckets.values())
@@ -82,7 +110,7 @@ def business_translator_node(state: GraphState) -> dict:
     )
 
     # ------------------------------------------------------------------
-    # Step 4: arxiv fallback（仅当本地 RAG 命中不足时）
+    # Step 4: Arxiv fallback (only when local RAG lacks coverage)
     # ------------------------------------------------------------------
     retrieved_arxiv: list[dict] = []
     if total_mckinsey_hits < MCKINSEY_MIN_HITS:
@@ -98,12 +126,12 @@ def business_translator_node(state: GraphState) -> dict:
         logger.info("Sufficient McKinsey hits; skipping arxiv fallback.")
 
     # ------------------------------------------------------------------
-    # Step 5: 加载风格骨架锚点
+    # Step 5: load style-outline anchors
     # ------------------------------------------------------------------
     style_skeletons = _load_style_skeletons()
 
     # ------------------------------------------------------------------
-    # Step 6: 调用 LLM 生成商业分析报告
+    # Step 6: invoke the LLM to draft the narrative report
     # ------------------------------------------------------------------
     report = _generate_business_report(
         user_goal,
@@ -116,6 +144,7 @@ def business_translator_node(state: GraphState) -> dict:
         dataset_description=dataset_description,
         eda_summary=eda_summary,
         eda_charts=eda_charts,
+        predictions_summary=predictions_summary,
     )
     logger.info("Business report generation complete.")
 
@@ -123,7 +152,7 @@ def business_translator_node(state: GraphState) -> dict:
 
 
 # ======================================================================
-# 私有辅助函数
+# Private helpers
 # ======================================================================
 
 def _load_feature_importance(path: str) -> dict:
@@ -190,7 +219,7 @@ def _load_feature_importance(path: str) -> dict:
 
 
 def _build_rag_queries(user_goal: str, top_features: list[str]) -> list[str]:
-    """调用 LLM 根据特征与目标交叉生成检索词。"""
+    """Ask the LLM to weave goal + strongest features into RAG-ready queries."""
     if not top_features:
         return [f"{user_goal} business analytics"]
 
@@ -288,6 +317,123 @@ def _format_mckinsey_bucket(label: str, items: list[dict]) -> str:
     return "\n\n".join(blocks) + "\n"
 
 
+def _summarise_test_predictions(path: str) -> dict:
+    """
+    Compute a small, prompt-friendly summary of the test-predictions artifact.
+
+    Returns a dict with stable keys regardless of whether the file exists:
+      - ``available``: bool
+      - ``path``: str (absolute or workspace-relative path attempted)
+      - ``n_rows``: int (0 when unavailable)
+      - ``pred_col``: str (the ``<target>_pred`` column name found, or "")
+      - ``has_proba``: bool (binary-classification probability column present)
+      - ``proba_col``: str
+      - ``positive_rate``: float | None (mean of the proba column when present)
+      - ``class_distribution``: dict[str, int] | None (small dict for
+        classification ``_pred`` columns, capped to top 10)
+      - ``regression_stats``: dict | None (count/mean/std/min/max for numeric
+        prediction columns when classification doesn't apply)
+      - ``error``: str | None (parse failure reason, surfaced in the prompt)
+    """
+    summary: dict = {
+        "available": False,
+        "path": path,
+        "n_rows": 0,
+        "pred_col": "",
+        "has_proba": False,
+        "proba_col": "",
+        "positive_rate": None,
+        "class_distribution": None,
+        "regression_stats": None,
+        "error": None,
+    }
+    if not os.path.exists(path) or os.path.getsize(path) <= 0:
+        return summary
+
+    try:
+        import pandas as pd  # local import to keep BT lean if unused
+    except ImportError as e:
+        summary["error"] = f"pandas unavailable: {e}"
+        return summary
+
+    try:
+        df = pd.read_csv(path)
+    except Exception as e:
+        summary["error"] = f"failed to parse predictions CSV: {e}"
+        return summary
+
+    summary["available"] = True
+    summary["n_rows"] = int(len(df))
+    cols_lower = {str(c).strip().lower(): c for c in df.columns}
+    pred_col_key = next(
+        (k for k in cols_lower if k.endswith("_pred")),
+        "prediction" if "prediction" in cols_lower else "",
+    )
+    if pred_col_key:
+        pred_col = cols_lower[pred_col_key]
+        summary["pred_col"] = pred_col
+        proba_key = next((k for k in cols_lower if k.endswith("_pred_proba")), "")
+        if proba_key:
+            proba_col = cols_lower[proba_key]
+            summary["has_proba"] = True
+            summary["proba_col"] = proba_col
+            try:
+                summary["positive_rate"] = float(df[proba_col].mean())
+            except Exception:
+                summary["positive_rate"] = None
+        try:
+            series = df[pred_col]
+            unique_count = int(series.nunique(dropna=True))
+            if unique_count <= 20:
+                vc = series.value_counts(dropna=False).head(10)
+                summary["class_distribution"] = {
+                    str(k): int(v) for k, v in vc.items()
+                }
+            else:
+                desc = series.describe()
+                summary["regression_stats"] = {
+                    "count": int(desc.get("count", 0)),
+                    "mean": float(desc.get("mean", 0.0)),
+                    "std": float(desc.get("std", 0.0)),
+                    "min": float(desc.get("min", 0.0)),
+                    "max": float(desc.get("max", 0.0)),
+                }
+        except Exception:
+            pass
+    return summary
+
+
+def _format_predictions_summary_block(summary: dict) -> str:
+    """Render the test-predictions summary as a Markdown block for the prompt."""
+    if not summary or not summary.get("available"):
+        return (
+            "(no test_predictions.csv found; do not invent prediction figures. "
+            "If the model selection stage did not write predictions, omit any "
+            "claims about test-set predictions.)"
+        )
+    lines = [
+        f"- **rows**: {summary.get('n_rows', 0)}",
+        f"- **prediction column**: `{summary.get('pred_col') or 'unknown'}`",
+    ]
+    if summary.get("has_proba"):
+        rate = summary.get("positive_rate")
+        rate_text = f"{rate:.3f}" if isinstance(rate, (int, float)) else "n/a"
+        lines.append(f"- **probability column**: `{summary['proba_col']}`")
+        lines.append(f"- **mean predicted positive-class probability**: {rate_text}")
+    dist = summary.get("class_distribution")
+    if dist:
+        items = ", ".join(f"`{k}`={v}" for k, v in dist.items())
+        lines.append(f"- **predicted class distribution**: {items}")
+    rstats = summary.get("regression_stats")
+    if rstats:
+        lines.append(
+            "- **predicted value stats**: count="
+            f"{rstats['count']}, mean={rstats['mean']:.4f}, "
+            f"std={rstats['std']:.4f}, min={rstats['min']:.4f}, max={rstats['max']:.4f}"
+        )
+    return "\n".join(lines)
+
+
 def _format_eda_charts_block(charts: list[dict]) -> str:
     if not charts:
         return (
@@ -314,8 +460,9 @@ def _generate_business_report(
     dataset_description: str = "",
     eda_summary: str = "",
     eda_charts: list[dict] | None = None,
+    predictions_summary: dict | None = None,
 ) -> str:
-    """调用 LLM 生成最终商业报告（McKinsey 风格）。"""
+    """Invoke the LLM to produce the final McKinsey-styled briefing."""
     mckinsey_buckets = mckinsey_buckets or {}
 
     arxiv_text = "\n".join(
@@ -334,6 +481,7 @@ def _generate_business_report(
     )
     eda_block = eda_summary if eda_summary else "(not provided by EDA stage)"
     eda_charts_block = _format_eda_charts_block(eda_charts or [])
+    predictions_block = _format_predictions_summary_block(predictions_summary or {})
 
     mck_block = _format_mckinsey_bucket("McKinsey Reports", mckinsey_buckets.get("mckinsey", []))
     eq_block = _format_mckinsey_bucket("Equity Research & Strategy", mckinsey_buckets.get("equity_research", []))
@@ -383,6 +531,11 @@ Use `![short caption](./eda_figs/<filename>.png)` in **Situation & Complication*
 
 # Model Validation Summary
 {model_summary}
+
+# Test-Set Predictions Summary
+{predictions_block}
+
+When the Model Validation Summary above does NOT contain test-set evaluation metrics (e.g. the test set arrived without ground-truth labels and the model selection stage skipped metric computation), do NOT invent test metrics. Instead anchor evaluation claims in the cross-validation score from the Model Validation Summary, and use the Test-Set Predictions Summary above to characterise the model's behaviour on the held-out set (e.g. predicted class distribution, mean positive-class probability, predicted value range). Be explicit when only CV evidence is available — it is more honest and more useful than fabricated holdout numbers.
 
 # Top Features & Importance
 {fi_text}
