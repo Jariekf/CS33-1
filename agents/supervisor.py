@@ -1,9 +1,11 @@
 """
-Supervisor Agent (质量把控与验证智能体)
-职责：
-  1. 接收 Worker 的代码产出与执行日志
-  2. 利用 LLM 进行结构化审查打分 (Pydantic ReviewReport)
-  3. 决策路由：通过 → 落盘报告 + 摘要入 Memory + 推进；不通过 → 反馈 + 重试
+Supervisor Agent (quality gate)
+
+Responsibilities:
+  1. Receive each worker phase's code and execution logs.
+  2. Run an LLM-based structured review and score it (``ReviewReport``).
+  3. Route outcomes: pass → persist report + write memory + advance;
+     fail → attach feedback + retry (within limits).
 """
 from __future__ import annotations
 
@@ -22,11 +24,11 @@ from config import SUPERVISOR_PASS_THRESHOLD, MAX_OUTER_RETRY, WORKSPACE_DIR
 logger = get_agent_logger("supervisor")
 
 # ======================================================================
-# 结构化审查报告定义
+# Structured review schema
 # ======================================================================
 
 class ReviewReport(BaseModel):
-    """Supervisor 产出的标准化审查报告。"""
+    """Normalized review artefact emitted by the Supervisor."""
     score: int = Field(description="Quality score from 1 to 5; 3 is the passing threshold.")
     passed: bool = Field(description="Whether the current phase is allowed to pass.")
     feedback_for_retry: str = Field(default="", description="Specific fix guidance when the phase does not pass.")
@@ -51,7 +53,7 @@ class ReviewReport(BaseModel):
 
 
 # ======================================================================
-# Prompt 模板
+# Prompt templates
 # ======================================================================
 
 _SYSTEM_PROMPT_REVIEW = """\
@@ -67,7 +69,7 @@ issues. Return a structured review report in strict JSON."""
 
 _USER_PROMPT_REVIEW = """\
 # PHASE #
-{phase}
+{phase}{run_context_block}
 
 # PLAN #
 {plan}
@@ -155,13 +157,13 @@ Your previous (invalid) reply was:
 
 
 # ======================================================================
-# Supervisor 节点
+# Supervisor node
 # ======================================================================
 
 def supervisor_node(state: GraphState) -> dict:
     """
-    Supervisor 的 LangGraph 节点函数。
-    读取 Worker 的执行日志，调用 LLM 进行评审，并更新 State。
+    LangGraph node for the Supervisor: read worker artefacts, call the LLM
+    reviewer, and return ``GraphState`` updates.
     """
     phase = state["current_phase"]
     code = state.get("current_code", "")
@@ -193,31 +195,44 @@ def supervisor_node(state: GraphState) -> dict:
         return updates
 
     # ------------------------------------------------------------------
-    # 调用 LLM 进行结构化审查
+    # LLM structured review
     # ------------------------------------------------------------------
-    review = _llm_review(phase, plan, code, execution_log)
+    run_context_block = _run_context_block(state)
+    review = _llm_review(
+        phase, plan, code, execution_log, run_context_block=run_context_block
+    )
     logger.info(f"LLM review completed. Score: {review.score}, Passed: {review.passed}")
 
     # ------------------------------------------------------------------
-    # 根据审查结果，构造状态更新
+    # Build state updates from the review
     # ------------------------------------------------------------------
     updates: dict = {"current_review": review.model_dump()}
 
     if review.passed:
         logger.info(f"Review passed for phase: {phase}. Writing report to output log.")
-        # ---- 通过：落盘详情 + 摘要入 Memory ----
+        # ---- Pass: persist report + memory summary ----
         report_path = os.path.join(WORKSPACE_DIR, f"{phase}_report.md")
         os.makedirs(WORKSPACE_DIR, exist_ok=True)
         with open(report_path, "w", encoding="utf-8") as f:
             f.write(review.detailed_report)
 
-        memory_entry = f"[{phase}] {review.summary_for_memory} Details: {report_path}"
+        # Strip pipeline-internal column names from the summary before it
+        # propagates into shared memory. Downstream agents read state["memory"]
+        # as part of their prompt context, and any column literal we leak here
+        # ends up looking like "real schema" to the next LLM. The marker column
+        # __dataset_split__ is dropped from the cleaned CSVs before the next
+        # phase loads them, so any reference to it in memory is misleading.
+        sanitized_summary = (review.summary_for_memory or "").replace(
+            "__dataset_split__",
+            "(internal split marker, dropped before the next phase loads its inputs)",
+        )
+        memory_entry = f"[{phase}] {sanitized_summary} Details: {report_path}"
         updates["memory"] = [memory_entry]
         updates["current_error"] = ""
         updates["retry_count"] = 0
     else:
         logger.warning(f"Review failed for phase: {phase}. Feedback: {review.feedback_for_retry}")
-        # ---- 不通过：附带反馈信息，累加重试计数 ----
+        # ---- Fail: carry feedback forward; bump retry counters ----
         updates["current_error"] = review.feedback_for_retry
         updates["retry_count"] = state.get("retry_count", 0) + 1
         updates["outer_retry_total"] = state.get("outer_retry_total", 0) + 1
@@ -226,16 +241,17 @@ def supervisor_node(state: GraphState) -> dict:
 
 
 # ======================================================================
-# 条件路由函数 (供 graph.py 的 add_conditional_edges 调用)
+# Conditional router (wired from ``graph.add_conditional_edges``)
 # ======================================================================
 
 def supervisor_router(state: GraphState) -> str:
     """
-    根据 Supervisor 审查结果决定路由方向。
-    返回:
-        "pass"  — 审查通过，推进至下一阶段
-        "retry" — 审查不通过，退回 Worker 重修
-        "error" — 超出最大重试次数，终止流程
+    Map the latest Supervisor review into a branch label.
+
+    Returns:
+        ``"pass"``: review passed → advance.
+        ``"retry"``: review failed → return to worker for another attempt.
+        ``"error"``: retries exhausted → terminal failure.
     """
     review = state.get("current_review")
     if review and review.get("passed"):
@@ -248,8 +264,78 @@ def supervisor_router(state: GraphState) -> str:
 
 
 # ======================================================================
-# 私有辅助函数
+# Private helpers
 # ======================================================================
+
+def _run_context_block(state: GraphState) -> str:
+    """
+    Conditionally inject a ``# RUN CONTEXT #`` section into the review prompt.
+
+    Empty string in single-CSV / single-mode runs (keeps the legacy prompt
+    byte-identical), otherwise a leading-newline block that tells the
+    Supervisor about pipeline-level facts the worker cannot communicate
+    through code or execution log alone — most importantly, that pre-split
+    runs may legitimately carry NaN values in columns that exist on one side
+    of the user-provided split but not the other.
+
+    Without this, the Supervisor may see a large NaN count on the train-side
+    label column in the combined-cleaning view and wrongly demand imputation,
+    which corrupts predict-only test sets where labels are intentionally absent.
+    """
+    test_data_path = (state.get("test_data_path") or "").strip() if isinstance(state, dict) else ""
+    if not test_data_path:
+        return ""
+    return (
+        "\n\n# RUN CONTEXT #\n"
+        "Pre-split mode is active: the user provided separate train and test "
+        "CSVs (positional `data_path` is the train file, `--test` points at the "
+        "test file). The two files were combined for the cleaning stage with a "
+        "hidden marker column `__dataset_split__` (values `train` / `test`) so "
+        "downstream agents can restore the original split.\n"
+        "\n"
+        "Implications you MUST account for when reviewing this phase:\n"
+        "1. Train and test may have different column sets. After concat, any "
+        "column that exists on only one side legitimately carries NaN on the "
+        "other side. The most common case is the supervised target column "
+        "being present in train but absent in test (held-out test sets where "
+        "ground-truth labels are intentionally not provided to the analyst). "
+        "If you observe ~`n_test` NaN values in a target-like column, that is "
+        "EXPECTED, not a cleaning defect.\n"
+        "2. Do NOT instruct the worker to impute / mode-fill / forward-fill / "
+        "drop rows for NaN values that are concentrated on the test side of a "
+        "target-like column. Imputing the target on test rows fabricates "
+        "labels, contaminates evaluation, and breaks the downstream Model "
+        "Selection stage (which auto-detects missing labels and switches to a "
+        "predict-only branch that writes `workspace/test_predictions.csv` "
+        "instead of fake metrics).\n"
+        "3. The marker column `__dataset_split__` itself must be preserved "
+        "untouched through the cleaning stage; it is dropped automatically "
+        "when the cleaned output is split back into train/test for downstream "
+        "consumers.\n"
+        "4. For Model Selection in pre-split mode: when the test target is "
+        "missing or all-NaN, the worker is REQUIRED to skip test-set metric "
+        "computation and write predictions to `workspace/test_predictions.csv` "
+        "instead. A log line of the form "
+        "`Test predictions: <n> rows written to ./workspace/test_predictions.csv "
+        "(no labels available; metrics skipped).` is the expected execution "
+        "evidence in that case — accept it as valid output, do NOT demand "
+        "test metrics that cannot be computed.\n"
+        "5. Cleaning operations whose decisions depend on per-column NaN "
+        "ratios (e.g. drop-column-if-NaN-ratio>X) should be evaluated on the "
+        "combined frame, not on either subset alone. Likewise, judging "
+        "all-NaN-ness of a column should be done on the combined frame.\n"
+        "6. The marker column `__dataset_split__` is internal pipeline "
+        "machinery and is automatically dropped from the cleaned CSVs before "
+        "the next phase loads them — downstream agents will NOT see it. Do "
+        "NOT mention `__dataset_split__` by name in your `summary_for_memory` "
+        "or `detailed_report`. If you must describe it abstractly, refer to "
+        "it as 'the internal train/test split tracker'. (Background: those "
+        "review fields propagate into shared memory that downstream agents "
+        "read as prompt context; any column literal you mention there can "
+        "be mistaken for real schema and trigger `KeyError` in the next "
+        "agent's generated code.)"
+    )
+
 
 def _extract_balanced_json_object(text: str) -> str | None:
     """
@@ -354,7 +440,12 @@ def _persist_raw_reply_for_debug(phase: str, reply: str, reason: str) -> str | N
 
 
 def _llm_review(
-    phase: str, plan: dict, code: str, execution_log: str
+    phase: str,
+    plan: dict,
+    code: str,
+    execution_log: str,
+    *,
+    run_context_block: str = "",
 ) -> ReviewReport:
     """
     Call the LLM to produce a structured review.
@@ -372,6 +463,7 @@ def _llm_review(
     system_prompt = _SYSTEM_PROMPT_REVIEW.format(threshold=SUPERVISOR_PASS_THRESHOLD)
     user_prompt = _USER_PROMPT_REVIEW.format(
         phase=phase,
+        run_context_block=run_context_block,
         plan=json.dumps(plan, ensure_ascii=False, indent=2),
         code=code,
         execution_log=execution_log,
