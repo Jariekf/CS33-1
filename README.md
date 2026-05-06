@@ -113,7 +113,7 @@ CS33-1/
 - [workspace](https://github.sydney.edu.au/CS33-1/CS33-1/tree/main/workspace)
   Stores generated CSV outputs (including **`test_predictions.csv`** when modelling completes), feature importance files, EDA figures, and Quarto (`.qmd`) / markdown-style reports.
 - [docs](https://github.sydney.edu.au/CS33-1/CS33-1/tree/main/docs)
-  Project documentation: [Quick Start](docs/quick-start.md), LLM configuration, testing notes, etc. A working summary of recent pipeline deltas is kept in [docs/local-vs-remote-changes.md](docs/local-vs-remote-changes.md).
+  Project documentation: [Quick Start](docs/quick-start.md), LLM configuration, testing notes, etc. 
 
 ## Tech Stack
 
