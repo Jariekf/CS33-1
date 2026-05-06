@@ -141,14 +141,22 @@ python main.py ./data/bank-full.csv "Predict term deposit subscription" \
 
 By default the pipeline takes one CSV and inside Data Cleaning produces an internal random 80/20 train/test split. If you instead arrive with a dataset that is **already split** into a training file and a held-out test file (typical for Kaggle releases, time-based splits, or any benchmark where the test partition is fixed), pass the test file via `--test`. The positional `data_path` is then treated as the train CSV.
 
+Sections **4.4** and **4.5** were validated using train/test splits and a short description file in the **bank customer churn — binary classification** setup from this Kaggle notebook (export or mirror the CSVs locally; paths below match a typical `./data/` layout): [Bank Churn Dataset — Binary Classification](https://www.kaggle.com/code/zynptkn06/bank-churn-dataset-binary-classification).
+
 ```bash
 python main.py ./data/train.csv "Predict term deposit subscription" \
   --test ./data/test.csv \
   --desc ./data/description.txt
 ```
 
+Churn-focused run (same pre-split mechanics as documented in §4.4–§4.5):
+
+```bash
+python main.py ./data/train.csv "Your task is to predict whether customers will continue using their accounts or close them, and to produce a business report." --test ./data/test.csv --desc ./data/dataset-description.txt
+```
+
 '''
-python main.py ./data/train.csv "Your task is to predict whether customers will continue using their accounts or close them, and to produce a business report." --test ./data/test.csv --desc ./data/dataset-description.txt  
+Description content: The dataset (both train and test) was generated from a deep learning model trained on the Bank Customer Churn Prediction dataset. Feature distributions are close to, but not exactly the same, as the original.
 '''
 
 
