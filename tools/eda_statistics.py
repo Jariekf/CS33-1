@@ -13,6 +13,17 @@ import numpy as np
 import pandas as pd
 logger = logging.getLogger(__name__)
 
+
+def _categorical_columns(df: pd.DataFrame) -> list[str]:
+    return [
+        c
+        for c in df.columns
+        if pd.api.types.is_object_dtype(df[c])
+        or isinstance(df[c].dtype, pd.CategoricalDtype)
+        or pd.api.types.is_string_dtype(df[c])
+    ]
+
+
 # Re-use same heuristics as eda_charts
 def infer_target_column(df: pd.DataFrame) -> str | None:
     if df.empty or df.shape[1] == 0:
@@ -115,7 +126,7 @@ def _quick_rf_importance(
         med = X_num[c].median()
         X_num[c] = X_num[c].fillna(med)
 
-    X_cat = X_df.select_dtypes(include=["object", "category"]).copy()
+    X_cat = X_df[_categorical_columns(X_df)].copy()
     for c in list(X_cat.columns):
         if X_cat[c].nunique(dropna=True) > 30:
             X_cat = X_cat.drop(columns=[c], errors="ignore")
@@ -232,10 +243,173 @@ def _train_test_drift(
     return out
 
 
+def _shape_for_path(path: str | None) -> dict[str, int] | None:
+    if not path or not os.path.isfile(path):
+        return None
+    try:
+        df = pd.read_csv(path)
+    except Exception:
+        return None
+    return {"rows": int(df.shape[0]), "columns": int(df.shape[1])}
+
+
+def _omega_squared_oneway(df: pd.DataFrame, feature: str, target_col: str) -> float | None:
+    x = pd.to_numeric(df[feature], errors="coerce")
+    y = df[target_col].astype(str)
+    valid = x.notna() & y.notna()
+    work = pd.DataFrame({"x": x[valid], "y": y[valid]})
+    groups = [g["x"].to_numpy() for _, g in work.groupby("y") if len(g) >= 2]
+    if len(groups) < 2:
+        return None
+    values = work["x"].to_numpy()
+    grand_mean = float(np.mean(values))
+    ss_between = sum(len(g) * (float(np.mean(g)) - grand_mean) ** 2 for g in groups)
+    ss_within = sum(float(np.sum((g - float(np.mean(g))) ** 2)) for g in groups)
+    ss_total = ss_between + ss_within
+    df_between = len(groups) - 1
+    df_within = len(values) - len(groups)
+    if ss_total <= 0 or df_within <= 0:
+        return None
+    ms_within = ss_within / df_within
+    omega = (ss_between - df_between * ms_within) / (ss_total + ms_within)
+    return float(max(0.0, omega))
+
+
+def _cramers_v(df: pd.DataFrame, feature: str, target_col: str) -> float | None:
+    try:
+        from scipy.stats import chi2_contingency
+    except ImportError:
+        return None
+    table = pd.crosstab(df[feature].astype(str), df[target_col].astype(str))
+    if table.shape[0] < 2 or table.shape[1] < 2:
+        return None
+    chi2, _, _, _ = chi2_contingency(table)
+    n = float(table.to_numpy().sum())
+    if n <= 0:
+        return None
+    r, k = table.shape
+    denom = min(k - 1, r - 1)
+    if denom <= 0:
+        return None
+    return float(np.sqrt((chi2 / n) / denom))
+
+
+def _data_shape_task_hint(y: pd.Series | None) -> str:
+    if y is None:
+        return "unknown"
+    nu = int(y.nunique(dropna=True))
+    if nu <= 0:
+        return "unknown"
+    if pd.api.types.is_numeric_dtype(y):
+        if nu > 25:
+            return "regression"
+        if nu <= 20:
+            return "classification"
+        return "unknown"
+    if nu <= 20:
+        return "classification"
+    return "unknown"
+
+
+def _semantic_task_hint(text: str | None) -> str:
+    hay = (text or "").strip().lower()
+    if not hay:
+        return "unknown"
+    classification_terms = (
+        "classify",
+        "classification",
+        "binary",
+        "multiclass",
+        "multi-class",
+        "class label",
+        "category",
+        "categorical target",
+        "label",
+    )
+    regression_terms = (
+        "regression",
+        "predict value",
+        "predict numeric",
+        "numeric target",
+        "continuous target",
+        "continuous value",
+        "forecast numeric",
+        "forecast value",
+        "estimate value",
+    )
+    has_classification = any(term in hay for term in classification_terms)
+    has_regression = any(term in hay for term in regression_terms)
+    if has_classification and not has_regression:
+        return "classification"
+    if has_regression and not has_classification:
+        return "regression"
+    return "unknown"
+
+
+def _resolve_task_type_hint(data_hint: str, semantic_hint: str) -> tuple[str, str]:
+    data_hint = data_hint if data_hint in {"classification", "regression"} else "unknown"
+    semantic_hint = semantic_hint if semantic_hint in {"classification", "regression"} else "unknown"
+    if data_hint != "unknown":
+        if semantic_hint != "unknown" and semantic_hint != data_hint:
+            return data_hint, (
+                f"semantic task hint ({semantic_hint}) conflicts with target-shape "
+                f"heuristic ({data_hint}); using target-shape heuristic for charts."
+            )
+        return data_hint, ""
+    if semantic_hint != "unknown":
+        return semantic_hint, ""
+    return "unknown", ""
+
+
+def _target_display_name(target_col: str | None, dataset_description: str | None) -> str:
+    if not target_col:
+        return ""
+    desc = dataset_description or ""
+    for raw_line in desc.splitlines():
+        line = raw_line.strip()
+        if not line:
+            continue
+        lower = line.lower()
+        target_lower = str(target_col).lower()
+        if target_lower not in lower:
+            continue
+        if "-" in line:
+            candidate = line.split("-", 1)[1].strip()
+        elif ":" in line:
+            candidate = line.split(":", 1)[1].strip()
+        else:
+            candidate = line
+        candidate = " ".join(candidate.split())
+        compact = candidate.lower().rstrip(" ?.")
+        if "subscribed" in compact and "term deposit" in compact:
+            return "Term deposit subscription"
+        if candidate.endswith("?"):
+            candidate = candidate[:-1]
+        if "(" in candidate:
+            candidate = candidate.split("(", 1)[0].strip()
+        if candidate:
+            return candidate[:100]
+    return str(target_col)
+
+
+def _target_class_label_map(y: pd.Series | None, dataset_description: str | None) -> dict[str, str]:
+    if y is None:
+        return {}
+    keys = {str(k) for k in y.dropna().astype(str).unique()}
+    desc = (dataset_description or "").lower()
+    if keys <= {"0", "1"} and ("yes" in desc or "subscribed" in desc):
+        return {"0": "No", "1": "Yes"}
+    return {k: k for k in sorted(keys)}
+
+
 def compute_eda_statistics(
     train_path: str,
     test_path: str | None = None,
     target_col: str | None = None,
+    raw_path: str | None = None,
+    cleaned_path: str | None = None,
+    semantic_context: str | None = None,
+    dataset_description: str | None = None,
 ) -> dict[str, Any]:
     """
     Load train (and optional test) CSV; return JSON-serializable EDA statistics dict.
@@ -246,6 +420,11 @@ def compute_eda_statistics(
         "test_path": test_path,
         "inferred_target": None,
         "target_type_hint": "unknown",
+        "target_type_data_hint": "unknown",
+        "target_type_semantic_hint": "unknown",
+        "target_type_warning": "",
+        "target_display_name": "",
+        "target_class_labels": {},
         "descriptive_stats": {},
         "skewness": {},
         "category_summary": {},
@@ -255,6 +434,8 @@ def compute_eda_statistics(
         "collinear_pairs": [],
         "target_correlation": [],
         "class_balance": {},
+        "numeric_feature_class_effects": [],
+        "categorical_target_associations": [],
         "rf_importance_top15": [],
         "rf_error": "",
         "datetime_columns": [],
@@ -285,11 +466,22 @@ def compute_eda_statistics(
 
     n_rows, n_feats = df.shape[0], df.shape[1]
     rpf = (n_rows / max(n_feats, 1)) if n_feats else 0.0
+    train_shape = {"rows": int(n_rows), "columns": int(n_feats)}
+    test_shape = _shape_for_path(test_path)
+    lineage_shapes = {
+        "raw": _shape_for_path(raw_path),
+        "cleaned": _shape_for_path(cleaned_path),
+        "train": train_shape,
+        "test": test_shape,
+    }
     result["sample_sufficiency"] = {
         "n_rows": int(n_rows),
         "n_features": int(n_feats),
         "rows_per_feature": round(float(rpf), 4),
         "warning_low_samples_per_feature": bool(rpf < 10 and n_feats > 5),
+        "train_shape": train_shape,
+        "test_shape": test_shape,
+        "lineage_shapes": lineage_shapes,
     }
 
     # --- descriptive ---
@@ -300,7 +492,7 @@ def compute_eda_statistics(
         for col in num_cols:
             if col in desc_num:
                 desc[col] = {k: _json_safe(v) for k, v in desc_num[col].items()}
-    obj_cols = df.select_dtypes(include=["object", "category"]).columns.tolist()
+    obj_cols = _categorical_columns(df)
     for col in obj_cols[:30]:
         vc = df[col].astype(str).value_counts().head(5)
         desc[col] = {
@@ -387,18 +579,41 @@ def compute_eda_statistics(
         else:
             result["class_balance"] = {}
 
-    # target type hint
-    if inferred is not None:
-        y = df[inferred]
-        nu = y.nunique(dropna=True)
-        if pd.api.types.is_numeric_dtype(y) and nu > 25:
-            result["target_type_hint"] = "regression"
-        elif nu <= 20:
-            result["target_type_hint"] = "classification"
-        else:
-            result["target_type_hint"] = "regression"
-    else:
-        result["target_type_hint"] = "clustering_or_none"
+    # target type hint: target shape first, user/plan semantics only as fallback.
+    y_for_hint = df[inferred] if inferred is not None else None
+    data_hint = _data_shape_task_hint(y_for_hint)
+    semantic_hint = _semantic_task_hint(semantic_context)
+    target_type, warning = _resolve_task_type_hint(data_hint, semantic_hint)
+    result["target_type_data_hint"] = data_hint
+    result["target_type_semantic_hint"] = semantic_hint
+    result["target_type_hint"] = target_type
+    result["target_type_warning"] = warning
+    result["target_display_name"] = _target_display_name(inferred, dataset_description)
+    result["target_class_labels"] = _target_class_label_map(y_for_hint, dataset_description)
+
+    # --- classification feature-target association summaries ---
+    if inferred is not None and result["target_type_hint"] == "classification":
+        y_nu = int(df[inferred].nunique(dropna=True))
+        if 2 <= y_nu <= 20:
+            num_effects: list[dict[str, Any]] = []
+            for c in num_cols:
+                if c == inferred:
+                    continue
+                omega = _omega_squared_oneway(df, c, inferred)
+                if omega is not None:
+                    num_effects.append({"feature": str(c), "omega_squared": float(omega)})
+            num_effects.sort(key=lambda d: -float(d["omega_squared"]))
+            result["numeric_feature_class_effects"] = num_effects[:15]
+
+            cat_assoc: list[dict[str, Any]] = []
+            for c in obj_cols[:40]:
+                if c == inferred or df[c].nunique(dropna=True) > 30:
+                    continue
+                cv = _cramers_v(df, c, inferred)
+                if cv is not None:
+                    cat_assoc.append({"feature": str(c), "cramers_v": float(cv)})
+            cat_assoc.sort(key=lambda d: -float(d["cramers_v"]))
+            result["categorical_target_associations"] = cat_assoc[:15]
 
     result["datetime_columns"] = _detect_datetime_columns(df)
 

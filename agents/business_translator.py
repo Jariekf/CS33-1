@@ -448,6 +448,67 @@ def _format_eda_charts_block(charts: list[dict]) -> str:
     return "\n".join(lines)
 
 
+def _select_eda_visual_charts(charts: list[dict], max_charts: int = 3) -> list[dict]:
+    priority = [
+        "class_balance.png",
+        "target_distribution.png",
+        "numeric_by_target_density.png",
+        "numeric_vs_target_regression.png",
+        "categorical_by_target_rate.png",
+        "categorical_vs_target_boxplot.png",
+        "corr_heatmap.png",
+        "rf_importance.png",
+    ]
+    by_name = {str(c.get("name", "")): c for c in charts if c.get("rel_path")}
+    selected: list[dict] = []
+    for name in priority:
+        chart = by_name.get(name)
+        if chart:
+            selected.append(chart)
+        if len(selected) >= max_charts:
+            return selected
+    for chart in charts:
+        if chart not in selected and chart.get("rel_path"):
+            selected.append(chart)
+        if len(selected) >= max_charts:
+            break
+    return selected
+
+
+def _required_eda_visual_charts(charts: list[dict]) -> list[dict]:
+    """Conservatively require high-value EDA overview charts when available."""
+    by_name = {str(c.get("name", "")): c for c in charts if c.get("rel_path")}
+    required: list[dict] = []
+    for name in ("class_balance.png", "corr_heatmap.png"):
+        chart = by_name.get(name)
+        if chart:
+            required.append(chart)
+    return required
+
+
+def _ensure_eda_visual_evidence(report: str, charts: list[dict]) -> str:
+    """Guarantee the final Quarto report contains key EDA images."""
+    report_text = report or ""
+    selected = [
+        chart
+        for chart in _required_eda_visual_charts(charts)
+        if str(chart.get("rel_path", "")).strip()
+        and str(chart.get("rel_path", "")).strip() not in report_text
+    ]
+    if not selected and "./eda_figs/" not in report_text:
+        selected = _select_eda_visual_charts(charts)
+    if not selected:
+        return report
+    lines = ["", "## EDA Visual Evidence", ""]
+    for chart in selected:
+        rel = str(chart.get("rel_path", "")).strip()
+        desc = str(chart.get("desc") or chart.get("name") or "EDA chart").strip()
+        if rel:
+            lines.append(f"![{desc}]({rel})")
+            lines.append("")
+    return (report or "").rstrip() + "\n" + "\n".join(lines).rstrip() + "\n"
+
+
 def _generate_business_report(
     user_goal: str,
     model_summary: str,
@@ -527,7 +588,7 @@ After the closing `---`, write the report sections in Markdown.
 # EDA chart files (embed when they support a claim; paths relative to project root / Quarto file location)
 {eda_charts_block}
 
-Use `![short caption](./eda_figs/<filename>.png)` in **Situation & Complication** and/or **Key Findings** where an image strengthens the narrative (typically 1--3 images). Do not reference images that are not listed above.
+You MUST embed 1-3 EDA charts from the listed files using `![short caption](./eda_figs/<filename>.png)` in **Situation & Complication** and/or **Key Findings**. Prefer target distribution/class balance charts when discussing imbalance, and correlation/feature-target charts when discussing drivers. Do not reference images that are not listed above.
 
 # Model Validation Summary
 {model_summary}
@@ -566,7 +627,7 @@ Style rules:
 """
     reply = call_llm(sys_prompt, user_prompt, agent_name="business_translator")
     if reply:
-        return reply
+        return _ensure_eda_visual_evidence(reply, eda_charts or [])
 
     return f"""# Business Insight Analysis Report
 

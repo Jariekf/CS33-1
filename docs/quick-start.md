@@ -178,6 +178,8 @@ Manager identifies the supervised target automatically from `user_goal` + `--des
 
 The Manager step is still LLM-driven, so on ambiguous datasets it can pick the wrong column. Use `--target` to override it explicitly:
 
+The `SalePrice` example below uses Kaggle's [House Prices - Advanced Regression Techniques](https://www.kaggle.com/competitions/house-prices-advanced-regression-techniques) dataset.
+
 ```bash
 python main.py ./data/train.csv "Predict house prices" \
   --test ./data/test.csv \
