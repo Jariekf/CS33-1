@@ -33,9 +33,21 @@ class GlobalState(TypedDict, total=False):
     cleaning_passed: bool
 
     # split
+    is_split: bool
     training_data_path: str
     testing_data_path: str
     split_report: dict[str, Any]
+
+    # per-target cleaning
+    cleaning_target: str  # "train" or "test"
+    train_cleaning_plan: dict[str, Any]
+    test_cleaning_plan: dict[str, Any]
+    train_cleaned_data_path: str
+    test_cleaned_data_path: str
+    train_cleaning_report: dict[str, Any]
+    test_cleaning_report: dict[str, Any]
+    train_cleaning_passed: bool
+    test_cleaning_passed: bool
 
     # eda
     eda_report: dict[str, Any]

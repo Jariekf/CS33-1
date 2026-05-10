@@ -45,7 +45,7 @@ def perform_train_test_file_split(
     test_size: float = 0.2,
     random_state: int = 42,
 ) -> dict[str, Any]:
-    df = pd.read_csv(source_path)
+    df = pd.read_csv(source_path, sep=None, engine="python")
     stratify = None
     stratify_requested = task_type == "classification"
     stratify_fallback = False

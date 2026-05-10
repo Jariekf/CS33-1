@@ -13,36 +13,39 @@ from core.global_state import GlobalState
 from core.my_llm import llm_deepseek
 
 from tools.agentmanager_tools.create_cleaning_plan import create_cleaning_plan
-from tools.agentmanager_tools.infer_task import infer_task
 from tools.agentmanager_tools.profile_dataset import profile_dataset
 from core.report_writer import save_agent_report
 
 
-tools = [profile_dataset, infer_task, create_cleaning_plan]
+tools = [profile_dataset, create_cleaning_plan]
 llm_with_tools = llm_deepseek.bind_tools(tools)
 
 
 def _manager_node(state: GlobalState) -> GlobalState:
     messages = state["messages"]
-    data_path = state.get("data_path")
-    description = state.get("description")
-    user_request = state.get("user_request")
-    if data_path or description or user_request:
-        messages = [
-            SystemMessage(
-                content=(
-                    "你是一个数据分析 Agent。"
-                    f"当前默认数据集路径是：{data_path or '未提供'}。"
-                    f"数据集描述是：{description or '未提供'}。"
-                    f"用户的问题是：{user_request or '未提供'}。"
-                    "当用户说“这个数据集”但没有提供路径时，请使用这个默认路径调用工具。"
-                    "工作流要求：先调用 profile_dataset 获取数据画像；"
-                    "然后调用 infer_task 判断任务类型和目标列；"
-                    "最后调用 create_cleaning_plan 记录数据清洗计划。"
-                )
-            ),
-            *messages,
-        ]
+    training_data_path = state.get("training_data_path") or state.get("data_path") or ""
+    description = state.get("description", "")
+    user_request = state.get("user_request", "")
+    testing_data_path = state.get("testing_data_path") or ""
+
+    messages = [
+        SystemMessage(
+            content=(
+                "你是一个数据分析 Agent。数据集已完成切分，训练集和测试集路径如下：\n"
+                f"训练集路径：{training_data_path or '未提供'}。\n"
+                f"测试集路径：{testing_data_path or '未提供'}。\n"
+                f"数据集描述：{description or '未提供'}。\n"
+                f"用户的问题：{user_request or '未提供'}。\n"
+                "工作流要求（严格按顺序执行）：\n"
+                f"1. 调用 profile_dataset(file_path='{training_data_path}') 获取训练集数据画像；\n"
+                "2. 调用 create_cleaning_plan(target='train', ...) 制定训练集清洗计划；\n"
+                "3. 调用 create_cleaning_plan(target='test', ...) 制定测试集清洗计划"
+                "   （测试集通常与训练集步骤相同，但不做基于标签分布的操作）。\n"
+                "完成以上三步后停止。"
+            )
+        ),
+        *messages,
+    ]
     response = llm_with_tools.invoke(messages)
     return {"messages": [response]}
 
@@ -53,8 +56,6 @@ def _tool_state_update_node(state: GlobalState) -> GlobalState:
         return {}
     if last_msg.name == "profile_dataset":
         return _update_profile_state(state, last_msg)
-    if last_msg.name == "infer_task":
-        return _update_task_state(last_msg)
     if last_msg.name == "create_cleaning_plan":
         return _update_cleaning_plan_state(last_msg)
     return {}
@@ -120,23 +121,25 @@ def _update_task_state(tool_message: ToolMessage) -> GlobalState:
 
 def _update_cleaning_plan_state(tool_message: ToolMessage) -> GlobalState:
     try:
-        cleaning_plan = json.loads(str(tool_message.content))
+        plan = json.loads(str(tool_message.content))
     except json.JSONDecodeError as exc:
         return {
             "current_stage": "cleaning_plan_failed",
-            "errors": [
-                {
-                    "stage": "cleaning_plan",
-                    "type": exc.__class__.__name__,
-                    "message": str(exc),
-                }
-            ],
+            "errors": [{"stage": "cleaning_plan", "type": exc.__class__.__name__, "message": str(exc)}],
         }
 
+    target = plan.get("target", "train")
+    if target == "test":
+        return {
+            "test_cleaning_plan": plan,
+            "cleaning_plan": plan,  # keep legacy field pointing to last plan
+            "current_stage": "cleaning_plans_created",
+            "next_action": "run_data_cleaning",
+        }
     return {
-        "cleaning_plan": cleaning_plan,
-        "current_stage": "cleaning_plan_created",
-        "next_action": "run_data_cleaning",
+        "train_cleaning_plan": plan,
+        "cleaning_plan": plan,
+        "current_stage": "train_cleaning_plan_created",
     }
 
 
@@ -151,19 +154,17 @@ def _route_after_manager(state: GlobalState) -> str:
 def _show_graph_if_needed(agent_graph, show_graph: bool) -> None:
     if not show_graph:
         return
+    output_dir = Path(__file__).resolve().parents[1] / "artifacts" / "graphs"
+    output_dir.mkdir(parents=True, exist_ok=True)
+    mmd_path = output_dir / "agent_manager_graph.mmd"
+    mmd_path.write_text(agent_graph.get_graph().draw_mermaid(), encoding="utf-8")
+    print(f"Agent Manager Mermaid 源码已保存: {mmd_path}")
     try:
-        output_dir = Path(__file__).resolve().parents[1] / "artifacts"
-        output_dir.mkdir(parents=True, exist_ok=True)
         image_path = output_dir / "agent_manager_graph.png"
-
-        image_bytes = agent_graph.get_graph().draw_mermaid_png()
-        image_path.write_bytes(image_bytes)
+        image_path.write_bytes(agent_graph.get_graph().draw_mermaid_png())
         print(f"Graph 图片已保存: {image_path}")
-
-        # 在 notebook 环境下额外尝试直接渲染
         try:
             from IPython.display import Image, display
-
             display(Image(filename=str(image_path)))
         except Exception:
             pass

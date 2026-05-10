@@ -36,49 +36,58 @@ llm_with_tools = llm_deepseek.bind_tools(tools)
 
 def _merge_cleaning_report(
     state: GlobalState, tool_name: str, payload: dict[str, Any]
-) -> dict[str, Any]:
-    existing = dict(state.get("cleaning_report") or {})
+) -> tuple[dict[str, Any], dict[str, Any]]:
+    target = state.get("cleaning_target", "train")
+    report_key = "train_cleaning_report" if target == "train" else "test_cleaning_report"
+    existing = dict(state.get(report_key) or {})
     steps = list(existing.get("steps", []))
     steps.append({"tool": tool_name, "result": payload})
     existing["steps"] = steps
-    return existing
+    return report_key, existing
 
 
 def _data_clean_node(state: GlobalState) -> GlobalState:
     messages = state["messages"]
-    data_path = state.get("data_path")
-    cleaning_plan = state.get("cleaning_plan")
-    dataset_id = state.get("dataset_id")
-    user_request = state.get("user_request")
-    description = state.get("description")
-    cleaned_data_path_hint = state.get("cleaned_data_path")
+    target = state.get("cleaning_target", "train")
     run_dir = state.get("run_dir") or ""
+    dataset_id = state.get("dataset_id")
+    description = state.get("description", "")
+    user_request = state.get("user_request", "")
+
+    if target == "train":
+        source_path = state.get("training_data_path") or state.get("data_path") or ""
+        cleaning_plan = state.get("train_cleaning_plan") or state.get("cleaning_plan")
+        prefix = "train_cleaned"
+    else:
+        source_path = state.get("testing_data_path") or ""
+        cleaning_plan = state.get("test_cleaning_plan") or state.get("cleaning_plan")
+        prefix = "test_cleaned"
 
     plan_text = (
         json.dumps(cleaning_plan, ensure_ascii=False, indent=2, default=str)
         if cleaning_plan
-        else "未提供（请根据用户说明自行决定清洗步骤）。"
+        else "未提供（请根据画像自行决定清洗步骤）。"
     )
 
+    from pathlib import Path as _Path
+    stem = _Path(source_path).stem if source_path else "dataset"
     default_save_path = (
-        f"{run_dir}/<filename>_cleaned.csv"
-        if run_dir
-        else cleaned_data_path_hint or "(项目根下 artifacts/cleaned_<dataset_id>.csv 等合理路径)"
+        f"{run_dir}/{prefix}_{stem}.csv" if run_dir else f"artifacts/{prefix}_{stem}.csv"
     )
 
     system_parts = [
-        "你是数据清洗执行 Agent（ReAct）：通过调用工具在内存 dataset_store 中完成清洗并落盘。",
-        f"默认原始数据路径：{data_path or '未提供'}。",
+        f"你是数据清洗执行 Agent（ReAct），当前处理：{target} 数据集。",
+        f"源文件路径：{source_path or '未提供'}。",
         f"当前内存 dataset_id：{dataset_id or '尚未加载'}。",
         f"数据集描述：{description or '未提供'}。",
         f"用户诉求：{user_request or '未提供'}。",
         f"本次运行工作目录：{run_dir or '未设置'}。所有输出文件应保存至此目录下。",
-        "若尚未加载数据，应优先调用 load_dataset_to_store(file_path=...)；路径缺失时使用上面的默认路径。",
+        "若尚未加载数据，应优先调用 load_dataset_to_store(file_path=...)；路径缺失时使用上面的源文件路径。",
         "后续按清洗计划依次调用 clean_data_types、clean_missing_values、clean_outliers、clean_duplicates；"
         "所有清洗工具的 dataset_id 必须与 load 返回的 dataset_id 一致。",
         "计划中若有 drop_columns：当前工具集不包含删列工具，请在最终回复中列出建议删除的列及原因，不要编造已删除。",
         f"完成后必须调用 save_dataset_from_store 写出 CSV，output_path 使用：{default_save_path}。",
-        "\n--- cleaning_plan ---\n",
+        f"\n--- cleaning_plan ({target}) ---\n",
         plan_text,
     ]
 
@@ -120,52 +129,65 @@ def _parse_tool_payload(tool_message: ToolMessage) -> dict[str, Any]:
 
 def _handle_load_dataset(state: GlobalState, tool_message: ToolMessage) -> GlobalState:
     payload = _parse_tool_payload(tool_message)
-    report = _merge_cleaning_report(state, tool_message.name, payload)
+    report_key, report = _merge_cleaning_report(state, tool_message.name, payload)
     if "error" in payload:
         return {
-            "cleaning_report": report,
+            report_key: report,
             "current_stage": "cleaning_load_failed",
-            "errors": (state.get("errors") or [])
-            + [{"stage": "cleaning_load", **payload["error"]}],
+            "errors": (state.get("errors") or []) + [{"stage": "cleaning_load", **payload["error"]}],
         }
     return {
         "dataset_id": payload["dataset_id"],
-        "cleaning_report": report,
+        report_key: report,
         "current_stage": "dataset_loaded",
     }
 
 
 def _handle_save_dataset(state: GlobalState, tool_message: ToolMessage) -> GlobalState:
     payload = _parse_tool_payload(tool_message)
-    report = _merge_cleaning_report(state, tool_message.name, payload)
+    report_key, report = _merge_cleaning_report(state, tool_message.name, payload)
+    target = state.get("cleaning_target", "train")
     if "error" in payload:
         return {
-            "cleaning_report": report,
+            report_key: report,
             "current_stage": "cleaning_save_failed",
-            "errors": (state.get("errors") or [])
-            + [{"stage": "cleaning_save", **payload["error"]}],
+            "errors": (state.get("errors") or []) + [{"stage": "cleaning_save", **payload["error"]}],
+        }
+    output_path = payload["output_path"]
+    if target == "train":
+        return {
+            "train_cleaned_data_path": output_path,
+            "training_data_path": output_path,  # update so downstream agents use cleaned data
+            "cleaned_data_path": output_path,   # legacy compat
+            report_key: report,
+            "train_cleaning_passed": True,
+            "cleaning_passed": True,
+            "current_stage": "train_cleaning_saved",
+            "next_action": "",
         }
     return {
-        "cleaned_data_path": payload["output_path"],
-        "cleaning_report": report,
+        "test_cleaned_data_path": output_path,
+        "testing_data_path": output_path,  # update so downstream agents use cleaned data
+        report_key: report,
+        "test_cleaning_passed": True,
         "cleaning_passed": True,
-        "current_stage": "cleaning_saved",
+        "current_stage": "test_cleaning_saved",
         "next_action": "",
     }
 
 
 def _handle_clean_step(state: GlobalState, tool_message: ToolMessage) -> GlobalState:
     payload = _parse_tool_payload(tool_message)
-    report = _merge_cleaning_report(state, tool_message.name, payload)
+    report_key, report = _merge_cleaning_report(state, tool_message.name, payload)
     if "error" in payload:
         return {
-            "cleaning_report": report,
+            report_key: report,
             "current_stage": "cleaning_step_failed",
             "errors": (state.get("errors") or [])
             + [{"stage": "cleaning_step", "tool": tool_message.name, **payload["error"]}],
         }
     return {
-        "cleaning_report": report,
+        report_key: report,
         "current_stage": "cleaning_step_done",
     }
 
@@ -182,8 +204,11 @@ def _show_graph_if_needed(agent_graph, show_graph: bool) -> None:
     if not show_graph:
         return
     try:
-        output_dir = PROJECT_ROOT / "artifacts"
+        output_dir = PROJECT_ROOT / "artifacts" / "graphs"
         output_dir.mkdir(parents=True, exist_ok=True)
+        mmd_path = output_dir / "data_clean_agent_graph.mmd"
+        mmd_path.write_text(agent_graph.get_graph().draw_mermaid(), encoding="utf-8")
+        print(f"Mermaid 源码已保存: {mmd_path}")
         image_path = output_dir / "data_clean_agent_graph.png"
         image_bytes = agent_graph.get_graph().draw_mermaid_png()
         image_path.write_bytes(image_bytes)
