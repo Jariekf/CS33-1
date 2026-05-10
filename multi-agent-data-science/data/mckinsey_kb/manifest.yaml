@@ -1,0 +1,72 @@
+# McKinsey-style RAG knowledge base manifest.
+#
+# Each entry must provide EXACTLY ONE of:
+#   - url:        a webpage / online PDF, fetched via Jina Reader (r.jina.ai)
+#   - local_pdf:  a local PDF, converted via pymupdf4llm
+#   - local_path: a local file already in markdown/text form, used as-is
+#
+# Required:
+#   source_type: mckinsey | equity_research | textbook
+# Recommended (written into chunk metadata):
+#   title: short human-readable title
+#   year:  publication year (int)
+#
+# Workflow:
+#   1) python scripts/prepare_mckinsey_md.py   # url + local_pdf -> data/mckinsey_kb/raw/*.md
+#   2) python scripts/upload_mckinsey_kb.py    # markdown -> Chroma collection mckinsey_kb
+
+
+# ---- McKinsey reports ----
+- url: https://www.mckinsey.com/capabilities/tech-and-ai/our-insights/the-economic-potential-of-generative-ai-the-next-productivity-frontier
+  source_type: mckinsey
+  title: "The Economic Potential of Generative AI: The Next Productivity Frontier"
+  year: 2025
+
+- url: https://www.mckinsey.com/industries/financial-services/our-insights/global-banking-annual-review
+  source_type: mckinsey
+  title: "Global Banking Annual Review"
+  year: 2024
+
+- url: https://www.mckinsey.com/industries/financial-services/our-insights/future-of-asia-the-future-of-financial-services
+  source_type: mckinsey
+  title: "Future of Asia: The Future of Financial Services"
+  year: 2024
+
+- url: https://www.mckinsey.com/capabilities/people-and-organizational-performance/our-insights/the-journey-to-an-agile-organization
+  source_type: mckinsey
+  title: "The Journey to an Agile Organization"
+  year: 2024
+
+- url: https://www.mckinsey.com/featured-insights/mckinsey-explainers/what-is-central-bank-digital-currency-cbdc
+  source_type: mckinsey
+  title: "What is Central Bank Digital Currency (CBDC)?"
+  year: 2024
+
+- url: https://www.mckinsey.com/capabilities/operations/our-insights/supply-chain-40--the-next-generation-digital-supply-chain
+  source_type: mckinsey
+  title: "Supply Chain 4.0: The Next Generation Digital Supply Chain"
+  year: 2024
+
+- url: https://www.mckinsey.com/capabilities/strategy-and-corporate-finance/our-insights/building-leaders-in-the-age-of-ai
+  source_type: mckinsey
+  title: "Building Leaders in the Age of AI"
+  year: 2024
+
+
+# ---- Equity research / strategy notes ----
+- local_pdf: "data/mckinsey_kb/source_pdf/bii-global-outlook-in-charts.pdf"
+  source_type: equity_research
+  title: "BII Global Outlook in Charts"
+  year: 2024
+
+- local_pdf: "data/mckinsey_kb/source_pdf/TOM_AI 2.0_ForRedaction.pdf"
+  source_type: equity_research
+  title: "TOM AI 2.0 For Redaction"
+  year: 2024
+
+
+# ---- Management textbook ----
+- local_pdf: "data/mckinsey_kb/source_pdf/Pyramid-principle_v2.1.pdf"
+  source_type: textbook
+  title: "The Pyramid Principle"
+  year: 1985

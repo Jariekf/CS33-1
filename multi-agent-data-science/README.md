@@ -22,6 +22,8 @@ feature_agent       (encodes & scales features — one loop iteration per candid
 model_agent         (trains & evaluates — one loop iteration per candidate model)
     |
 compare             (picks best model by R2 for regression, F1-weighted for classification)
+    |
+business_translator (McKinsey KB RAG + arXiv fallback → Markdown business insight report)
 ```
 
 All intermediate files and reports are written to the run's workspace directory (`artifacts/workspace/YYYY-MM-DD-HH-MM/`), so parallel or back-to-back runs never overwrite each other.
@@ -117,6 +119,22 @@ KIMI_MODEL=moonshot-v1-8k
 ```
 
 The active LLM is selected in `core/my_llm.py`. By default the pipeline uses `llm_deepseek`; swap the import in each agent file to use a different provider.
+
+### Business Action Translator (BAT) — McKinsey RAG
+
+After `compare`, the **business_translator** subgraph generates `reports/business_report.md` using:
+
+- Retrieval from Chroma collection **`mckinsey_kb`** (three buckets: `mckinsey`, `equity_research`, `textbook`)
+- **arXiv** fallback when bucket hits fall below `MCKINSEY_MIN_HITS`
+
+**First-time setup (one-shot ingest):**
+
+```bash
+# From multi-agent-data-science/ — requires embedding API (see RAG_* in .env.example)
+python scripts/build_mckinsey_kb.py
+```
+
+This reads `data/mckinsey_kb/manifest.lock.yaml`, embeds `data/mckinsey_kb/raw/*.md`, and writes vectors under `artifacts/chroma_rag/` (override with `RAG_CHROMA_DIR`). Copy variables from `.env.example` (`RAG_EMBEDDING_*`, `MCKINSEY_*`, `ARXIV_MAX_RESULTS`, etc.). Details: [`rag/README.md`](rag/README.md).
 
 ---
 
@@ -245,7 +263,8 @@ artifacts/workspace/2026-05-09-14-30/
 |   |-- data_clean_agent_report.md    #   cleaning actions taken, rows dropped/fixed
 |   |-- eda_agent_report.md           #   EDA findings, model selection rationale
 |   |-- feature_agent_report.md       #   encoding/scaling decisions per model
-|   `-- model_agent_report.md         #   training scores and evaluation metrics
+|   |-- model_agent_report.md         #   training scores and evaluation metrics
+|   `-- business_report.md           #   BAT: McKinsey-style business insight report
 |
 |-- features/                         # Feature-engineered datasets (one per model)
 |   |-- encoders/                     #   fitted LabelEncoders / OneHotEncoders (.pkl)
@@ -272,12 +291,18 @@ You can inspect any intermediate result without re-running the pipeline — open
 |-- main.py                        # CLI entry point
 |-- requirements.txt
 |-- .env                           # API keys (not committed)
+|-- scripts/
+|   `-- build_mckinsey_kb.py       # One-shot ingest raw/*.md → Chroma mckinsey_kb
+|-- data/
+|   `-- mckinsey_kb/               # McKinsey corpus manifest + raw markdown (BAT RAG)
+|-- rag/                           # Chroma RAG pipeline (embeddings, ingest, retrieve)
 |-- agent/
 |   |-- agent_manager.py           # Dataset profiling, task inference, cleaning plan
 |   |-- data_clean_agent.py        # Data cleaning execution
 |   |-- eda_agent.py               # EDA, feature engineering plan, model selection
 |   |-- feature_agent.py           # Feature engineering (one pass per candidate model)
-|   `-- model_agent.py             # Train + evaluate (one pass per candidate model)
+|   |-- model_agent.py             # Train + evaluate (one pass per candidate model)
+|   `-- business_translator_agent.py  # BAT: RAG + business Markdown report
 |-- core/
 |   |-- global_state.py            # GlobalState TypedDict (shared across all nodes)
 |   |-- graph.py                   # Pipeline assembly (build_full_pipeline)
@@ -292,7 +317,8 @@ You can inspect any intermediate result without re-running the pipeline — open
 |   |-- dataclean_tools/           # handle_missing, remove_duplicates, fix_types, ...
 |   |-- eda_tools/                 # profile_training_data, correlation_matrix, select_candidate_models
 |   |-- feature_tools/             # encode_categorical, scale_features, save_featured_dataset
-|   `-- model_tools/               # train_model, evaluate_model
+|   |-- model_tools/               # train_model, evaluate_model
+|   `-- business_tools/            # arxiv_tool, file_reader (BAT)
 |-- tests/
 |   |-- conftest.py                # Shared path constants
 |   |-- testenv/                   # Synthetic CSV fixtures (no external data needed)

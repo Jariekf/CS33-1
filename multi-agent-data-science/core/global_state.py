@@ -62,6 +62,12 @@ class GlobalState(TypedDict, total=False):
     # final report
     business_report: str
 
+    # business translator (BAT) intermediate context
+    bat_rag_buckets: dict[str, Any]
+    bat_arxiv_papers: list[dict[str, Any]]
+    bat_style_skeletons: str
+    bat_tool_rounds: int
+
     # workflow control
     current_stage: str
     next_action: str
