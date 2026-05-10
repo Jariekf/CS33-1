@@ -10,45 +10,55 @@ from core.env_utils import PROJECT_ROOT
 from tools.tool_trace import trace_tool_call
 
 
-def _get_model(model_name: str) -> Any:
+def _get_model(model_name: str, model_params: dict[str, Any] | None = None) -> Any:
+    params = model_params or {}
     if model_name == "LogisticRegression":
         from sklearn.linear_model import LogisticRegression
-        return LogisticRegression(max_iter=1000, random_state=42)
+        defaults = {"max_iter": 1000, "random_state": 42}
+        return LogisticRegression(**{**defaults, **params})
     if model_name == "RandomForest":
         from sklearn.ensemble import RandomForestClassifier
-        return RandomForestClassifier(n_estimators=100, random_state=42)
+        defaults = {"n_estimators": 100, "random_state": 42}
+        return RandomForestClassifier(**{**defaults, **params})
     if model_name == "XGBoost":
         try:
             from xgboost import XGBClassifier
-            return XGBClassifier(random_state=42, eval_metric="logloss", verbosity=0)
+            defaults = {"random_state": 42, "eval_metric": "logloss", "verbosity": 0}
+            return XGBClassifier(**{**defaults, **params})
         except ImportError:
             from sklearn.ensemble import GradientBoostingClassifier
-            return GradientBoostingClassifier(random_state=42)
+            defaults = {"random_state": 42}
+            return GradientBoostingClassifier(**{**defaults, **params})
     if model_name == "SVM":
         from sklearn.svm import SVC
-        return SVC(probability=True, random_state=42)
+        defaults = {"probability": True, "random_state": 42}
+        return SVC(**{**defaults, **params})
     if model_name == "KNN":
         from sklearn.neighbors import KNeighborsClassifier
-        return KNeighborsClassifier()
+        return KNeighborsClassifier(**params)
     if model_name == "LinearRegression":
         from sklearn.linear_model import LinearRegression
-        return LinearRegression()
+        return LinearRegression(**params)
     if model_name == "Ridge":
         from sklearn.linear_model import Ridge
-        return Ridge(random_state=42)
+        defaults = {"random_state": 42}
+        return Ridge(**{**defaults, **params})
     if model_name == "RandomForestRegressor":
         from sklearn.ensemble import RandomForestRegressor
-        return RandomForestRegressor(n_estimators=100, random_state=42)
+        defaults = {"n_estimators": 100, "random_state": 42}
+        return RandomForestRegressor(**{**defaults, **params})
     if model_name == "XGBoostRegressor":
         try:
             from xgboost import XGBRegressor
-            return XGBRegressor(random_state=42, verbosity=0)
+            defaults = {"random_state": 42, "verbosity": 0}
+            return XGBRegressor(**{**defaults, **params})
         except ImportError:
             from sklearn.ensemble import GradientBoostingRegressor
-            return GradientBoostingRegressor(random_state=42)
+            defaults = {"random_state": 42}
+            return GradientBoostingRegressor(**{**defaults, **params})
     if model_name == "SVR":
         from sklearn.svm import SVR
-        return SVR()
+        return SVR(**params)
     raise ValueError(f"未知模型名称: {model_name}")
 
 
@@ -59,6 +69,7 @@ def train_model(
     task_type: str,
     target_column: str,
     output_dir: str = "",
+    model_params: dict[str, Any] | None = None,
 ) -> str:
     """在特征工程完成后的训练集上训练指定模型，保存模型和特征列表。
 
@@ -68,6 +79,7 @@ def train_model(
       task_type (str)："classification" 或 "regression"。
       target_column (str)：目标列名，训练时会从特征中排除。
       output_dir (str)：模型保存目录，默认 artifacts/models/。
+      model_params (dict)：可选，模型参数（通常来自 tune_and_select_model 的 best_params）。
 
     返回 JSON，包含：
       model_path：保存的模型 pkl 路径。
@@ -81,6 +93,7 @@ def train_model(
         "model_name": model_name,
         "task_type": task_type,
         "target_column": target_column,
+        "model_params": model_params or {},
     }
     try:
         df = pd.read_csv(featured_train_path)
@@ -92,7 +105,7 @@ def train_model(
         feature_cols = X.columns.tolist()
         y = df[target_column]
 
-        model = _get_model(model_name)
+        model = _get_model(model_name, model_params=model_params)
         model.fit(X, y)
         train_score = round(float(model.score(X, y)), 4)
 
@@ -112,6 +125,7 @@ def train_model(
             "model_name": model_name,
             "train_score": train_score,
             "rows_trained": int(len(df)),
+            "model_params": model_params or {},
         }
         output = json.dumps(result, ensure_ascii=False, indent=2)
     except Exception as exc:
