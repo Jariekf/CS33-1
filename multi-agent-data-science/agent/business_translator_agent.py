@@ -4,9 +4,13 @@ from __future__ import annotations
 
 import json
 import logging
+import os
 import sys
 from pathlib import Path
 from typing import Any
+
+# 单次 BAT 子图内「LLM→Tools→更新」循环上限，防止模型反复 tool_calls 耗尽全图 recursion_limit
+BAT_MAX_TOOL_ROUNDS = int(os.getenv("BAT_MAX_TOOL_ROUNDS", "15"))
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
 if str(PROJECT_ROOT) not in sys.path:
@@ -413,6 +417,8 @@ def _business_translator_node(state: GlobalState) -> GlobalState:
         "3. 调用 **load_report_style_skeletons** 加载写作结构参考（可选但推荐）。\n"
         "4. 调用 **generate_business_report** 生成最终 Markdown；该步骤会汇总 GlobalState 中的指标、EDA、RAG 结果并落盘到 "
         f"{run_dir + '/reports/business_report.md' if run_dir else 'run_dir/reports/business_report.md'}。\n"
+        "**务必控制轮次**：完成检索与可选 arXiv / skeleton 后，立即调用 **generate_business_report**，"
+        "不要重复检索；若无更多信息，也应直接调用 generate_business_report。\n"
         "除上述工具外不要编造外部数据来源。"
     )
 
@@ -433,7 +439,14 @@ def _tool_state_update_node(state: GlobalState) -> GlobalState:
         "generate_business_report": _handle_generate_report,
     }
     handler = handlers.get(last_msg.name)
-    return handler(state, last_msg) if handler else {}
+    if not handler:
+        return {}
+    out = handler(state, last_msg)
+    if not out:
+        return {}
+    merged = dict(out)
+    merged["bat_tool_rounds"] = (state.get("bat_tool_rounds") or 0) + 1
+    return merged
 
 
 def _save_business_artifacts(state: GlobalState) -> None:
@@ -455,7 +468,15 @@ def _save_business_artifacts(state: GlobalState) -> None:
 
 def _route_after_business_translator(state: GlobalState) -> str:
     last_msg = state["messages"][-1]
+    rounds = state.get("bat_tool_rounds") or 0
     if isinstance(last_msg, AIMessage) and last_msg.tool_calls:
+        if rounds >= BAT_MAX_TOOL_ROUNDS:
+            logger.warning(
+                "BAT exceeded BAT_MAX_TOOL_ROUNDS=%s (current=%s); forcing bat_finalize.",
+                BAT_MAX_TOOL_ROUNDS,
+                rounds,
+            )
+            return "bat_finalize"
         return "tools"
     if state.get("business_report"):
         _save_business_artifacts(state)

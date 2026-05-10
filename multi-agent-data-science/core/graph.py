@@ -190,7 +190,8 @@ if __name__ == "__main__":
            # "cleaned_data_path": str(PROJECT_ROOT / "artifacts" / "bank-full_cleaned.csv"),
         },
         stream_mode="values",
-        config={"recursion_limit": 120},
+        # 含 EDA/Feature/Model 多轮工具调用 + BAT 子图，默认 120 易触发 GraphRecursionError
+        config={"recursion_limit": 280},
     )
     for event in events:
         if "messages" in event:
