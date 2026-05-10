@@ -1,0 +1,62 @@
+{
+  "task_type": "regression",
+  "target_column": "profit",
+  "model_id": "random_forest_regressor",
+  "metric": "r2",
+  "cv_score": 0.9365926129100113,
+  "cv_scores": [],
+  "test_metrics": {
+    "r2": 0.9362871994508473,
+    "mae": 5242.993077315213,
+    "rmse": 11727.855147592576
+  },
+  "tuning": {
+    "status": "completed",
+    "failure_reason": "",
+    "baseline": {
+      "metric": "r2",
+      "cv": 3,
+      "scores": [
+        0.9599600625626598,
+        0.945300568112202,
+        0.9420596520829734
+      ],
+      "mean_cv_score": 0.9491067609192784
+    },
+    "plan": {
+      "source": "llm",
+      "model_id": "random_forest_regressor",
+      "task_type": "regression",
+      "metric": "r2",
+      "cv": 3,
+      "budget": "small",
+      "param_grid": {
+        "n_estimators": [
+          100,
+          200
+        ],
+        "max_depth": [
+          5,
+          10
+        ],
+        "min_samples_leaf": [
+          1,
+          2
+        ],
+        "max_features": [
+          "sqrt"
+        ]
+      },
+      "explanation": "The tuning plan focuses on a compact grid with a mix of n_estimators and max_depth to explore model complexity while ensuring a manageable search space for the small budget. The inclusion of min_samples_leaf and max_features allows for fine-tuning of the model's ability to generalize without overfitting."
+    },
+    "n_jobs": -1,
+    "best_params": {
+      "max_depth": 10,
+      "max_features": "sqrt",
+      "min_samples_leaf": 1,
+      "n_estimators": 200
+    },
+    "best_cv_score": 0.9365926129100113,
+    "explanation": "The tuning plan focuses on a compact grid with a mix of n_estimators and max_depth to explore model complexity while ensuring a manageable search space for the small budget. The inclusion of min_samples_leaf and max_features allows for fine-tuning of the model's ability to generalize without overfitting."
+  }
+}

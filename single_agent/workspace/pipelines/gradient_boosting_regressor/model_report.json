@@ -1,0 +1,62 @@
+{
+  "task_type": "regression",
+  "target_column": "profit",
+  "model_id": "gradient_boosting_regressor",
+  "metric": "r2",
+  "cv_score": 0.9848126728287561,
+  "cv_scores": [],
+  "test_metrics": {
+    "r2": 0.9743721745193653,
+    "mae": 2769.6289874749136,
+    "rmse": 7438.084787224997
+  },
+  "tuning": {
+    "status": "completed",
+    "failure_reason": "",
+    "baseline": {
+      "metric": "r2",
+      "cv": 3,
+      "scores": [
+        0.9802429421696444,
+        0.9865258730012829,
+        0.9755160359632745
+      ],
+      "mean_cv_score": 0.9807616170447339
+    },
+    "plan": {
+      "source": "llm",
+      "model_id": "gradient_boosting_regressor",
+      "task_type": "regression",
+      "metric": "r2",
+      "cv": 3,
+      "budget": "small",
+      "param_grid": {
+        "n_estimators": [
+          100,
+          150
+        ],
+        "learning_rate": [
+          0.03,
+          0.1
+        ],
+        "max_depth": [
+          2,
+          3
+        ],
+        "subsample": [
+          0.8
+        ]
+      },
+      "explanation": "The baseline performance is strong, so we focus on a compact grid with a mix of n_estimators and learning_rate to explore their impact while keeping max_depth and subsample fixed to ensure stability."
+    },
+    "n_jobs": -1,
+    "best_params": {
+      "learning_rate": 0.1,
+      "max_depth": 3,
+      "n_estimators": 150,
+      "subsample": 0.8
+    },
+    "best_cv_score": 0.9848126728287561,
+    "explanation": "The baseline performance is strong, so we focus on a compact grid with a mix of n_estimators and learning_rate to explore their impact while keeping max_depth and subsample fixed to ensure stability."
+  }
+}
