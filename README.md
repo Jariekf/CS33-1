@@ -1,217 +1,316 @@
-<div align="center">
+# Multi-Agent Data Science Pipeline
 
-# Multi-Agent AutoDS Workflow System
+A LangGraph-powered multi-agent pipeline that automates the full machine learning workflow — from raw CSV to trained, evaluated, and compared models — using LLM agents for every reasoning step.
 
-<hr>
+---
 
-A prototype platform for automated data science workflows with multi-agent collaboration, staged verification, and business-oriented reporting.
+## Pipeline Overview
 
-<p>
-  <img alt="python" src="https://img.shields.io/badge/python-3.10%2B-blue?logo=python&logoColor=white">
-  <img alt="LangGraph" src="./docs/assets/langgraph_badge.svg">
-  <img alt="llm" src="https://img.shields.io/badge/llm-openai%20compatible-orange?logo=openai&logoColor=white">
-</p>
-
-<p>
-  <a href="#project-overview">Project Overview</a> |
-  <a href="#repository-structure">Repository Structure</a> |
-  <a href="#tech-stack">Tech Stack</a> |
-  <a href="#current-capabilities">Current Capabilities</a> |
-  <a href="#quick-start">Quick Start</a>
-</p>
-
-</div>
-
-## Project Overview
-
-### Real-world Problem
-
-Many organisations can build machine learning models, but still struggle to operationalise an end-to-end workflow and turn technical outputs into business decisions. In practice, useful data science work typically connects business goal understanding, data preparation, feature engineering, model selection and validation, and business-facing interpretation.
-
-Traditional AutoML systems reduce modelling effort, but they often stop at technical outputs. This repository focuses on a broader AutoDS workflow: coordinating specialised agents across the main analytical stages and producing actionable business recommendations with traceable intermediate outputs.
-
-### Project Goal
-
-This repository implements a prototype **multi-agent Automated Data Science (AutoDS) system** inspired by reference frameworks such as AutoML-Agent and AutoKaggle. The project scope targets **text and tabular datasets**. The implementation uses **LangGraph** to orchestrate specialised agents and **OpenAI-compatible LLM APIs** to support planning, code generation, review, and business insight generation.
-
-The system is designed to:
-
-- decompose data science work into specialised agent roles
-- support staged execution across cleaning, feature engineering, modelling, and reporting
-- convert model outputs into business-facing recommendations
-- keep multi-stage runs semantically aligned through shared dataset context when available
-
-## System Architecture
-
-### Workflow
-
-The current pipeline is organised as the following sequence:
-
-1. `Manager Agent`
-   Serves as the main planning entry point: interprets the user goal, optional cleaning hints, and optional authoritative dataset description, previews the dataset, generates a requirement summary and retrieval slots, optionally builds RAP context from external sources, produces a structured global plan, and initializes shared workflow state.
-2. `Data Cleaning Agent`
-   Generates and executes cleaning code for the raw input dataset, then writes the cleaned artifact to a fixed workspace path for downstream reuse.
-3. `Supervisor Agent`
-   Reviews code and execution logs through a structured JSON report, and either passes the stage or requests a retry.
-4. `EDA Analysis`
-   After cleaning passes, reads the train split CSV; runs **deterministic statistics** (correlations, collinearity, quick RF importance, optional train/test drift) and **static charts** under `workspace/eda_figs/`; calls an LLM for structured conclusions (with heuristic fallback); writes **`workspace/eda_report.md`** (four sections: descriptive / correlation / diagnosis / conclusions) and stores **`eda_conclusions`** in `GraphState` for model selection.
-5. `Feature Engineering Agent`
-   Generates and executes feature engineering code based on the manager plan and prior stage summary, reading the cleaned train split from a fixed upstream path and applying aligned transformations to both train and test artifacts.
-6. `Supervisor Agent`
-   Performs another review checkpoint.
-7. `Model Agent`
-   Generates model selection and validation code, then exports feature importance.
-8. `Supervisor Agent`
-   Validates the modelling stage.
-9. `Business Action Translator Agent`
-   Combines the model-stage summary, EDA summary and chart paths, feature importance, dataset context, and RAG retrieval results to produce a **Quarto (`.qmd`)** business insight report. If the [Quarto](https://quarto.org) CLI is on `PATH`, `main.py` will also run `quarto render` to produce HTML. PDF output is optional (install a TeX distribution or `quarto install tinytex`).
-
-### Core Design Highlights
-
-- **State-driven orchestration**
-  The workflow is managed through LangGraph and a shared `GraphState`.
-- **Shared dataset semantics**
-  Optional dataset description files or folders can be injected once and reused across Manager and worker prompts as authoritative context.
-- **Specialised agents**
-  Each stage is handled by a separate module under `agents/`.
-- **Fixed-path worker handoff**
-  Downstream workers read upstream artifacts from fixed workspace paths rather than mutating a shared data pointer, which keeps Supervisor retries cleaner.
-- **Supervisor quality gate**
-  The supervisor reviews intermediate outputs before the next stage proceeds, with structured parsing, repair re-asks, and a clearly marked degraded-pass fallback.
-- **RAP/RAG support**
-  Manager-side RAP supports arXiv abstracts plus optional web search, PapersWithCode metadata, and Kaggle kernel metadata. The Business Action Translator uses arXiv-style retrieval to support business interpretation.
-- **Workspace-based artifact generation**
-  Intermediate outputs and reports are stored under `workspace/`; transient per-run artifacts are purged at startup to reduce stale-output reuse.
-
-## Repository Structure
-
-```text
-CS33-1/
-├─ agents/        # Specialised agent implementations
-├─ core/          # LangGraph build logic, shared state, LLM wrapper
-├─ data/          # Input datasets
-├─ docs/          # Project documentation
-├─ tests/         # Test and debug scripts
-├─ tools/         # Utility tools such as code execution and file reading
-├─ workspace/     # Generated outputs and reports
-├─ config.py      # Global configuration
-├─ main.py        # Pipeline entry point
-├─ requirements.txt
-└─ .env           # Local environment variables (not for sharing)
+```
+init_run            (creates timestamped workspace under artifacts/workspace/)
+    |
+agent_manager       (profiles dataset, infers task type & target column, produces cleaning plan)
+    |
+data_clean_agent    (executes cleaning: missing values, outliers, type fixes)
+    |
+split               (train / test split, stratified for classification)
+    |
+eda_agent           (correlation analysis, distribution profiling, selects 3 candidate models)
+    |
+feature_agent       (encodes & scales features — one loop iteration per candidate model)
+    |
+model_agent         (trains & evaluates — one loop iteration per candidate model)
+    |
+compare             (picks best model by R2 for regression, F1-weighted for classification)
 ```
 
-### Directory Notes
+All intermediate files and reports are written to the run's workspace directory (`artifacts/workspace/YYYY-MM-DD-HH-MM/`), so parallel or back-to-back runs never overwrite each other.
 
-- [agents](https://github.sydney.edu.au/CS33-1/CS33-1/tree/main/agents)
-  Contains `manager`, `data_cleaning`, `eda_analysis`, `feature_engineering`, `model_selection`, `supervisor`, and `business_translator`.
-- [core](https://github.sydney.edu.au/CS33-1/CS33-1/tree/main/core)
-  Defines the workflow graph, shared state, and the common LLM access layer.
-- [tools](https://github.sydney.edu.au/CS33-1/CS33-1/tree/main/tools)
-  Contains support utilities such as `arxiv_tool`, `python_repl`, and `file_reader`.
-- [workspace](https://github.sydney.edu.au/CS33-1/CS33-1/tree/main/workspace)
-  Stores generated CSV outputs, feature importance files, and markdown reports.
-- [docs](https://github.sydney.edu.au/CS33-1/CS33-1/tree/main/docs)
-  Stores repository documentation such as the GitHub commit guide.
+---
 
-## Tech Stack
+## Requirements
 
-### Core Frameworks
+| Component | Version |
+|---|---|
+| Python | 3.12+ |
+| langgraph | 1.1.10 |
+| langchain-core | 1.3.2 |
+| langchain-openai | 1.2.1 |
+| langsmith | 0.8.0 |
+| openai | 2.33.0 |
+| pandas | 3.0.2 |
+| numpy | 2.4.4 |
+| scikit-learn | 1.8.0 |
+| xgboost | 3.2.0 |
+| python-dotenv | 1.2.2 |
+| pytest | 9.0.3 |
 
-- `langgraph`
-- `langchain-core`
-- `langchain-openai`
+---
 
-### Data and Modelling
+## Installation
 
-- `pandas`
-- `scikit-learn`
+```bash
+git clone https://github.com/your-org/multi-agent-data-science.git
+cd multi-agent-data-science
 
-### Supporting Utilities
+python -m venv .venv
 
-- `arxiv`
-- `python-dotenv`
-- `pydantic`
+# Windows
+.venv\Scripts\activate
+# macOS / Linux
+source .venv/bin/activate
 
-## Current Capabilities
+pip install -r requirements.txt
+```
 
-The current repository exposes the following prototype capabilities:
+---
 
-- dataset preview and initial goal-aware planning
-- optional `--desc/-d` dataset-description loading (file or directory) plus optional `--hints` input for narrower cleaning constraints
-- shared dataset-description injection across Manager and worker prompts for more semantically stable runs on the same dataset
-- LLM- and arXiv-integrated workflow stages, with stub/fallback paths for local development and failure recovery
-- LLM-assisted cleaning code generation
-- LLM-assisted feature engineering code generation
-- LLM-assisted model selection and feature-importance export
-- fixed-path artifact handoff across cleaning -> feature engineering -> model selection, improving retry semantics
-- supervisor review and retry routing, with structured JSON parsing hardening and degraded-pass placeholders on parse failure
-- business report generation in markdown
-- manager-side prompt and midlayer evaluation reports with health metrics, faithfulness warnings, failure attribution labels, and artifact status checks
-- structured workflow outputs that support traceability, including run logs, stage review records, manager evaluation artifacts, and workspace-level execution artifacts
-- an initial business-report generation chain that connects Manager outputs, model-stage artifacts, feature importance, and BAT-oriented reporting
-- early baseline-planning work, including identification of candidate comparison workflows and evaluation dimensions for later benchmarking
-- local artifact persistence in `workspace/`
+## Configuration
 
+Copy the example env file and fill in at least one LLM provider key:
 
-## What's Next
+```bash
+cp .env.example .env
+```
 
-- consolidate and strengthen existing observability/reporting across run logs, stage reports, manager evaluation artifacts, retry counts, and artifact paths
-- refine the Feature Engineering Agent and improve output consistency across datasets and input schemas
-- establish the postponed traditional baseline workflow and continue defining benchmark metrics for comparison against the multi-agent system
-- improve the Model Agent and Supervisor Agent with stronger checks for valid model outputs, generated evaluation metrics, and retry/revision decisions
-- refine the Business Action Translator so it more consistently translates model outputs, feature importance, and evaluation results into business-oriented recommendations
-- conduct incremental integration testing, result validation, and benchmark evaluation against baseline workflows before final documentation and demo preparation
+`.env` reference — only the provider(s) you plan to use need to be set:
+
+```dotenv
+# ── DeepSeek ──────────────────────────────────────────────
+DEEPSEEK_API_KEY=sk-...
+DEEPSEEK_BASE_URL=https://api.deepseek.com
+DEEPSEEK_MODEL=deepseek-chat
+
+# ── OpenAI ────────────────────────────────────────────────
+OPENAI_API_KEY=sk-...
+OPENAI_BASE_URL=https://api.openai.com/v1
+OPENAI_MODEL=gpt-4o
+
+# ── Zhipu (GLM) ───────────────────────────────────────────
+ZHIPU_API_KEY=...
+ZHIPU_BASE_URL=https://open.bigmodel.cn/api/paas/v4
+ZHIPU_MODEL=glm-4-plus
+
+# ── Google Gemini ─────────────────────────────────────────
+GEMINI_API_KEY=...
+GEMINI_BASE_URL=https://generativelanguage.googleapis.com/v1beta/openai
+GEMINI_MODEL=gemini-2.5-pro
+
+GEMINI_FLASH_API_KEY=...
+GEMINI_FLASH_BASE_URL=https://generativelanguage.googleapis.com/v1beta/openai
+GEMINI_FLASH_MODEL=gemini-2.0-flash
+
+# ── Qwen (Alibaba) ────────────────────────────────────────
+QWEN_API_KEY=...
+QWEN_BASE_URL=https://dashscope.aliyuncs.com/compatible-mode/v1
+QWEN_MODEL=qwen-plus
+
+# ── MiniMax ───────────────────────────────────────────────
+MINIMAX_API_KEY=...
+MINIMAX_BASE_URL=https://api.minimax.chat/v1
+MINIMAX_MODEL=MiniMax-Text-01
+
+# ── Kimi (Moonshot) ───────────────────────────────────────
+KIMI_API_KEY=...
+KIMI_BASE_URL=https://api.moonshot.cn/v1
+KIMI_MODEL=moonshot-v1-8k
+```
+
+The active LLM is selected in `core/my_llm.py`. By default the pipeline uses `llm_deepseek`; swap the import in each agent file to use a different provider.
+
+---
 
 ## Quick Start
 
-For setup and first run, see [Quick Start](docs/quick-start.md). The current CLI supports:
-
 ```bash
-python main.py <data_path> "<user_goal>" [--desc PATH] [--hints TEXT]
+python main.py \
+  --data datasets/bank-full.csv \
+  --description "Binary classification: predict whether a client subscribes to a term deposit (target column: y)" \
+  --request "Please run the full pipeline — clean the data, split it, perform EDA, engineer features, train models, and select the best classifier"
 ```
 
-Use `--desc` for authoritative dataset context such as a README, data dictionary, or docs folder; use `--hints` for short cleaning-specific constraints.
+**All arguments are required:**
 
-For model setup and agent-to-LLM mapping, see [LLM Model Configuration Guide](docs/llm-model-config-guide.md).
+| Argument | Description |
+|---|---|
+| `--data` | Path to the raw CSV dataset |
+| `--description` | Dataset context — task type, target column, domain background |
+| `--request` | Natural-language instruction given to the first agent |
+| `--show-graph` | *(optional)* Save pipeline graph as `artifacts/full_pipeline.png` |
+| `--recursion-limit` | *(optional)* LangGraph max recursion steps (default `200`) |
 
-## Testing
+### Use as a library
 
-For validation scripts and testing notes, see [Testing Guide](docs/testing.md).
+```python
+from main import run_pipeline
 
-## Expected Outputs
+result = run_pipeline(
+    data_path="datasets/bank-full.csv",
+    description="Binary classification: predict term deposit subscription (target: y)",
+    user_request="Run the full pipeline and select the best classifier",
+)
 
-Following the project proposal, the intended outputs of this project are:
-
-- **Multi-agent AutoDS prototype** covering coordinated planning, data processing, modelling, verification, and business-oriented reporting
-- **Experimental benchmarking results** comparing the proposed system with representative baseline workflows
-- **Workflow reports and review records** including stage-specific execution artifacts, supervisor feedback, and interpretable modelling outputs such as feature importance
-- **Final report and reproducible project assets** including source code, configuration, testing records, and supporting materials for demonstration and evaluation
-
-The current repository mainly exposes the prototype workflow and its generated artifacts, while the broader project deliverables also include benchmarking and final evaluation outputs.
-
----
-
-## License
-
-This repository is for Group-Based Capstone Project COMP5703 only and not intended for open-source distribution.
-
----
-
-## Acknowledgements
-
-- [LangGraph](https://github.com/langchain-ai/langgraph) for workflow orchestration
-- [AutoML-Agent](https://github.com/deepauto-ai/automl-agent) and [AutoKaggle](https://github.com/multimodal-art-projection/AutoKaggle) as reference frameworks
-- [arXiv](https://arxiv.org/) for literature retrieval support in RAP/RAG-style stages
-- OpenAI-compatible LLM APIs for planning, code generation, review, and report synthesis
+print(result["best_model"])
+# {'model_name': 'XGBoost', 'metrics': {'accuracy': 0.91, 'f1_weighted': 0.90}, ...}
+```
 
 ---
 
-<div align="center">
+## Modular Agent Execution
 
-**Built for the CS33-1 Capstone Project**
+Every agent can be run **standalone** without invoking the full pipeline. This is useful when you are iterating on a single stage and don't want to re-run everything upstream.
 
-Multi-agent AutoDS prototype for planning, staged execution, and business-oriented reporting.
+Each agent file contains a `__main__` block and each test file contains a matching `_run_xxx()` helper. Run them directly and interact with the agent in the terminal:
 
-[Back to Top](#multi-agent-autods-workflow-system)
+```bash
+# Run only the Agent Manager (dataset profiling + cleaning plan)
+python agent/agent_manager.py
 
-</div>
+# Run only the EDA Agent (given a pre-split training CSV)
+python tests/test_eda_agent.py
+
+# Run only the Feature Agent (given a training CSV + plan)
+python tests/test_feature_agent.py
+
+# Run only the Model Agent (given feature-engineered CSVs)
+python tests/test_model_agent.py
+
+# Run only the full pipeline interactively (streaming output)
+python tests/test_full_pipeline.py
+```
+
+These entry points stream every agent message to the terminal and print `[stage]` transitions so you can see exactly what the LLM decided at each step.
+
+---
+
+## Testing and Debugging
+
+The test suite is split into two layers so you can iterate quickly without an API key:
+
+### Pure-function tests (no API key needed)
+
+These cover graph structure, routing logic, and tool behaviour using synthetic fixtures in `tests/testenv/`. They run in seconds.
+
+```bash
+# Run everything
+python -m pytest tests/ -v
+
+# Focus on one agent
+python -m pytest tests/test_feature_agent.py -v
+
+# Run a single test case
+python -m pytest tests/test_model_agent.py::test_train_model_regression -v
+```
+
+**What each test file covers:**
+
+| File | Covers |
+|---|---|
+| `test_profile_dataset.py` | `profile_dataset` tool — shape, missing values, type detection |
+| `test_agent_manager.py` | Graph structure, routing, tool outputs |
+| `test_data_clean_agent.py` | Graph structure, routing, all cleaning tools |
+| `test_full_pipeline.py` | Full graph nodes & edges, split node, pipeline routing |
+| `test_eda_agent.py` | Graph structure, model selection validation, EDA tools |
+| `test_feature_agent.py` | Graph structure, encode/scale tools, state updates |
+| `test_model_agent.py` | Graph structure, train/evaluate tools, compare node |
+
+### LLM invoke tests (API key required)
+
+Each test file contains one end-to-end `test_xxx_invoke` test that calls the real LLM. These are skipped automatically when no key is present, and can be run explicitly once your key is configured:
+
+```bash
+# Example: run the EDA agent end-to-end against the test dataset
+python -m pytest tests/test_eda_agent.py::test_eda_agent_invoke -v -s
+```
+
+### Typical debugging workflow
+
+If you modify an agent and want to verify it still behaves correctly:
+
+1. Run its test file with `-v` to check all pure-function assertions pass.
+2. Run `python tests/test_xxx.py` to invoke the agent interactively with the testenv CSV — inspect the streamed messages and `[stage]` output.
+3. Check `artifacts/workspace/<timestamp>/reports/` for the agent's saved report to see exactly what the LLM produced.
+
+---
+
+## Run Artifacts
+
+Every pipeline run writes all its output to a dedicated timestamped directory so nothing is ever overwritten:
+
+```
+artifacts/workspace/2026-05-09-14-30/
+|
+|-- reports/                          # Markdown report saved after each agent finishes
+|   |-- agent_manager_report.md       #   dataset profile, task inference, cleaning plan
+|   |-- data_clean_agent_report.md    #   cleaning actions taken, rows dropped/fixed
+|   |-- eda_agent_report.md           #   EDA findings, model selection rationale
+|   |-- feature_agent_report.md       #   encoding/scaling decisions per model
+|   `-- model_agent_report.md         #   training scores and evaluation metrics
+|
+|-- features/                         # Feature-engineered datasets (one per model)
+|   |-- encoders/                     #   fitted LabelEncoders / OneHotEncoders (.pkl)
+|   |-- LogisticRegression_train_featured.csv
+|   |-- RandomForest_train_featured.csv
+|   `-- XGBoost_train_featured.csv
+|
+|-- models/                           # Trained model files
+|   |-- LogisticRegression_model.pkl
+|   |-- RandomForest_model.pkl
+|   `-- XGBoost_model.pkl
+|
+|-- bank-full_cleaned_train.csv       # Post-cleaning train split
+`-- bank-full_cleaned_test.csv        # Post-cleaning test split
+```
+
+You can inspect any intermediate result without re-running the pipeline — open the reports for the LLM's reasoning, load the featured CSVs to inspect what encoding was applied, or load a `.pkl` model directly for inference.
+
+---
+
+## Directory Structure
+
+```
+|-- main.py                        # CLI entry point
+|-- requirements.txt
+|-- .env                           # API keys (not committed)
+|-- agent/
+|   |-- agent_manager.py           # Dataset profiling, task inference, cleaning plan
+|   |-- data_clean_agent.py        # Data cleaning execution
+|   |-- eda_agent.py               # EDA, feature engineering plan, model selection
+|   |-- feature_agent.py           # Feature engineering (one pass per candidate model)
+|   `-- model_agent.py             # Train + evaluate (one pass per candidate model)
+|-- core/
+|   |-- global_state.py            # GlobalState TypedDict (shared across all nodes)
+|   |-- graph.py                   # Pipeline assembly (build_full_pipeline)
+|   |-- dataset_split.py           # Split node (pure function)
+|   |-- compare_node.py            # Compare node (pure function, picks best model)
+|   |-- dataset_store.py           # In-memory dataset cache (dataset_id -> DataFrame)
+|   |-- report_writer.py           # Saves per-agent reports to run_dir
+|   |-- my_llm.py                  # LLM instances (one per provider)
+|   `-- env_utils.py               # PROJECT_ROOT, env var loading
+|-- tools/
+|   |-- agentmanager_tools/        # profile_dataset, infer_task, create_cleaning_plan
+|   |-- dataclean_tools/           # handle_missing, remove_duplicates, fix_types, ...
+|   |-- eda_tools/                 # profile_training_data, correlation_matrix, select_candidate_models
+|   |-- feature_tools/             # encode_categorical, scale_features, save_featured_dataset
+|   `-- model_tools/               # train_model, evaluate_model
+|-- tests/
+|   |-- conftest.py                # Shared path constants
+|   |-- testenv/                   # Synthetic CSV fixtures (no external data needed)
+|   |   |-- raw/sample.csv
+|   |   |-- clean/sample_cleaned.csv
+|   |   |-- split/sample_train.csv, sample_test.csv
+|   |   `-- feature/{Model}_train/test_featured.csv
+|   `-- test_*.py
+`-- artifacts/
+    `-- workspace/                 # Per-run output directories (git-ignored)
+```
+
+---
+
+## Candidate Model Pools
+
+The EDA Agent selects exactly **3 models** from the relevant pool based on dataset characteristics.
+
+**Classification:** `LogisticRegression`, `RandomForest`, `XGBoost`, `SVM`, `KNN`
+
+**Regression:** `LinearRegression`, `Ridge`, `RandomForestRegressor`, `XGBoostRegressor`, `SVR`

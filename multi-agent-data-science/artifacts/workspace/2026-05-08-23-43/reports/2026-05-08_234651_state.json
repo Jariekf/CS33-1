@@ -1,0 +1,1262 @@
+{
+  "user_request": "我要预测y值",
+  "data_path": "C:\\Projects\\multi-agent-data-science\\datasets\\bank-full.csv",
+  "dataset_name": "bank-full.csv",
+  "description": "The data is related with direct marketing campaigns of a Portuguese banking institution. The marketing campaigns were based on phone calls. Often, more than one contact to the same client was required, in order to access if the product (bank term deposit) would be ('yes') or not ('no') subscribed. There are four datasets: 1) bank-additional-full.csv with all examples (41188) and 20 inputs, ordered by date (from May 2008 to November 2010), very close to the data analyzed in [Moro et al., 2014] 2) bank-additional.csv with 10% of the examples (4119), randomly selected from 1), and 20 inputs. 3) bank-full.csv with all examples and 17 inputs, ordered by date (older version of this dataset with less inputs). 4) bank.csv with 10% of the examples and 17 inputs, randomly selected from 3 (older version of this dataset with less inputs). The smallest datasets are provided to test more computationally demanding machine learning algorithms(e.g., SVM). The classification goal is to predict if the client will subscribe (yes/no) a term deposit (variable y).",
+  "target_column": "y",
+  "task_type": "classification",
+  "dataset_profile": {
+    "dataset": {
+      "file_path": "C:\\Projects\\multi-agent-data-science\\datasets\\bank-full.csv",
+      "rows": 45211,
+      "cols": 17,
+      "columns": [
+        "age",
+        "job",
+        "marital",
+        "education",
+        "default",
+        "balance",
+        "housing",
+        "loan",
+        "contact",
+        "day",
+        "month",
+        "duration",
+        "campaign",
+        "pdays",
+        "previous",
+        "poutcome",
+        "y"
+      ],
+      "dtypes": {
+        "age": "int64",
+        "job": "str",
+        "marital": "str",
+        "education": "str",
+        "default": "str",
+        "balance": "int64",
+        "housing": "str",
+        "loan": "str",
+        "contact": "str",
+        "day": "int64",
+        "month": "str",
+        "duration": "int64",
+        "campaign": "int64",
+        "pdays": "int64",
+        "previous": "int64",
+        "poutcome": "str",
+        "y": "str"
+      }
+    },
+    "missing_values": {
+      "total_missing_cells": 0,
+      "total_missing_ratio": 0.0,
+      "high_missing_columns": [],
+      "columns": {
+        "age": {
+          "missing_count": 0,
+          "missing_ratio": 0.0
+        },
+        "job": {
+          "missing_count": 0,
+          "missing_ratio": 0.0
+        },
+        "marital": {
+          "missing_count": 0,
+          "missing_ratio": 0.0
+        },
+        "education": {
+          "missing_count": 0,
+          "missing_ratio": 0.0
+        },
+        "default": {
+          "missing_count": 0,
+          "missing_ratio": 0.0
+        },
+        "balance": {
+          "missing_count": 0,
+          "missing_ratio": 0.0
+        },
+        "housing": {
+          "missing_count": 0,
+          "missing_ratio": 0.0
+        },
+        "loan": {
+          "missing_count": 0,
+          "missing_ratio": 0.0
+        },
+        "contact": {
+          "missing_count": 0,
+          "missing_ratio": 0.0
+        },
+        "day": {
+          "missing_count": 0,
+          "missing_ratio": 0.0
+        },
+        "month": {
+          "missing_count": 0,
+          "missing_ratio": 0.0
+        },
+        "duration": {
+          "missing_count": 0,
+          "missing_ratio": 0.0
+        },
+        "campaign": {
+          "missing_count": 0,
+          "missing_ratio": 0.0
+        },
+        "pdays": {
+          "missing_count": 0,
+          "missing_ratio": 0.0
+        },
+        "previous": {
+          "missing_count": 0,
+          "missing_ratio": 0.0
+        },
+        "poutcome": {
+          "missing_count": 0,
+          "missing_ratio": 0.0
+        },
+        "y": {
+          "missing_count": 0,
+          "missing_ratio": 0.0
+        }
+      }
+    },
+    "outliers": {
+      "method": "iqr",
+      "columns": {
+        "age": {
+          "outlier_count": 487,
+          "outlier_ratio": 0.010772,
+          "lower_bound": 10.5,
+          "upper_bound": 70.5,
+          "min": 18.0,
+          "max": 95.0
+        },
+        "balance": {
+          "outlier_count": 4729,
+          "outlier_ratio": 0.104598,
+          "lower_bound": -1962.0,
+          "upper_bound": 3462.0,
+          "min": -8019.0,
+          "max": 102127.0
+        },
+        "day": {
+          "outlier_count": 0,
+          "outlier_ratio": 0.0,
+          "lower_bound": -11.5,
+          "upper_bound": 40.5,
+          "min": 1.0,
+          "max": 31.0
+        },
+        "duration": {
+          "outlier_count": 3235,
+          "outlier_ratio": 0.071553,
+          "lower_bound": -221.0,
+          "upper_bound": 643.0,
+          "min": 0.0,
+          "max": 4918.0
+        },
+        "campaign": {
+          "outlier_count": 3064,
+          "outlier_ratio": 0.067771,
+          "lower_bound": -2.0,
+          "upper_bound": 6.0,
+          "min": 1.0,
+          "max": 63.0
+        },
+        "pdays": {
+          "outlier_count": 8257,
+          "outlier_ratio": 0.182633,
+          "lower_bound": -1.0,
+          "upper_bound": -1.0,
+          "min": -1.0,
+          "max": 871.0
+        },
+        "previous": {
+          "outlier_count": 8257,
+          "outlier_ratio": 0.182633,
+          "lower_bound": 0.0,
+          "upper_bound": 0.0,
+          "min": 0.0,
+          "max": 275.0
+        }
+      }
+    },
+    "type_issues": {
+      "numeric_like_object_columns": [],
+      "datetime_like_object_columns": [],
+      "category_columns": {
+        "job": {
+          "unique_count": 12,
+          "unique_ratio": 0.000265
+        },
+        "marital": {
+          "unique_count": 3,
+          "unique_ratio": 6.6e-05
+        },
+        "education": {
+          "unique_count": 4,
+          "unique_ratio": 8.8e-05
+        },
+        "default": {
+          "unique_count": 2,
+          "unique_ratio": 4.4e-05
+        },
+        "housing": {
+          "unique_count": 2,
+          "unique_ratio": 4.4e-05
+        },
+        "loan": {
+          "unique_count": 2,
+          "unique_ratio": 4.4e-05
+        },
+        "contact": {
+          "unique_count": 3,
+          "unique_ratio": 6.6e-05
+        },
+        "month": {
+          "unique_count": 12,
+          "unique_ratio": 0.000265
+        },
+        "poutcome": {
+          "unique_count": 4,
+          "unique_ratio": 8.8e-05
+        },
+        "y": {
+          "unique_count": 2,
+          "unique_ratio": 4.4e-05
+        }
+      },
+      "high_cardinality_columns": []
+    },
+    "drop_candidates": {
+      "empty_columns": [],
+      "constant_columns": [],
+      "id_like_columns": []
+    },
+    "sample_rows": [
+      {
+        "age": 58,
+        "job": "management",
+        "marital": "married",
+        "education": "tertiary",
+        "default": "no",
+        "balance": 2143,
+        "housing": "yes",
+        "loan": "no",
+        "contact": "unknown",
+        "day": 5,
+        "month": "may",
+        "duration": 261,
+        "campaign": 1,
+        "pdays": -1,
+        "previous": 0,
+        "poutcome": "unknown",
+        "y": "no"
+      },
+      {
+        "age": 44,
+        "job": "technician",
+        "marital": "single",
+        "education": "secondary",
+        "default": "no",
+        "balance": 29,
+        "housing": "yes",
+        "loan": "no",
+        "contact": "unknown",
+        "day": 5,
+        "month": "may",
+        "duration": 151,
+        "campaign": 1,
+        "pdays": -1,
+        "previous": 0,
+        "poutcome": "unknown",
+        "y": "no"
+      },
+      {
+        "age": 33,
+        "job": "entrepreneur",
+        "marital": "married",
+        "education": "secondary",
+        "default": "no",
+        "balance": 2,
+        "housing": "yes",
+        "loan": "yes",
+        "contact": "unknown",
+        "day": 5,
+        "month": "may",
+        "duration": 76,
+        "campaign": 1,
+        "pdays": -1,
+        "previous": 0,
+        "poutcome": "unknown",
+        "y": "no"
+      },
+      {
+        "age": 47,
+        "job": "blue-collar",
+        "marital": "married",
+        "education": "unknown",
+        "default": "no",
+        "balance": 1506,
+        "housing": "yes",
+        "loan": "no",
+        "contact": "unknown",
+        "day": 5,
+        "month": "may",
+        "duration": 92,
+        "campaign": 1,
+        "pdays": -1,
+        "previous": 0,
+        "poutcome": "unknown",
+        "y": "no"
+      },
+      {
+        "age": 33,
+        "job": "unknown",
+        "marital": "single",
+        "education": "unknown",
+        "default": "no",
+        "balance": 1,
+        "housing": "no",
+        "loan": "no",
+        "contact": "unknown",
+        "day": 5,
+        "month": "may",
+        "duration": 198,
+        "campaign": 1,
+        "pdays": -1,
+        "previous": 0,
+        "poutcome": "unknown",
+        "y": "no"
+      }
+    ]
+  },
+  "dataset_id": "dataset_a2f21427abad4c858bbb39c8ad430a8d",
+  "cleaning_plan": {
+    "summary": "对bank-full.csv数据集进行清洗，目标为预测y（二分类）。数据无缺失值，但存在一些异常值和类型转换需求。主要操作包括：处理数值异常值、将分类变量进行编码、处理pdays和previous中的特殊值（-1表示未联系过）。",
+    "column_name_actions": [
+      {
+        "column": "y",
+        "action": "保留原列名，作为目标变量",
+        "reason": "目标列，无需修改"
+      }
+    ],
+    "type_conversions": [
+      {
+        "column": "job",
+        "from_type": "str",
+        "to_type": "category",
+        "reason": "分类变量，共12个类别，适合转换为category类型以便编码"
+      },
+      {
+        "column": "marital",
+        "from_type": "str",
+        "to_type": "category",
+        "reason": "分类变量，3个类别"
+      },
+      {
+        "column": "education",
+        "from_type": "str",
+        "to_type": "category",
+        "reason": "分类变量，4个类别"
+      },
+      {
+        "column": "default",
+        "from_type": "str",
+        "to_type": "category",
+        "reason": "二值分类变量"
+      },
+      {
+        "column": "housing",
+        "from_type": "str",
+        "to_type": "category",
+        "reason": "二值分类变量"
+      },
+      {
+        "column": "loan",
+        "from_type": "str",
+        "to_type": "category",
+        "reason": "二值分类变量"
+      },
+      {
+        "column": "contact",
+        "from_type": "str",
+        "to_type": "category",
+        "reason": "分类变量，3个类别"
+      },
+      {
+        "column": "month",
+        "from_type": "str",
+        "to_type": "category",
+        "reason": "分类变量，12个月份"
+      },
+      {
+        "column": "poutcome",
+        "from_type": "str",
+        "to_type": "category",
+        "reason": "分类变量，4个类别"
+      },
+      {
+        "column": "y",
+        "from_type": "str",
+        "to_type": "category",
+        "reason": "目标变量，二分类（yes/no）"
+      }
+    ],
+    "missing_value_actions": [],
+    "outlier_actions": [
+      {
+        "column": "age",
+        "action": "保留或进行封顶处理（winsorize）",
+        "reason": "487个异常值（年龄>70.5或<10.5），极端值95岁可能是真实数据，建议封顶处理"
+      },
+      {
+        "column": "balance",
+        "action": "保留或进行封顶处理",
+        "reason": "4729个异常值（10.46%），最大值102127远高于上界，可能存在高净值客户，建议封顶或保留"
+      },
+      {
+        "column": "duration",
+        "action": "保留",
+        "reason": "3235个异常值，通话时长与目标变量强相关，不建议删除"
+      },
+      {
+        "column": "campaign",
+        "action": "保留或进行封顶处理",
+        "reason": "3064个异常值，最大联系次数63次，建议封顶处理"
+      },
+      {
+        "column": "pdays",
+        "action": "保留，特殊值-1表示从未联系过",
+        "reason": "8257个异常值，但-1是有效编码，表示客户之前未被联系过，应保留"
+      },
+      {
+        "column": "previous",
+        "action": "保留，特殊值0表示之前未联系过",
+        "reason": "8257个异常值，但0是有效值，表示之前联系次数为0，应保留"
+      }
+    ],
+    "drop_columns": [],
+    "notes": [
+      "数据无缺失值，无需处理缺失值",
+      "pdays=-1 表示客户之前从未被联系过，是有效编码，应保留",
+      "duration与目标变量y高度相关，建模时需注意数据泄露问题",
+      "没有需要删除的列"
+    ]
+  },
+  "cleaned_data_path": "C:\\Projects\\multi-agent-data-science\\artifacts\\workspace\\2026-05-08-23-43\\bank-full_cleaned.csv",
+  "cleaning_report": {
+    "steps": [
+      {
+        "tool": "load_dataset_to_store",
+        "result": {
+          "dataset_id": "dataset_003d5e25db904a27bab3f13850e0ba41",
+          "source_path": "C:\\Projects\\multi-agent-data-science\\datasets\\bank-full.csv",
+          "shape": {
+            "rows": 45211,
+            "cols": 17
+          },
+          "columns": [
+            "age",
+            "job",
+            "marital",
+            "education",
+            "default",
+            "balance",
+            "housing",
+            "loan",
+            "contact",
+            "day",
+            "month",
+            "duration",
+            "campaign",
+            "pdays",
+            "previous",
+            "poutcome",
+            "y"
+          ]
+        }
+      },
+      {
+        "tool": "clean_data_types",
+        "result": {
+          "dataset_id": "dataset_003d5e25db904a27bab3f13850e0ba41",
+          "converted_columns": [],
+          "skipped_columns": [
+            {
+              "column": "job",
+              "reason": "unsupported_target_type:None"
+            },
+            {
+              "column": "marital",
+              "reason": "unsupported_target_type:None"
+            },
+            {
+              "column": "education",
+              "reason": "unsupported_target_type:None"
+            },
+            {
+              "column": "default",
+              "reason": "unsupported_target_type:None"
+            },
+            {
+              "column": "housing",
+              "reason": "unsupported_target_type:None"
+            },
+            {
+              "column": "loan",
+              "reason": "unsupported_target_type:None"
+            },
+            {
+              "column": "contact",
+              "reason": "unsupported_target_type:None"
+            },
+            {
+              "column": "month",
+              "reason": "unsupported_target_type:None"
+            },
+            {
+              "column": "poutcome",
+              "reason": "unsupported_target_type:None"
+            },
+            {
+              "column": "y",
+              "reason": "unsupported_target_type:None"
+            }
+          ]
+        }
+      },
+      {
+        "tool": "clean_outliers",
+        "result": {
+          "dataset_id": "dataset_003d5e25db904a27bab3f13850e0ba41",
+          "processed_columns": [
+            "age",
+            "balance",
+            "campaign"
+          ],
+          "skipped_columns": []
+        }
+      },
+      {
+        "tool": "clean_duplicates",
+        "result": {
+          "dataset_id": "dataset_003d5e25db904a27bab3f13850e0ba41",
+          "subset": null,
+          "keep": "first",
+          "dropped_rows": 0,
+          "rows": 45211
+        }
+      },
+      {
+        "tool": "save_dataset_from_store",
+        "result": {
+          "dataset_id": "dataset_003d5e25db904a27bab3f13850e0ba41",
+          "output_path": "C:\\Projects\\multi-agent-data-science\\artifacts\\workspace\\2026-05-08-23-43\\bank-full_cleaned.csv",
+          "shape": {
+            "rows": 45211,
+            "cols": 17
+          },
+          "columns": [
+            "age",
+            "job",
+            "marital",
+            "education",
+            "default",
+            "balance",
+            "housing",
+            "loan",
+            "contact",
+            "day",
+            "month",
+            "duration",
+            "campaign",
+            "pdays",
+            "previous",
+            "poutcome",
+            "y"
+          ]
+        }
+      }
+    ]
+  },
+  "cleaning_passed": true,
+  "training_data_path": "C:\\Projects\\multi-agent-data-science\\artifacts\\workspace\\2026-05-08-23-43\\bank-full_cleaned_train.csv",
+  "testing_data_path": "C:\\Projects\\multi-agent-data-science\\artifacts\\workspace\\2026-05-08-23-43\\bank-full_cleaned_test.csv",
+  "split_report": {
+    "source_path": "C:\\Projects\\multi-agent-data-science\\artifacts\\workspace\\2026-05-08-23-43\\bank-full_cleaned.csv",
+    "task_type": "classification",
+    "target_column": "y",
+    "test_size": 0.2,
+    "random_state": 42,
+    "train_rows": 36168,
+    "test_rows": 9043,
+    "train_path": "C:\\Projects\\multi-agent-data-science\\artifacts\\workspace\\2026-05-08-23-43\\bank-full_cleaned_train.csv",
+    "test_path": "C:\\Projects\\multi-agent-data-science\\artifacts\\workspace\\2026-05-08-23-43\\bank-full_cleaned_test.csv",
+    "stratify_requested": true,
+    "stratify_used": true,
+    "stratify_fallback_to_random": false
+  },
+  "eda_report": {
+    "steps": [
+      {
+        "tool": "profile_training_data",
+        "result": {
+          "dataset": {
+            "file_path": "C:\\Projects\\multi-agent-data-science\\artifacts\\workspace\\2026-05-08-23-43\\bank-full_cleaned_train.csv",
+            "rows": 36168,
+            "cols": 17,
+            "columns": [
+              "age",
+              "job",
+              "marital",
+              "education",
+              "default",
+              "balance",
+              "housing",
+              "loan",
+              "contact",
+              "day",
+              "month",
+              "duration",
+              "campaign",
+              "pdays",
+              "previous",
+              "poutcome",
+              "y"
+            ],
+            "dtypes": {
+              "age": "float64",
+              "job": "str",
+              "marital": "str",
+              "education": "str",
+              "default": "str",
+              "balance": "int64",
+              "housing": "str",
+              "loan": "str",
+              "contact": "str",
+              "day": "int64",
+              "month": "str",
+              "duration": "int64",
+              "campaign": "int64",
+              "pdays": "int64",
+              "previous": "int64",
+              "poutcome": "str",
+              "y": "str"
+            }
+          },
+          "missing_values": {
+            "total_missing_cells": 0,
+            "total_missing_ratio": 0.0,
+            "high_missing_columns": [],
+            "columns": {
+              "age": {
+                "missing_count": 0,
+                "missing_ratio": 0.0
+              },
+              "job": {
+                "missing_count": 0,
+                "missing_ratio": 0.0
+              },
+              "marital": {
+                "missing_count": 0,
+                "missing_ratio": 0.0
+              },
+              "education": {
+                "missing_count": 0,
+                "missing_ratio": 0.0
+              },
+              "default": {
+                "missing_count": 0,
+                "missing_ratio": 0.0
+              },
+              "balance": {
+                "missing_count": 0,
+                "missing_ratio": 0.0
+              },
+              "housing": {
+                "missing_count": 0,
+                "missing_ratio": 0.0
+              },
+              "loan": {
+                "missing_count": 0,
+                "missing_ratio": 0.0
+              },
+              "contact": {
+                "missing_count": 0,
+                "missing_ratio": 0.0
+              },
+              "day": {
+                "missing_count": 0,
+                "missing_ratio": 0.0
+              },
+              "month": {
+                "missing_count": 0,
+                "missing_ratio": 0.0
+              },
+              "duration": {
+                "missing_count": 0,
+                "missing_ratio": 0.0
+              },
+              "campaign": {
+                "missing_count": 0,
+                "missing_ratio": 0.0
+              },
+              "pdays": {
+                "missing_count": 0,
+                "missing_ratio": 0.0
+              },
+              "previous": {
+                "missing_count": 0,
+                "missing_ratio": 0.0
+              },
+              "poutcome": {
+                "missing_count": 0,
+                "missing_ratio": 0.0
+              },
+              "y": {
+                "missing_count": 0,
+                "missing_ratio": 0.0
+              }
+            }
+          },
+          "outliers": {
+            "method": "iqr",
+            "columns": {
+              "age": {
+                "outlier_count": 0,
+                "outlier_ratio": 0.0,
+                "lower_bound": 10.5,
+                "upper_bound": 70.5,
+                "min": 18.0,
+                "max": 70.5
+              },
+              "balance": {
+                "outlier_count": 15,
+                "outlier_ratio": 0.000415,
+                "lower_bound": -1960.375,
+                "upper_bound": 3464.625,
+                "min": -1962.0,
+                "max": 3462.0
+              },
+              "day": {
+                "outlier_count": 0,
+                "outlier_ratio": 0.0,
+                "lower_bound": -11.5,
+                "upper_bound": 40.5,
+                "min": 1.0,
+                "max": 31.0
+              },
+              "duration": {
+                "outlier_count": 2632,
+                "outlier_ratio": 0.072772,
+                "lower_bound": -219.5,
+                "upper_bound": 640.5,
+                "min": 0.0,
+                "max": 4918.0
+              },
+              "campaign": {
+                "outlier_count": 0,
+                "outlier_ratio": 0.0,
+                "lower_bound": -2.0,
+                "upper_bound": 6.0,
+                "min": 1.0,
+                "max": 6.0
+              },
+              "pdays": {
+                "outlier_count": 6584,
+                "outlier_ratio": 0.182039,
+                "lower_bound": -1.0,
+                "upper_bound": -1.0,
+                "min": -1.0,
+                "max": 871.0
+              },
+              "previous": {
+                "outlier_count": 6584,
+                "outlier_ratio": 0.182039,
+                "lower_bound": 0.0,
+                "upper_bound": 0.0,
+                "min": 0.0,
+                "max": 275.0
+              }
+            }
+          },
+          "type_issues": {
+            "numeric_like_object_columns": [],
+            "datetime_like_object_columns": [],
+            "category_columns": {
+              "job": {
+                "unique_count": 12,
+                "unique_ratio": 0.000332
+              },
+              "marital": {
+                "unique_count": 3,
+                "unique_ratio": 8.3e-05
+              },
+              "education": {
+                "unique_count": 4,
+                "unique_ratio": 0.000111
+              },
+              "default": {
+                "unique_count": 2,
+                "unique_ratio": 5.5e-05
+              },
+              "housing": {
+                "unique_count": 2,
+                "unique_ratio": 5.5e-05
+              },
+              "loan": {
+                "unique_count": 2,
+                "unique_ratio": 5.5e-05
+              },
+              "contact": {
+                "unique_count": 3,
+                "unique_ratio": 8.3e-05
+              },
+              "month": {
+                "unique_count": 12,
+                "unique_ratio": 0.000332
+              },
+              "poutcome": {
+                "unique_count": 4,
+                "unique_ratio": 0.000111
+              },
+              "y": {
+                "unique_count": 2,
+                "unique_ratio": 5.5e-05
+              }
+            },
+            "high_cardinality_columns": []
+          },
+          "drop_candidates": {
+            "empty_columns": [],
+            "constant_columns": [],
+            "id_like_columns": []
+          },
+          "sample_rows": [
+            {
+              "age": 36.0,
+              "job": "technician",
+              "marital": "divorced",
+              "education": "secondary",
+              "default": "no",
+              "balance": 861,
+              "housing": "no",
+              "loan": "no",
+              "contact": "telephone",
+              "day": 29,
+              "month": "aug",
+              "duration": 140,
+              "campaign": 2,
+              "pdays": -1,
+              "previous": 0,
+              "poutcome": "unknown",
+              "y": "no"
+            },
+            {
+              "age": 24.0,
+              "job": "student",
+              "marital": "single",
+              "education": "secondary",
+              "default": "no",
+              "balance": 3462,
+              "housing": "no",
+              "loan": "no",
+              "contact": "cellular",
+              "day": 5,
+              "month": "apr",
+              "duration": 907,
+              "campaign": 4,
+              "pdays": 185,
+              "previous": 7,
+              "poutcome": "failure",
+              "y": "yes"
+            },
+            {
+              "age": 44.0,
+              "job": "technician",
+              "marital": "single",
+              "education": "secondary",
+              "default": "no",
+              "balance": 244,
+              "housing": "yes",
+              "loan": "no",
+              "contact": "cellular",
+              "day": 12,
+              "month": "aug",
+              "duration": 1735,
+              "campaign": 4,
+              "pdays": -1,
+              "previous": 0,
+              "poutcome": "unknown",
+              "y": "yes"
+            },
+            {
+              "age": 48.0,
+              "job": "unemployed",
+              "marital": "married",
+              "education": "secondary",
+              "default": "no",
+              "balance": 0,
+              "housing": "no",
+              "loan": "no",
+              "contact": "telephone",
+              "day": 31,
+              "month": "jul",
+              "duration": 35,
+              "campaign": 6,
+              "pdays": -1,
+              "previous": 0,
+              "poutcome": "unknown",
+              "y": "no"
+            },
+            {
+              "age": 38.0,
+              "job": "technician",
+              "marital": "married",
+              "education": "secondary",
+              "default": "no",
+              "balance": 257,
+              "housing": "no",
+              "loan": "no",
+              "contact": "cellular",
+              "day": 26,
+              "month": "aug",
+              "duration": 57,
+              "campaign": 6,
+              "pdays": -1,
+              "previous": 0,
+              "poutcome": "unknown",
+              "y": "no"
+            }
+          ]
+        }
+      },
+      {
+        "tool": "compute_correlation_matrix",
+        "result": {
+          "columns": [
+            "age",
+            "balance",
+            "day",
+            "duration",
+            "campaign",
+            "pdays",
+            "previous"
+          ],
+          "matrix": {
+            "age": {
+              "age": 1.0,
+              "balance": 0.1209,
+              "day": -0.0098,
+              "duration": -0.0061,
+              "campaign": 0.0303,
+              "pdays": -0.0261,
+              "previous": 0.0002
+            },
+            "balance": {
+              "age": 0.1209,
+              "balance": 1.0,
+              "day": 0.0106,
+              "duration": 0.0391,
+              "campaign": -0.0265,
+              "pdays": 0.0174,
+              "previous": 0.037
+            },
+            "day": {
+              "age": -0.0098,
+              "balance": 0.0106,
+              "day": 1.0,
+              "duration": -0.0314,
+              "campaign": 0.152,
+              "pdays": -0.0935,
+              "previous": -0.0494
+            },
+            "duration": {
+              "age": -0.0061,
+              "balance": 0.0391,
+              "day": -0.0314,
+              "duration": 1.0,
+              "campaign": -0.0668,
+              "pdays": -0.0063,
+              "previous": -0.0008
+            },
+            "campaign": {
+              "age": 0.0303,
+              "balance": -0.0265,
+              "day": 0.152,
+              "duration": -0.0668,
+              "campaign": 1.0,
+              "pdays": -0.0921,
+              "previous": -0.0201
+            },
+            "pdays": {
+              "age": -0.0261,
+              "balance": 0.0174,
+              "day": -0.0935,
+              "duration": -0.0063,
+              "campaign": -0.0921,
+              "pdays": 1.0,
+              "previous": 0.439
+            },
+            "previous": {
+              "age": 0.0002,
+              "balance": 0.037,
+              "day": -0.0494,
+              "duration": -0.0008,
+              "campaign": -0.0201,
+              "pdays": 0.439,
+              "previous": 1.0
+            }
+          }
+        }
+      },
+      {
+        "tool": "plot_distributions",
+        "result": {
+          "output_dir": "C:\\Projects\\multi-agent-data-science\\artifacts\\workspace\\2026-05-08-23-43\\plots",
+          "plot_count": 7,
+          "plot_paths": [
+            "C:\\Projects\\multi-agent-data-science\\artifacts\\workspace\\2026-05-08-23-43\\plots\\age_distribution.png",
+            "C:\\Projects\\multi-agent-data-science\\artifacts\\workspace\\2026-05-08-23-43\\plots\\balance_distribution.png",
+            "C:\\Projects\\multi-agent-data-science\\artifacts\\workspace\\2026-05-08-23-43\\plots\\day_distribution.png",
+            "C:\\Projects\\multi-agent-data-science\\artifacts\\workspace\\2026-05-08-23-43\\plots\\duration_distribution.png",
+            "C:\\Projects\\multi-agent-data-science\\artifacts\\workspace\\2026-05-08-23-43\\plots\\campaign_distribution.png",
+            "C:\\Projects\\multi-agent-data-science\\artifacts\\workspace\\2026-05-08-23-43\\plots\\pdays_distribution.png",
+            "C:\\Projects\\multi-agent-data-science\\artifacts\\workspace\\2026-05-08-23-43\\plots\\previous_distribution.png"
+          ]
+        }
+      },
+      {
+        "tool": "select_candidate_models",
+        "result": {
+          "selected_models": [
+            "LogisticRegression",
+            "RandomForest",
+            "XGBoost"
+          ],
+          "feature_engineering_plan": {
+            "LogisticRegression": {
+              "scaling": true,
+              "encoding": "onehot",
+              "notes": "线性模型对特征尺度敏感，需标准化/归一化；分类变量使用One-Hot编码以保持线性可加性"
+            },
+            "RandomForest": {
+              "scaling": false,
+              "encoding": "label",
+              "notes": "树模型不受特征尺度影响，无需缩放；分类变量可用Label Encoding；能自动处理特征交互和非线性关系"
+            },
+            "XGBoost": {
+              "scaling": false,
+              "encoding": "label",
+              "notes": "梯度提升树同样无需特征缩放；Label Encoding即可；对异常值鲁棒，能处理pdays=-1等特殊值"
+            }
+          },
+          "model_selection_plan": "基于EDA分析选择以下3个模型：\n\n1. **LogisticRegression**：作为线性基线模型。数据有7个数值特征（age, balance, day, duration, campaign, pdays, previous）和10个分类特征，特征维度适中。LogisticRegression可提供可解释的系数，帮助理解各因素对订阅定期存款的影响方向。需注意特征缩放和One-Hot编码。\n\n2. **RandomForest**：集成树模型，适合处理混合数据类型（数值+分类）。数据中存在pdays（-1表示未联系过）、previous（0表示未联系过）等特殊编码值，RandomForest能天然处理这些非单调关系。对duration等存在异常值的列鲁棒性好，且能捕捉特征间的非线性交互作用。\n\n3. **XGBoost**：梯度提升树，在结构化表格数据上表现优异。训练集有36,168行，数据量充足，XGBoost能充分利用数据。对pdays（18.2%异常值但为有效编码）、previous等特征有良好处理能力。支持正则化防止过拟合，适合处理分类变量较多的场景。\n\n**未选模型理由**：\n- SVM：训练集36,168行×17列，SVM计算复杂度高（O(n²)~O(n³)），且需要精细调参和特征缩放，在大数据量下效率低。\n- KNN：对特征缩放敏感，且在高维混合特征空间中距离度量效果差；数据中pdays=-1等特殊值会影响距离计算；预测时推理速度慢。"
+        }
+      }
+    ]
+  },
+  "candidate_models": [
+    "LogisticRegression",
+    "RandomForest",
+    "XGBoost"
+  ],
+  "feature_engineering_plan": {
+    "LogisticRegression": {
+      "scaling": true,
+      "encoding": "onehot",
+      "notes": "线性模型对特征尺度敏感，需标准化/归一化；分类变量使用One-Hot编码以保持线性可加性"
+    },
+    "RandomForest": {
+      "scaling": false,
+      "encoding": "label",
+      "notes": "树模型不受特征尺度影响，无需缩放；分类变量可用Label Encoding；能自动处理特征交互和非线性关系"
+    },
+    "XGBoost": {
+      "scaling": false,
+      "encoding": "label",
+      "notes": "梯度提升树同样无需特征缩放；Label Encoding即可；对异常值鲁棒，能处理pdays=-1等特殊值"
+    }
+  },
+  "model_selection_plan": "基于EDA分析选择以下3个模型：\n\n1. **LogisticRegression**：作为线性基线模型。数据有7个数值特征（age, balance, day, duration, campaign, pdays, previous）和10个分类特征，特征维度适中。LogisticRegression可提供可解释的系数，帮助理解各因素对订阅定期存款的影响方向。需注意特征缩放和One-Hot编码。\n\n2. **RandomForest**：集成树模型，适合处理混合数据类型（数值+分类）。数据中存在pdays（-1表示未联系过）、previous（0表示未联系过）等特殊编码值，RandomForest能天然处理这些非单调关系。对duration等存在异常值的列鲁棒性好，且能捕捉特征间的非线性交互作用。\n\n3. **XGBoost**：梯度提升树，在结构化表格数据上表现优异。训练集有36,168行，数据量充足，XGBoost能充分利用数据。对pdays（18.2%异常值但为有效编码）、previous等特征有良好处理能力。支持正则化防止过拟合，适合处理分类变量较多的场景。\n\n**未选模型理由**：\n- SVM：训练集36,168行×17列，SVM计算复杂度高（O(n²)~O(n³)），且需要精细调参和特征缩放，在大数据量下效率低。\n- KNN：对特征缩放敏感，且在高维混合特征空间中距离度量效果差；数据中pdays=-1等特殊值会影响距离计算；预测时推理速度慢。",
+  "feature_dataset_ids": {
+    "LogisticRegression": "C:\\Projects\\multi-agent-data-science\\artifacts\\workspace\\2026-05-08-23-43\\features\\LogisticRegression_train_featured.csv",
+    "RandomForest": "C:\\Projects\\multi-agent-data-science\\artifacts\\workspace\\2026-05-08-23-43\\features\\RandomForest_train_featured.csv",
+    "XGBoost": "C:\\Projects\\multi-agent-data-science\\artifacts\\workspace\\2026-05-08-23-43\\features\\XGBoost_train_featured.csv"
+  },
+  "feature_preprocessors": {
+    "LogisticRegression": {
+      "scaler_path": "C:\\Projects\\multi-agent-data-science\\artifacts\\workspace\\2026-05-08-23-43\\features\\scalers\\dataset_5775d0f5b6c34c6ca0402553b8d936c5_standard_scaler.pkl",
+      "scaler_method": "standard",
+      "scaled_columns": [
+        "age",
+        "balance",
+        "day",
+        "duration",
+        "campaign",
+        "pdays",
+        "previous"
+      ],
+      "encoder_paths": {},
+      "encoding_method": "onehot",
+      "encoded_columns": [
+        "job",
+        "marital",
+        "education",
+        "default",
+        "housing",
+        "loan",
+        "contact",
+        "month",
+        "poutcome"
+      ],
+      "new_columns": [
+        "job_admin.",
+        "job_blue-collar",
+        "job_entrepreneur",
+        "job_housemaid",
+        "job_management",
+        "job_retired",
+        "job_self-employed",
+        "job_services",
+        "job_student",
+        "job_technician",
+        "job_unemployed",
+        "job_unknown",
+        "marital_divorced",
+        "marital_married",
+        "marital_single",
+        "education_primary",
+        "education_secondary",
+        "education_tertiary",
+        "education_unknown",
+        "default_no",
+        "default_yes",
+        "housing_no",
+        "housing_yes",
+        "loan_no",
+        "loan_yes",
+        "contact_cellular",
+        "contact_telephone",
+        "contact_unknown",
+        "month_apr",
+        "month_aug",
+        "month_dec",
+        "month_feb",
+        "month_jan",
+        "month_jul",
+        "month_jun",
+        "month_mar",
+        "month_may",
+        "month_nov",
+        "month_oct",
+        "month_sep",
+        "poutcome_failure",
+        "poutcome_other",
+        "poutcome_success",
+        "poutcome_unknown"
+      ]
+    },
+    "RandomForest": {
+      "encoder_paths": {
+        "job": "C:\\Projects\\multi-agent-data-science\\artifacts\\workspace\\2026-05-08-23-43\\features\\encoders\\dataset_995b1cd9a5e84856a3d2a48b268c16ff_job_label_encoder.pkl",
+        "marital": "C:\\Projects\\multi-agent-data-science\\artifacts\\workspace\\2026-05-08-23-43\\features\\encoders\\dataset_995b1cd9a5e84856a3d2a48b268c16ff_marital_label_encoder.pkl",
+        "education": "C:\\Projects\\multi-agent-data-science\\artifacts\\workspace\\2026-05-08-23-43\\features\\encoders\\dataset_995b1cd9a5e84856a3d2a48b268c16ff_education_label_encoder.pkl",
+        "default": "C:\\Projects\\multi-agent-data-science\\artifacts\\workspace\\2026-05-08-23-43\\features\\encoders\\dataset_995b1cd9a5e84856a3d2a48b268c16ff_default_label_encoder.pkl",
+        "housing": "C:\\Projects\\multi-agent-data-science\\artifacts\\workspace\\2026-05-08-23-43\\features\\encoders\\dataset_995b1cd9a5e84856a3d2a48b268c16ff_housing_label_encoder.pkl",
+        "loan": "C:\\Projects\\multi-agent-data-science\\artifacts\\workspace\\2026-05-08-23-43\\features\\encoders\\dataset_995b1cd9a5e84856a3d2a48b268c16ff_loan_label_encoder.pkl",
+        "contact": "C:\\Projects\\multi-agent-data-science\\artifacts\\workspace\\2026-05-08-23-43\\features\\encoders\\dataset_995b1cd9a5e84856a3d2a48b268c16ff_contact_label_encoder.pkl",
+        "month": "C:\\Projects\\multi-agent-data-science\\artifacts\\workspace\\2026-05-08-23-43\\features\\encoders\\dataset_995b1cd9a5e84856a3d2a48b268c16ff_month_label_encoder.pkl",
+        "poutcome": "C:\\Projects\\multi-agent-data-science\\artifacts\\workspace\\2026-05-08-23-43\\features\\encoders\\dataset_995b1cd9a5e84856a3d2a48b268c16ff_poutcome_label_encoder.pkl"
+      },
+      "encoding_method": "label",
+      "encoded_columns": [
+        "job",
+        "marital",
+        "education",
+        "default",
+        "housing",
+        "loan",
+        "contact",
+        "month",
+        "poutcome"
+      ],
+      "new_columns": []
+    },
+    "XGBoost": {
+      "target_encoder_path": "C:\\Projects\\multi-agent-data-science\\artifacts\\workspace\\2026-05-08-23-43\\features\\encoders\\dataset_a2f21427abad4c858bbb39c8ad430a8d_XGBoost_target_encoder.pkl",
+      "target_original_classes": [
+        "no",
+        "yes"
+      ],
+      "encoder_paths": {
+        "job": "C:\\Projects\\multi-agent-data-science\\artifacts\\workspace\\2026-05-08-23-43\\features\\encoders\\dataset_a2f21427abad4c858bbb39c8ad430a8d_job_label_encoder.pkl",
+        "marital": "C:\\Projects\\multi-agent-data-science\\artifacts\\workspace\\2026-05-08-23-43\\features\\encoders\\dataset_a2f21427abad4c858bbb39c8ad430a8d_marital_label_encoder.pkl",
+        "education": "C:\\Projects\\multi-agent-data-science\\artifacts\\workspace\\2026-05-08-23-43\\features\\encoders\\dataset_a2f21427abad4c858bbb39c8ad430a8d_education_label_encoder.pkl",
+        "default": "C:\\Projects\\multi-agent-data-science\\artifacts\\workspace\\2026-05-08-23-43\\features\\encoders\\dataset_a2f21427abad4c858bbb39c8ad430a8d_default_label_encoder.pkl",
+        "housing": "C:\\Projects\\multi-agent-data-science\\artifacts\\workspace\\2026-05-08-23-43\\features\\encoders\\dataset_a2f21427abad4c858bbb39c8ad430a8d_housing_label_encoder.pkl",
+        "loan": "C:\\Projects\\multi-agent-data-science\\artifacts\\workspace\\2026-05-08-23-43\\features\\encoders\\dataset_a2f21427abad4c858bbb39c8ad430a8d_loan_label_encoder.pkl",
+        "contact": "C:\\Projects\\multi-agent-data-science\\artifacts\\workspace\\2026-05-08-23-43\\features\\encoders\\dataset_a2f21427abad4c858bbb39c8ad430a8d_contact_label_encoder.pkl",
+        "month": "C:\\Projects\\multi-agent-data-science\\artifacts\\workspace\\2026-05-08-23-43\\features\\encoders\\dataset_a2f21427abad4c858bbb39c8ad430a8d_month_label_encoder.pkl",
+        "poutcome": "C:\\Projects\\multi-agent-data-science\\artifacts\\workspace\\2026-05-08-23-43\\features\\encoders\\dataset_a2f21427abad4c858bbb39c8ad430a8d_poutcome_label_encoder.pkl"
+      },
+      "encoding_method": "label",
+      "encoded_columns": [
+        "job",
+        "marital",
+        "education",
+        "default",
+        "housing",
+        "loan",
+        "contact",
+        "month",
+        "poutcome"
+      ],
+      "new_columns": []
+    }
+  },
+  "model_results": {
+    "LogisticRegression": {
+      "model_path": "C:\\Projects\\multi-agent-data-science\\artifacts\\workspace\\2026-05-08-23-43\\models\\LogisticRegression_model.pkl",
+      "metrics": {
+        "accuracy": 0.8876,
+        "f1_macro": 0.5972,
+        "f1_weighted": 0.8592
+      }
+    },
+    "RandomForest": {
+      "model_path": "C:\\Projects\\multi-agent-data-science\\artifacts\\workspace\\2026-05-08-23-43\\models\\RandomForest_model.pkl",
+      "metrics": {
+        "accuracy": 0.9049,
+        "f1_macro": 0.7249,
+        "f1_weighted": 0.8953
+      }
+    },
+    "XGBoost": {
+      "model_path": "C:\\Projects\\multi-agent-data-science\\artifacts\\workspace\\2026-05-08-23-43\\models\\XGBoost_model.pkl",
+      "metrics": {
+        "accuracy": 0.9057,
+        "f1_macro": 0.7481,
+        "f1_weighted": 0.9007
+      }
+    }
+  },
+  "current_stage": "compare_done",
+  "next_action": "run_feature_engineering",
+  "run_dir": "C:\\Projects\\multi-agent-data-science\\artifacts\\workspace\\2026-05-08-23-43",
+  "best_model": {
+    "model_name": "XGBoost",
+    "model_path": "C:\\Projects\\multi-agent-data-science\\artifacts\\workspace\\2026-05-08-23-43\\models\\XGBoost_model.pkl",
+    "metrics": {
+      "accuracy": 0.9057,
+      "f1_macro": 0.7481,
+      "f1_weighted": 0.9007
+    },
+    "task_type": "classification"
+  }
+}
