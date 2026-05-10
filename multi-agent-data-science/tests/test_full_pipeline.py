@@ -17,6 +17,7 @@ from core.dataset_split import split_dataset_node
 from core.env_utils import DEEPSEEK_API_KEY
 from core.graph import (
     _route_after_agent_manager,
+    _route_after_compare,
     _route_after_data_clean,
     build_full_pipeline,
 )
@@ -34,13 +35,30 @@ SAMPLE_DESCRIPTION = (
 def test_pipeline_graph_contains_all_nodes():
     pipeline = build_full_pipeline(show_graph=False)
     graph = pipeline.get_graph()
-    for node in ["init_run", "agent_manager", "data_clean_agent", "split", "eda_agent", "feature_agent", "model_agent", "compare"]:
+    for node in [
+        "init_run",
+        "agent_manager",
+        "data_clean_agent",
+        "split",
+        "eda_agent",
+        "feature_agent",
+        "model_agent",
+        "compare",
+        "business_translator",
+    ]:
         assert node in graph.nodes
 
     edges = {(edge.source, edge.target) for edge in graph.edges}
     assert ("__start__", "init_run") in edges
     assert ("init_run", "agent_manager") in edges
-    assert ("split", "__end__") in edges
+
+
+def test_route_compare_to_business_translator_when_best_model():
+    assert _route_after_compare({"best_model": {"model_name": "X"}}) == "business_translator"
+
+
+def test_route_compare_to_end_without_best_model():
+    assert _route_after_compare({}) == END
 
 
 # ── 路由：Manager → Data Clean ───────────────────────────────────────────────
