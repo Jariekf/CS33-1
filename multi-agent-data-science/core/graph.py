@@ -20,8 +20,8 @@ from agent.data_clean_agent import build_data_clean_agent
 from agent.eda_agent import build_eda_agent
 from agent.feature_agent import build_feature_agent, _get_current_model
 from agent.model_agent import build_model_agent, _get_current_model as _get_current_model_for_eval
+from agent.split_agent import build_split_agent
 from core.compare_node import compare_models_node
-from core.dataset_split import split_dataset_node
 from core.global_state import GlobalState
 
 
@@ -29,34 +29,20 @@ def _init_run_node(state: GlobalState) -> GlobalState:
     ts = datetime.now().strftime("%Y-%m-%d-%H-%M")
     run_dir = PROJECT_ROOT / "artifacts" / "workspace" / ts
     run_dir.mkdir(parents=True, exist_ok=True)
-    print(f"[init_run] 本次运行目录：{run_dir}")
-    return {"run_dir": str(run_dir)}
+    is_split = bool(
+        (state.get("training_data_path") or "").strip()
+        and (state.get("testing_data_path") or "").strip()
+    )
+    print(f"[init_run] 本次运行目录：{run_dir}  is_split={is_split}")
+    return {"run_dir": str(run_dir), "is_split": is_split}
 
 
-def _route_after_agent_manager(state: GlobalState) -> str:
-    """Manager 结束后：若已生成清洗计划且约定下一步为清洗，则进入 Data Clean。"""
-    plan = state.get("cleaning_plan")
-    if (
-        state.get("next_action") == "run_data_cleaning"
-        and isinstance(plan, dict)
-        and bool(plan)
-    ):
-        return "data_clean_agent"
-    return END
 
-
-def _route_after_data_clean(state: GlobalState) -> str:
-    """Data Clean 结束后：清洗通过则进入 split，否则结束。"""
-    if state.get("cleaning_passed"):
-        return "split"
-    return END
-
-
-def _route_after_split(state: GlobalState) -> str:
-    """Split 结束后：成功则进入 EDA，否则结束。"""
-    if state.get("current_stage") == "split_done":
-        return "eda_agent"
-    return END
+def _route_after_init(state: GlobalState) -> str:
+    """已传入 train/test 路径则跳过切分，直接进 agent_manager。"""
+    if state.get("is_split"):
+        return "agent_manager"
+    return "split_agent"
 
 
 def _route_after_eda(state: GlobalState) -> str:
@@ -90,12 +76,14 @@ def _route_after_compare(state: GlobalState) -> str:
 def _show_graph_if_needed(compiled, show_graph: bool) -> None:
     if not show_graph:
         return
+    output_dir = PROJECT_ROOT / "artifacts" / "graphs"
+    output_dir.mkdir(parents=True, exist_ok=True)
+    mmd_path = output_dir / "full_pipeline.mmd"
+    mmd_path.write_text(compiled.get_graph().draw_mermaid(), encoding="utf-8")
+    print(f"Pipeline Mermaid 源码已保存: {mmd_path}  (可粘贴到 https://mermaid.live 查看)")
     try:
-        output_dir = PROJECT_ROOT / "artifacts"
-        output_dir.mkdir(parents=True, exist_ok=True)
         image_path = output_dir / "full_pipeline.png"
-        image_bytes = compiled.get_graph().draw_mermaid_png()
-        image_path.write_bytes(image_bytes)
+        image_path.write_bytes(compiled.get_graph().draw_mermaid_png())
         print(f"Pipeline Graph 图片已保存: {image_path}")
         try:
             from IPython.display import Image, display
@@ -106,9 +94,19 @@ def _show_graph_if_needed(compiled, show_graph: bool) -> None:
         print(f"图渲染失败: {exc}")
 
 
+def _set_clean_train(state: GlobalState) -> GlobalState:
+    return {"cleaning_target": "train", "dataset_id": ""}
+
+
+def _set_clean_test(state: GlobalState) -> GlobalState:
+    return {"cleaning_target": "test", "dataset_id": ""}
+
+
 def build_full_pipeline(show_graph: bool = False):
+    split_graph = build_split_agent(show_graph=False)
     manager_graph = build_agent_manager(show_graph=False)
-    clean_graph = build_data_clean_agent(show_graph=False)
+    clean_train_graph = build_data_clean_agent(show_graph=False)
+    clean_test_graph = build_data_clean_agent(show_graph=False)
     eda_graph = build_eda_agent(show_graph=False)
     feature_graph = build_feature_agent(show_graph=False)
     model_graph = build_model_agent(show_graph=False)
@@ -116,39 +114,29 @@ def build_full_pipeline(show_graph: bool = False):
 
     graph = StateGraph(GlobalState)
     graph.add_node("init_run", _init_run_node)
+    graph.add_node("split_agent", split_graph)
     graph.add_node("agent_manager", manager_graph)
-    graph.add_node("data_clean_agent", clean_graph)
-    graph.add_node("split", split_dataset_node)
+    graph.add_node("set_clean_train", _set_clean_train)
+    graph.add_node("data_clean_train", clean_train_graph)
+    graph.add_node("set_clean_test", _set_clean_test)
+    graph.add_node("data_clean_test", clean_test_graph)
     graph.add_node("eda_agent", eda_graph)
     graph.add_node("feature_agent", feature_graph)
     graph.add_node("model_agent", model_graph)
     graph.add_node("compare", compare_models_node)
     graph.add_node("business_translator", business_translator_graph)
     graph.set_entry_point("init_run")
-    graph.add_edge("init_run", "agent_manager")
-    # graph.add_conditional_edges(
-    #     "agent_manager",
-    #     _route_after_agent_manager,
-    #     {"data_clean_agent": "data_clean_agent", END: END},
-    # )
-    # graph.add_conditional_edges(
-    #     "data_clean_agent",
-    #     _route_after_data_clean,
-    #     {"split": "split", END: END},
-    # )
-    # graph.add_conditional_edges(
-    #     "split",
-    #     _route_after_split,
-    #     {"eda_agent": "eda_agent", END: END},
-    # )
-    # graph.add_conditional_edges(
-    #     "eda_agent",
-    #     _route_after_eda,
-    #     {"feature_agent": "feature_agent", END: END},
-    # )
-    graph.add_edge("agent_manager", "data_clean_agent")
-    graph.add_edge("data_clean_agent", "split")
-    graph.add_edge("split", "eda_agent")
+    graph.add_conditional_edges(
+        "init_run",
+        _route_after_init,
+        {"split_agent": "split_agent", "agent_manager": "agent_manager"},
+    )
+    graph.add_edge("split_agent", "agent_manager")
+    graph.add_edge("agent_manager", "set_clean_train")
+    graph.add_edge("set_clean_train", "data_clean_train")
+    graph.add_edge("data_clean_train", "set_clean_test")
+    graph.add_edge("set_clean_test", "data_clean_test")
+    graph.add_edge("data_clean_test", "eda_agent")
     graph.add_edge("eda_agent", "feature_agent")
 
     graph.add_conditional_edges(

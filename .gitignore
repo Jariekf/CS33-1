@@ -21,7 +21,7 @@ Thumbs.db
 .idea/
 
 # 每次运行的中间产物
-multi-agent-data-science/artifacts/workspace/
+multi-agent-data-science/artifacts/
 # multi-agent-data-science/artifacts/chroma_rag/  # 已提交，供他人直接使用
 multi-agent-data-science/artifacts/features/
 multi-agent-data-science/artifacts/reports/*_state.json

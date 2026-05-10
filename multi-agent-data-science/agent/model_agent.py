@@ -223,8 +223,11 @@ def _show_graph_if_needed(agent_graph, show_graph: bool) -> None:
     if not show_graph:
         return
     try:
-        output_dir = PROJECT_ROOT / "artifacts"
+        output_dir = PROJECT_ROOT / "artifacts" / "graphs"
         output_dir.mkdir(parents=True, exist_ok=True)
+        mmd_path = output_dir / "model_agent_graph.mmd"
+        mmd_path.write_text(agent_graph.get_graph().draw_mermaid(), encoding="utf-8")
+        print(f"Mermaid 源码已保存: {mmd_path}")
         image_path = output_dir / "model_agent_graph.png"
         image_bytes = agent_graph.get_graph().draw_mermaid_png()
         image_path.write_bytes(image_bytes)
