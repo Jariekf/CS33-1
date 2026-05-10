@@ -82,3 +82,15 @@ llm_kimi = ChatOpenAI(
     api_key=KIMI_API_KEY,
     base_url=KIMI_BASEURL,
 )
+
+
+def call_llm(system_prompt: str, user_prompt: str, agent_name: str = "") -> str:
+    """单次 Chat 调用（与 CS33-automl ``call_llm`` 对齐），供 BAT 等节点使用。"""
+    from langchain_core.messages import HumanMessage, SystemMessage
+
+    _ = agent_name  # reserved for tracing / logging
+    msg = llm_deepseek.invoke(
+        [SystemMessage(content=system_prompt), HumanMessage(content=user_prompt)]
+    )
+    content = getattr(msg, "content", None)
+    return str(content) if content is not None else ""

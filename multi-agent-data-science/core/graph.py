@@ -15,6 +15,7 @@ from langchain_core.messages import HumanMessage
 from langgraph.graph import END, StateGraph
 
 from agent.agent_manager import _pretty_print_message, build_agent_manager
+from agent.business_translator_agent import build_business_translator_agent
 from agent.data_clean_agent import build_data_clean_agent
 from agent.eda_agent import build_eda_agent
 from agent.feature_agent import build_feature_agent, _get_current_model
@@ -79,6 +80,13 @@ def _route_after_model(state: GlobalState) -> str:
     return "compare"
 
 
+def _route_after_compare(state: GlobalState) -> str:
+    """Compare 结束后：仅有最优模型时才生成业务报告。"""
+    if state.get("best_model"):
+        return "business_translator"
+    return END
+
+
 def _show_graph_if_needed(compiled, show_graph: bool) -> None:
     if not show_graph:
         return
@@ -104,6 +112,7 @@ def build_full_pipeline(show_graph: bool = False):
     eda_graph = build_eda_agent(show_graph=False)
     feature_graph = build_feature_agent(show_graph=False)
     model_graph = build_model_agent(show_graph=False)
+    business_translator_graph = build_business_translator_agent(show_graph=False)
 
     graph = StateGraph(GlobalState)
     graph.add_node("init_run", _init_run_node)
@@ -114,6 +123,7 @@ def build_full_pipeline(show_graph: bool = False):
     graph.add_node("feature_agent", feature_graph)
     graph.add_node("model_agent", model_graph)
     graph.add_node("compare", compare_models_node)
+    graph.add_node("business_translator", business_translator_graph)
     graph.set_entry_point("init_run")
     graph.add_edge("init_run", "agent_manager")
     graph.add_conditional_edges(
@@ -146,7 +156,12 @@ def build_full_pipeline(show_graph: bool = False):
         _route_after_model,
         {"model_agent": "model_agent", "compare": "compare"},
     )
-    graph.add_edge("compare", END)
+    graph.add_conditional_edges(
+        "compare",
+        _route_after_compare,
+        {"business_translator": "business_translator", END: END},
+    )
+    graph.add_edge("business_translator", END)
     compiled = graph.compile()
     _show_graph_if_needed(compiled, show_graph=show_graph)
     return compiled

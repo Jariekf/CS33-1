@@ -22,7 +22,17 @@ Thumbs.db
 
 # 每次运行的中间产物
 multi-agent-data-science/artifacts/workspace/
+# multi-agent-data-science/artifacts/chroma_rag/  # 已提交，供他人直接使用
+multi-agent-data-science/artifacts/features/
+multi-agent-data-science/artifacts/reports/*_state.json
 CS33-automl/workspace/
+
+# 大型二进制 / PDF 源文件（通过 manifest 重建即可）
+multi-agent-data-science/data/mckinsey_kb/source_pdf/*.pdf
+
+# pytest 缓存
+.pytest_cache/
+**/.pytest_cache/
 
 # 项目内部开发说明（不对外暴露）
 CLAUDE.md

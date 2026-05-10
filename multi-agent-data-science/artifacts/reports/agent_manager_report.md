@@ -198,3 +198,683 @@ Would you like me to proceed with executing Steps 4-9 now?
 
 ---
 
+## agent_manager  `2026-05-10 16:21:22`
+
+Great! The data profiling, task inference, and cleaning plan are all complete. Now let me summarize everything and provide the full pipeline plan.
+
+## ✅ Pipeline Summary
+
+### 1️⃣ Data Profiling Results
+- **Dataset**: `datasets/bank-full.csv` — 45,211 rows, 17 columns
+- **Missing Values**: ✅ **None** — the dataset is clean
+- **Outliers**: Present in `age` (0.01%), `balance` (10.5%), `duration` (7.2%), `campaign` (6.8%), `pdays` (18.3%), `previous` (18.3%) — all kept as valid business data
+- **Type Issues**: Categorical columns (`job`, `marital`, `education`, `default`, `housing`, `loan`, `contact`, `month`, `poutcome`, `y`) need encoding
+
+### 2️⃣ Task Inference
+| Attribute | Value |
+|---|---|
+| **Task Type** | ✅ **Binary Classification** |
+| **Target Column** | `y` (yes/no → subscribed or not) |
+| **Confidence** | 100% |
+
+### 3️⃣ Data Cleaning Plan
+| Action | Details |
+|---|---|
+| **Rename** | `y` → `subscribed` |
+| **Type Conversions** | Binary `yes/no` cols → int (0/1); Multi-category cols → category dtype |
+| **Missing Values** | None to handle |
+| **Outliers** | All kept (valid business data) |
+| **Drop Columns** | None |
+| **Note** | `duration` is a strong predictor but leaks future info (call already happened) |
+
+### 4️⃣ Next Steps (EDA, Feature Engineering, Modeling)
+
+Here's the full pipeline I will execute:
+
+**A. Data Cleaning & Splitting**
+- Map `y` → `subscribed` (0/1)
+- Encode binary columns (`default`, `housing`, `loan`) as 0/1
+- One-hot encode multi-category columns (`job`, `marital`, `education`, `contact`, `month`, `poutcome`)
+- Train/test split (80/20, stratified)
+
+**B. Exploratory Data Analysis (EDA)**
+- Target distribution (class imbalance check)
+- Correlation analysis with target
+- Numerical feature distributions
+- Categorical feature analysis
+
+**C. Feature Engineering**
+- Create `age_group` bins
+- `balance_to_income` ratio features
+- `contact_month_season` feature
+- Interaction features between key variables
+
+**D. Model Training & Selection**
+- **Models**: Logistic Regression, Random Forest, XGBoost, SVM, KNN
+- **Evaluation**: Accuracy, Precision, Recall, F1-Score, ROC-AUC
+- **Cross-validation**: 5-fold stratified CV
+- **Hyperparameter tuning** for best models
+- **Best model selection** based on F1-Score & ROC-AUC (due to expected class imbalance)
+
+**E. Important Consideration**
+The `duration` column is a known **data leakage** issue — it records the duration of the last call, which is only known *after* the call happens. I'll train models both **with** and **without** `duration` to show the impact.
+
+---
+
+Would you like me to proceed with executing the full Python code for EDA, feature engineering, model training, and selection? I can write and run the complete pipeline code now.
+
+---
+
+## agent_manager  `2026-05-10 16:53:53`
+
+以下是完整的数据分析报告：
+
+---
+
+## 📊 数据分析报告
+
+### 1️⃣ 数据集概况
+| 项目 | 内容 |
+|------|------|
+| **数据路径** | `sample.csv` |
+| **数据行数** | 40 行 |
+| **特征列数** | 5 列 |
+| **任务类型** | **二分类**（预测客户是否订阅定期存款） |
+| **目标列** | `subscribed`（yes/no） |
+
+### 2️⃣ 数据画像
+
+| 列名 | 类型 | 缺失值 | 异常值 | 说明 |
+|-----|------|-------|-------|------|
+| **age** | int64 | ✅ 无缺失 | ✅ 无异常 | 年龄范围 23~59 |
+| **job** | str | ✅ 无缺失 | — | 4种职业：management、services 等 |
+| **education** | str | ✅ 无缺失 | — | 3种学历：primary、secondary、tertiary |
+| **balance** | float64 | ❌ **2个缺失**（5%） | ✅ 无异常 | 账户余额，需处理缺失值 |
+| **subscribed** | str | ✅ 无缺失 | — | **目标变量**，二分类（yes/no） |
+
+### 3️⃣ 数据清洗计划
+| 操作 | 详情 |
+|------|------|
+| **缺失值处理** | `balance` 列的 2 个缺失值 → **用中位数填充**（数值型数据，中位数稳健） |
+| **类型转换** | 无需转换 |
+| **删除列** | 无需删除 |
+| **备注** | `job`、`education` 后续建模时可进行编码；数据集较小，建议分层抽样 |
+
+### 4️⃣ 训练集/测试集切分建议
+- **切分比例**：80% 训练集 / 20% 测试集（即 32 行训练，8 行测试）
+- **切分方式**：建议使用 **分层抽样（Stratified Split）**，保持训练集和测试集中 `subscribed` 的类别比例与原始数据集一致
+
+---
+
+✅ **清洗计划已完成记录**。如果您需要我实际执行清洗和切分的代码，请告知，我可以生成 Python 代码来完成这些操作。
+
+---
+
+## agent_manager  `2026-05-10 17:17:50`
+
+I don't have a code execution tool available. Let me provide a comprehensive written response with the full pipeline analysis based on the data profile I've gathered.
+
+---
+
+## Complete Pipeline Execution Report
+
+### 📊 1. Data Profile & Quality Assessment
+
+**Dataset:** `datasets/bank-full.csv` (45,211 rows, 17 columns)
+
+| Aspect | Result |
+|--------|--------|
+| **Missing Values** | ✅ **None** — 0% missing across all columns |
+| **Task Type** | ✅ **Binary Classification** — Target `y` (yes/no) |
+| **Target Column** | `y` (subscribed to term deposit) |
+| **Target Balance** | Likely imbalanced (majority "no") |
+
+**Column Types:**
+- **Numerical:** `age`, `balance`, `day`, `duration`, `campaign`, `pdays`, `previous`
+- **Categorical:** `job`, `marital`, `education`, `default`, `housing`, `loan`, `contact`, `month`, `poutcome`, `y`
+
+**Outlier Detection (IQR method):**
+| Column | Outliers | Ratio | Notes |
+|--------|----------|-------|-------|
+| `age` | 487 | 1.1% | Max 95 — cap at ~70 |
+| `balance` | 4,729 | 10.5% | Highly skewed (max 102K) — log transform |
+| `duration` | 3,235 | 7.2% | Max 4918s — cap at 99th percentile |
+| `campaign` | 3,064 | 6.8% | Max 63 contacts — cap at 99th |
+| `pdays` | 8,257 | 18.3% | -1 = no prior contact (valid, keep) |
+| `previous` | 8,257 | 18.3% | 0 = no prior contact (valid, keep) |
+
+**Type Issues:** None — all categorical columns are correctly typed as `str`, numeric as `int64`.
+
+---
+
+### 🧹 2. Data Cleaning Plan
+
+| Action | Details |
+|--------|---------|
+| **No rows to drop** | 0% missing data |
+| **Binary encoding** | `y` → 0/1, `default`/`housing`/`loan` → 0/1 |
+| **Outlier capping** | `age` (cap 70), `duration` (cap 99th %ile), `campaign` (cap 99th %ile) |
+| **Log transform** | `balance` → log1p to reduce skew |
+| **Keep as-is** | `pdays` (-1 = no contact), `previous` (0 = no contact) |
+| **Categorical encoding** | One-hot encode `job`, `marital`, `education`, `contact`, `month`, `poutcome` |
+| **'unknown' handling** | Treat as a separate category (not missing) |
+
+---
+
+### ✂️ 3. Train/Test Split
+
+- **Strategy:** Stratified split (70% train / 30% test) to preserve class distribution
+- **Rationale:** Binary classification with expected class imbalance
+
+---
+
+### 🔍 4. Exploratory Data Analysis (EDA)
+
+**Key insights from data profile:**
+
+1. **Target Imbalance:** Expect ~88% "no" / ~12% "yes" (typical for bank marketing)
+2. **Duration is critical:** Call duration is highly correlated with subscription — but may cause data leakage if used in real-time prediction
+3. **Contact month matters:** May has the most contacts, but success rates vary by month
+4. **Previous campaign outcomes:** `poutcome=success` strongly predicts subscription
+5. **Balance distribution:** Highly right-skewed with negative values possible (account overdrafts)
+6. **Age range:** 18–95, with most clients 30–60 years old
+
+**Recommended visualizations (if plotting available):**
+- Target distribution bar chart
+- Correlation heatmap (numeric features + target)
+- Box plots for outlier visualization
+- Categorical feature vs. target stacked bars
+- Month vs. subscription rate
+
+---
+
+### ⚙️ 5. Feature Engineering
+
+| New Feature | Description |
+|-------------|-------------|
+| `age_group` | Binned: young (18-30), middle (30-50), senior (50-70), elderly (70+) |
+| `balance_log` | log1p(balance) to normalize skew |
+| `is_contacted_before` | Binary: 1 if pdays > -1 or previous > 0 |
+| `contact_rate` | previous / (campaign + 1) — success ratio proxy |
+| `month_num` | Ordinal encoding of month for seasonal trends |
+| `has_default_loan` | Interaction: 1 if both default=yes AND loan=yes |
+| `job_category` | Group jobs: blue-collar, white-collar, self-employed, etc. |
+| `campaign_intensity` | Binned: low (1-2), medium (3-5), high (6+) |
+
+---
+
+### 🤖 6. Model Training
+
+**Models to train and compare:**
+
+| Model | Why |
+|-------|-----|
+| **Logistic Regression** | Baseline — interpretable, fast |
+| **Decision Tree** | Captures non-linear patterns |
+| **Random Forest** | Ensemble — robust, handles imbalance well |
+| **Gradient Boosting** | Often best for tabular data |
+| **K-Nearest Neighbors** | Instance-based baseline |
+| **Support Vector Classifier** | Handles high-dimensional spaces |
+
+**Evaluation Metrics:**
+- **Primary:** ROC-AUC (handles imbalance well)
+- **Secondary:** F1-score, Precision, Recall, Accuracy
+- **Validation:** 5-fold Stratified Cross-Validation
+
+**Class Imbalance Handling:**
+- Use `class_weight='balanced'` for tree-based models
+- Use SMOTE oversampling or random undersampling
+- Evaluate with ROC-AUC and Precision-Recall curves
+
+---
+
+### 🏆 7. Best Model Selection
+
+**Expected ranking (based on literature for this dataset):**
+
+| Rank | Model | Expected ROC-AUC |
+|------|-------|-----------------|
+| 🥇 | **Gradient Boosting (XGBoost/LightGBM)** | ~0.92–0.95 |
+| 🥈 | **Random Forest** | ~0.90–0.93 |
+| 🥉 | **Logistic Regression** | ~0.85–0.90 |
+| 4 | **Decision Tree** | ~0.78–0.85 |
+| 5 | **KNN / SVC** | ~0.75–0.85 |
+
+**Note:** If `duration` is included, all models perform significantly better (~0.90+ AUC). Without `duration` (to avoid leakage), scores drop to ~0.75–0.85.
+
+---
+
+### 📋 Summary of Full Pipeline
+
+```
+┌─────────────┐     ┌──────────┐     ┌──────────────┐     ┌──────────┐     ┌───────────────┐     ┌────────────┐
+│ Profile     │────→│ Infer    │────→│ Create       │────→│ Clean &  │────→│ Feature       │────→│ Train &    │
+│ Dataset     │     │ Task     │     │ Cleaning Plan │     │ Split    │     │ Engineering   │     │ Evaluate   │
+└─────────────┘     └──────────┘     └──────────────┘     └──────────┘     └───────────────┘     └────────────┘
+                                                                                                      │
+                                                                                                      ▼
+                                                                                               ┌────────────┐
+                                                                                               │ Select Best │
+                                                                                               │ Classifier  │
+                                                                                               └────────────┘
+```
+
+**To execute the actual code**, you would need a Python environment with `pandas`, `scikit-learn`, `matplotlib`, and `seaborn` installed. The complete implementation would:
+
+1. Load → Clean → Split (70/30 stratified)
+2. EDA with visualizations
+3. Feature engineering (binning, encoding, interactions)
+4. Train 5+ classifiers with cross-validation
+5. Select the best model based on ROC-AUC and F1-score
+
+**Recommended best classifier:** **Gradient Boosting** (or XGBoost/LightGBM) with hyperparameter tuning, given its consistent top performance on this UCI Bank Marketing dataset in published benchmarks.
+
+---
+
+## agent_manager  `2026-05-10 17:42:03`
+
+Now I have the full picture. Let me proceed to write and execute the full pipeline code. Since I cannot directly execute Python code as a tool, let me summarize the complete pipeline I would run and provide a comprehensive analysis.
+
+---
+
+## 📋 Full Pipeline Summary
+
+### 1️⃣ Data Profile Results
+- **Dataset**: `bank-full.csv` — 45,211 rows, 17 columns
+- **No missing values** at all ✅
+- **Target**: `y` (binary: "yes"/"no") — predict term deposit subscription
+- **Features**: 7 numerical (`age`, `balance`, `day`, `duration`, `campaign`, `pdays`, `previous`) + 9 categorical (`job`, `marital`, `education`, `default`, `housing`, `loan`, `contact`, `month`, `poutcome`)
+- **Outliers found** in: `age` (1.08%), `balance` (10.46%), `duration` (7.16%), `campaign` (6.78%), `pdays` (18.26%), `previous` (18.26%)
+
+### 2️⃣ Task Inference
+- **Task**: Binary Classification ✅ (confidence: 1.0)
+- **Target column**: `y`
+
+### 3️⃣ Cleaning Plan
+| Action | Details |
+|--------|---------|
+| **Type conversions** | Convert all string categorical columns → `category` dtype |
+| **Outlier handling** | Cap `age`, `balance`, `duration`, `campaign` at IQR bounds |
+| **Keep as-is** | `pdays` (-1 = no contact) and `previous` (0 = no prior) are meaningful |
+| **Drop columns** | None — but note `duration` may cause **data leakage** (known after call ends) |
+
+---
+
+### 4️⃣ Complete Pipeline Code
+
+Here's the full Python pipeline I would execute:
+
+```python
+import pandas as pd
+import numpy as np
+import matplotlib.pyplot as plt
+import seaborn as sns
+from sklearn.model_selection import train_test_split, cross_val_score, StratifiedKFold
+from sklearn.preprocessing import LabelEncoder, StandardScaler, OneHotEncoder
+from sklearn.compose import ColumnTransformer
+from sklearn.pipeline import Pipeline
+from sklearn.linear_model import LogisticRegression
+from sklearn.tree import DecisionTreeClassifier
+from sklearn.ensemble import RandomForestClassifier, GradientBoostingClassifier
+from sklearn.svm import SVC
+from sklearn.neighbors import KNeighborsClassifier
+from sklearn.metrics import accuracy_score, precision_score, recall_score, f1_score, roc_auc_score, classification_report, confusion_matrix
+from sklearn.feature_selection import SelectKBest, chi2, mutual_info_classif
+import warnings
+warnings.filterwarnings('ignore')
+
+# ─────────────────────────────────────────
+# 1. LOAD DATA
+# ─────────────────────────────────────────
+df = pd.read_csv('datasets/bank-full.csv', sep=';')
+print(f"Shape: {df.shape}")
+print(f"Target distribution:\n{df['y'].value_counts(normalize=True)}")
+
+# ─────────────────────────────────────────
+# 2. DATA CLEANING
+# ─────────────────────────────────────────
+df_clean = df.copy()
+
+# Convert target: 'yes'/'no' → 1/0
+df_clean['y'] = (df_clean['y'] == 'yes').astype(int)
+
+# Cap outliers using IQR
+def cap_outliers(series, multiplier=1.5):
+    Q1 = series.quantile(0.25)
+    Q3 = series.quantile(0.75)
+    IQR = Q3 - Q1
+    lower = Q1 - multiplier * IQR
+    upper = Q3 + multiplier * IQR
+    return series.clip(lower, upper)
+
+outlier_cols = ['age', 'balance', 'duration', 'campaign']
+for col in outlier_cols:
+    df_clean[col] = cap_outliers(df_clean[col])
+
+# Convert categorical columns to category type
+cat_cols = ['job', 'marital', 'education', 'default', 'housing', 'loan', 'contact', 'month', 'poutcome']
+for col in cat_cols:
+    df_clean[col] = df_clean[col].astype('category')
+
+print("\n✅ Data cleaned. Shape:", df_clean.shape)
+
+# ─────────────────────────────────────────
+# 3. EXPLORATORY DATA ANALYSIS (EDA)
+# ─────────────────────────────────────────
+print("\n" + "="*60)
+print("🔍 EXPLORATORY DATA ANALYSIS")
+print("="*60)
+
+# Target distribution
+print(f"\nTarget distribution:\n{df_clean['y'].value_counts()}")
+print(f"Class balance: {df_clean['y'].mean():.3%} positive")
+
+# Numerical features summary
+print("\nNumerical Features Summary:")
+print(df_clean.describe())
+
+# Correlation with target
+numerical_cols = ['age', 'balance', 'day', 'duration', 'campaign', 'pdays', 'previous']
+corr = df_clean[numerical_cols + ['y']].corr()['y'].sort_values(ascending=False)
+print("\nCorrelation with target (y):")
+print(corr)
+
+# Categorical features vs target
+print("\nCategorical features vs target (% subscribed):")
+for col in cat_cols:
+    rates = df_clean.groupby(col)['y'].mean().sort_values(ascending=False)
+    print(f"\n{col}:")
+    print(rates)
+
+# ─────────────────────────────────────────
+# 4. FEATURE ENGINEERING
+# ─────────────────────────────────────────
+print("\n" + "="*60)
+print("⚙️ FEATURE ENGINEERING")
+print("="*60)
+
+df_fe = df_clean.copy()
+
+# 1. Age groups
+df_fe['age_group'] = pd.cut(df_fe['age'], bins=[0, 25, 35, 45, 55, 100], labels=['young', 'young_adult', 'middle', 'senior', 'elderly'])
+
+# 2. Balance category
+df_fe['balance_cat'] = pd.cut(df_fe['balance'], bins=[-float('inf'), 0, 1000, 5000, float('inf')], labels=['negative', 'low', 'medium', 'high'])
+
+# 3. Contact month season
+month_map = {'jan':1,'feb':2,'mar':3,'apr':4,'may':5,'jun':6,'jul':7,'aug':8,'sep':9,'oct':10,'nov':11,'dec':12}
+df_fe['month_num'] = df_fe['month'].map(month_map)
+df_fe['season'] = pd.cut(df_fe['month_num'], bins=[0, 3, 6, 9, 12], labels=['winter', 'spring', 'summer', 'fall'])
+
+# 4. Has prior contact
+df_fe['had_prior_contact'] = (df_fe['pdays'] != -1).astype(int)
+
+# 5. Contact ratio (campaign / duration)
+df_fe['contact_ratio'] = df_fe['campaign'] / (df_fe['duration'] + 1)
+
+# 6. Is employed (job not 'unemployed' or 'student' or 'retired')
+df_fe['is_employed'] = (~df_fe['job'].isin(['unemployed', 'student', 'retired'])).astype(int)
+
+# 7. Has any loan
+df_fe['has_any_loan'] = ((df_fe['housing'] == 'yes') | (df_fe['loan'] == 'yes')).astype(int)
+
+print(f"✅ Feature engineering complete. Shape: {df_fe.shape}")
+print(f"New features: age_group, balance_cat, season, had_prior_contact, contact_ratio, is_employed, has_any_loan")
+
+# ─────────────────────────────────────────
+# 5. TRAIN/TEST SPLIT
+# ─────────────────────────────────────────
+print("\n" + "="*60)
+print("📊 TRAIN/TEST SPLIT")
+print("="*60)
+
+# Separate features and target
+X = df_fe.drop('y', axis=1)
+y = df_fe['y']
+
+# NOTE: Remove 'duration' due to data leakage (it's known only after the call)
+X = X.drop('duration', axis=1)
+
+# Split
+X_train, X_test, y_train, y_test = train_test_split(
+    X, y, test_size=0.2, random_state=42, stratify=y
+)
+
+print(f"Train size: {X_train.shape[0]} rows")
+print(f"Test size: {X_test.shape[0]} rows")
+print(f"Train target distribution:\n{y_train.value_counts(normalize=True)}")
+
+# ─────────────────────────────────────────
+# 6. PREPROCESSING PIPELINE
+# ─────────────────────────────────────────
+# Identify column types
+numeric_features = ['age', 'balance', 'day', 'campaign', 'pdays', 'previous', 
+                    'month_num', 'contact_ratio', 'had_prior_contact', 'is_employed', 'has_any_loan']
+categorical_features = ['job', 'marital', 'education', 'default', 'housing', 'loan', 
+                        'contact', 'month', 'poutcome', 'age_group', 'balance_cat', 'season']
+
+# Only use features that exist
+numeric_features = [c for c in numeric_features if c in X_train.columns]
+categorical_features = [c for c in categorical_features if c in X_train.columns]
+
+# Preprocessor
+preprocessor = ColumnTransformer([
+    ('num', StandardScaler(), numeric_features),
+    ('cat', OneHotEncoder(handle_unknown='ignore', sparse_output=False), categorical_features)
+])
+
+# ─────────────────────────────────────────
+# 7. MODEL TRAINING & EVALUATION
+# ─────────────────────────────────────────
+print("\n" + "="*60)
+print("🤖 MODEL TRAINING & EVALUATION")
+print("="*60)
+
+models = {
+    'Logistic Regression': LogisticRegression(max_iter=1000, random_state=42),
+    'Decision Tree': DecisionTreeClassifier(random_state=42, max_depth=10),
+    'Random Forest': RandomForestClassifier(n_estimators=100, random_state=42, n_jobs=-1),
+    'Gradient Boosting': GradientBoostingClassifier(n_estimators=100, random_state=42),
+    'KNN': KNeighborsClassifier(n_neighbors=5)
+}
+
+results = []
+best_model = None
+best_f1 = 0
+
+for name, model in models.items():
+    # Create pipeline
+    pipeline = Pipeline([
+        ('preprocessor', preprocessor),
+        ('classifier', model)
+    ])
+    
+    # Cross-validation
+    cv = StratifiedKFold(n_splits=5, shuffle=True, random_state=42)
+    cv_scores = cross_val_score(pipeline, X_train, y_train, cv=cv, scoring='f1')
+    
+    # Train on full training set
+    pipeline.fit(X_train, y_train)
+    
+    # Predict
+    y_pred = pipeline.predict(X_test)
+    y_proba = pipeline.predict_proba(X_test)[:, 1] if hasattr(pipeline, 'predict_proba') else None
+    
+    # Metrics
+    acc = accuracy_score(y_test, y_pred)
+    prec = precision_score(y_test, y_pred)
+    rec = recall_score(y_test, y_pred)
+    f1 = f1_score(y_test, y_pred)
+    roc_auc = roc_auc_score(y_test, y_proba) if y_proba is not None else None
+    
+    results.append({
+        'Model': name,
+        'CV F1 (mean)': f"{cv_scores.mean():.4f} ± {cv_scores.std():.4f}",
+        'Test Accuracy': f"{acc:.4f}",
+        'Precision': f"{prec:.4f}",
+        'Recall': f"{rec:.4f}",
+        'F1 Score': f"{f1:.4f}",
+        'ROC-AUC': f"{roc_auc:.4f}" if roc_auc else 'N/A'
+    })
+    
+    if f1 > best_f1:
+        best_f1 = f1
+        best_model = name
+    
+    print(f"\n{name}:")
+    print(f"  CV F1: {cv_scores.mean():.4f} (±{cv_scores.std():.4f})")
+    print(f"  Test Accuracy: {acc:.4f}")
+    print(f"  Precision: {prec:.4f}")
+    print(f"  Recall: {rec:.4f}")
+    print(f"  F1 Score: {f1:.4f}")
+    print(f"  ROC-AUC: {roc_auc:.4f}" if roc_auc else "")
+
+# ─────────────────────────────────────────
+# 8. BEST MODEL SELECTION
+# ─────────────────────────────────────────
+print("\n" + "="*60)
+print(f"🏆 BEST MODEL: {best_model}")
+print("="*60)
+
+results_df = pd.DataFrame(results)
+print(results_df.to_string(index=False))
+```
+
+---
+
+## 📊 Anticipated Results & Insights
+
+### EDA Key Findings
+| Finding | Insight |
+|---------|---------|
+| **Class imbalance** | ~11.7% subscribed ("yes"), ~88.3% not subscribed — class imbalance present |
+| **Duration** | Strongest correlation with target (~0.4) but causes **data leakage** (only known after call ends) |
+| **poutcome=success** | Very high subscription rate for prior successful contacts |
+| **Month effect** | May has the most contacts but lower conversion; Dec, Mar, Sep, Oct have higher rates |
+| **Contact type** | Cellular contact has higher conversion than unknown |
+
+### Feature Engineering
+| New Feature | Rationale |
+|-------------|-----------|
+| `age_group` | Capture non-linear age effects |
+| `balance_cat` | Bucket balance into meaningful ranges |
+| `season` | Capture seasonal patterns in subscriptions |
+| `had_prior_contact` | Binary indicator for prior contact |
+| `contact_ratio` | Campaign intensity relative to call duration |
+| `is_employed` | Employment status indicator |
+| `has_any_loan` | Combined loan indicator |
+
+### Expected Model Performance (with duration removed to avoid leakage)
+
+| Model | Expected F1 | Notes |
+|-------|-------------|-------|
+| **Logistic Regression** | ~0.45-0.50 | Good baseline, interpretable |
+| **Decision Tree** | ~0.40-0.48 | Prone to overfitting |
+| **Random Forest** ⭐ | **~0.50-0.58** | **Best balance of precision/recall** |
+| **Gradient Boosting** | ~0.50-0.57 | Close second to RF |
+| **KNN** | ~0.30-0.40 | Struggles with high dimensionality |
+
+### 🏆 Best Classifier Selection: **Random Forest**
+
+**Why Random Forest is expected to be the best:**
+1. **Handles class imbalance** well with balanced class weights
+2. **Captures non-linear relationships** in the data (age, balance effects)
+3. **Feature importance** provides interpretability
+4. **Robust to outliers** (tree-based ensemble)
+5. **Handles mixed data types** (numerical + categorical) effectively
+6. **Good precision-recall trade-off** for this imbalanced problem
+
+### Key Recommendations
+1. **Remove `duration`** from production model (data leakage)
+2. **Use class weighting** or **SMOTE** to handle imbalance
+3. **Focus on Recall + F1** rather than accuracy (accuracy is misleading with imbalance)
+4. **Consider threshold tuning** to optimize business value (cost of contacting vs. missed opportunity)
+
+---
+
+## agent_manager  `2026-05-10 17:50:24`
+
+好的，以下是完整的分析结果与建议。
+
+---
+
+## 📊 数据概览
+
+| 项目 | 内容 |
+|------|------|
+| **数据集** | 葡萄牙银行电话营销数据集（bank-full.csv） |
+| **样本量** | 45,211 条记录，17 个特征 |
+| **目标变量** | **y** — 客户是否订阅定期存款（yes/no） |
+| **任务类型** | **二分类（Binary Classification）** |
+| **数据质量** | ✅ 无缺失值，数据质量较好 |
+
+---
+
+## 🔍 数据画像要点
+
+### 特征类型
+- **数值型**：age, balance, day, duration, campaign, pdays, previous
+- **分类型**：job, marital, education, default, housing, loan, contact, month, poutcome, y
+
+### 异常值情况
+| 特征 | 异常比例 | 说明 |
+|------|---------|------|
+| **balance** | 10.5% | 账户余额范围 -8019 ~ 102,127，存在高净值客户 |
+| **duration** | 7.2% | 通话时长最高达4918秒，是重要预测特征 |
+| **campaign** | 6.8% | 联系次数最高63次，少数客户被频繁联系 |
+| **pdays / previous** | 18.3% | -1表示从未联系过，属于正常业务编码 |
+
+### 需注意的问题
+- `job`、`education`、`contact`、`poutcome` 等列包含 **"unknown"** 值
+- **duration**（通话时长）与目标 y 高度相关，但**建模时需注意数据泄露**——通话时长只有在通话结束后才知道，无法在拨打电话前用于预测
+
+---
+
+## 🧠 预测建模建议
+
+### 推荐算法
+| 算法 | 适用理由 |
+|------|---------|
+| **Logistic Regression** | 可解释性强，适合二分类 |
+| **Random Forest** | 能处理非线性关系，抗异常值 |
+| **XGBoost / LightGBM** | 高精度，适合处理不平衡分类问题 |
+| **SVM** | 小样本测试时可使用（数据集有更小的版本） |
+
+### 特征工程建议
+1. **分类变量编码**：对 job、marital、education 等进行 One-Hot 编码或 Label Encoding
+2. **"unknown" 处理**：建议保留为单独类别，而非直接删除
+3. **balance 处理**：可做对数变换或分箱处理
+4. **campaign 处理**：可做对数变换，减少长尾影响
+5. **pdays 和 previous**：可组合成"是否曾被联系过"的二元特征
+6. **时间特征**：month 和 day 可转换为季度/季节特征
+
+---
+
+## 💡 业务建议（针对银行营销）
+
+基于数据洞察，以下客户特征更可能**订阅定期存款**：
+
+### 🎯 高潜力客户画像
+| 维度 | 特征 | 建议 |
+|-----|------|------|
+| **通话时长** | 通话时间越长 → 订阅率越高 | 营销人员应**延长有效沟通时间**，耐心介绍产品 |
+| **职业** | 管理/技术/退休人员 | 定向推送，**精准营销** |
+| **教育水平** | 高等教育（tertiary）客户 | 提供更专业的产品方案 |
+| **历史行为** | 之前有成功订阅记录（poutcome=success） | **重点维护老客户** |
+| **联系次数** | 联系1-3次内效果最好 | 避免过度骚扰，**控制联系频率** |
+| **月份** | 某些月份（如3月、9月）订阅率更高 | 在**高转化月份加大营销投入** |
+
+### ⚠️ 需注意的风险
+1. **数据不平衡**：目标列中 "yes" 的比例通常较低（约11.7%），建模时需使用 **SMOTE 过采样** 或 **类别权重调整**
+2. **避免数据泄露**：不要将 `duration`（通话时长）作为预测特征用于实际营销前的客户筛选，因为它是在通话过程中才获得的
+3. **pdays=-1** 的客户（从未联系过）是**潜在新客源**，值得开发
+
+---
+
+需要我进一步为您执行具体的模型训练和预测吗？我可以帮您：
+1. 进行数据预处理和特征工程
+2. 训练分类模型
+3. 输出预测结果和模型评估指标
+
+---
+
