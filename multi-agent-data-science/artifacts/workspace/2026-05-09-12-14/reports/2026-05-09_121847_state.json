@@ -1,0 +1,1348 @@
+{
+  "user_request": "Please run the full pipeline — clean the data, split it, perform EDA, engineer features, train models, and select the best classifier",
+  "data_path": "datasets/bank-full.csv",
+  "dataset_name": "bank-full.csv",
+  "description": "Binary classification: predict whether a client subscribes to a term deposit (target column: y)",
+  "target_column": "y",
+  "task_type": "classification",
+  "dataset_profile": {
+    "dataset": {
+      "file_path": "/Users/liamxue/Projects/ai/multi-agent-data-science/datasets/bank-full.csv",
+      "rows": 45211,
+      "cols": 17,
+      "columns": [
+        "age",
+        "job",
+        "marital",
+        "education",
+        "default",
+        "balance",
+        "housing",
+        "loan",
+        "contact",
+        "day",
+        "month",
+        "duration",
+        "campaign",
+        "pdays",
+        "previous",
+        "poutcome",
+        "y"
+      ],
+      "dtypes": {
+        "age": "int64",
+        "job": "str",
+        "marital": "str",
+        "education": "str",
+        "default": "str",
+        "balance": "int64",
+        "housing": "str",
+        "loan": "str",
+        "contact": "str",
+        "day": "int64",
+        "month": "str",
+        "duration": "int64",
+        "campaign": "int64",
+        "pdays": "int64",
+        "previous": "int64",
+        "poutcome": "str",
+        "y": "str"
+      }
+    },
+    "missing_values": {
+      "total_missing_cells": 0,
+      "total_missing_ratio": 0.0,
+      "high_missing_columns": [],
+      "columns": {
+        "age": {
+          "missing_count": 0,
+          "missing_ratio": 0.0
+        },
+        "job": {
+          "missing_count": 0,
+          "missing_ratio": 0.0
+        },
+        "marital": {
+          "missing_count": 0,
+          "missing_ratio": 0.0
+        },
+        "education": {
+          "missing_count": 0,
+          "missing_ratio": 0.0
+        },
+        "default": {
+          "missing_count": 0,
+          "missing_ratio": 0.0
+        },
+        "balance": {
+          "missing_count": 0,
+          "missing_ratio": 0.0
+        },
+        "housing": {
+          "missing_count": 0,
+          "missing_ratio": 0.0
+        },
+        "loan": {
+          "missing_count": 0,
+          "missing_ratio": 0.0
+        },
+        "contact": {
+          "missing_count": 0,
+          "missing_ratio": 0.0
+        },
+        "day": {
+          "missing_count": 0,
+          "missing_ratio": 0.0
+        },
+        "month": {
+          "missing_count": 0,
+          "missing_ratio": 0.0
+        },
+        "duration": {
+          "missing_count": 0,
+          "missing_ratio": 0.0
+        },
+        "campaign": {
+          "missing_count": 0,
+          "missing_ratio": 0.0
+        },
+        "pdays": {
+          "missing_count": 0,
+          "missing_ratio": 0.0
+        },
+        "previous": {
+          "missing_count": 0,
+          "missing_ratio": 0.0
+        },
+        "poutcome": {
+          "missing_count": 0,
+          "missing_ratio": 0.0
+        },
+        "y": {
+          "missing_count": 0,
+          "missing_ratio": 0.0
+        }
+      }
+    },
+    "outliers": {
+      "method": "iqr",
+      "columns": {
+        "age": {
+          "outlier_count": 487,
+          "outlier_ratio": 0.010772,
+          "lower_bound": 10.5,
+          "upper_bound": 70.5,
+          "min": 18.0,
+          "max": 95.0
+        },
+        "balance": {
+          "outlier_count": 4729,
+          "outlier_ratio": 0.104598,
+          "lower_bound": -1962.0,
+          "upper_bound": 3462.0,
+          "min": -8019.0,
+          "max": 102127.0
+        },
+        "day": {
+          "outlier_count": 0,
+          "outlier_ratio": 0.0,
+          "lower_bound": -11.5,
+          "upper_bound": 40.5,
+          "min": 1.0,
+          "max": 31.0
+        },
+        "duration": {
+          "outlier_count": 3235,
+          "outlier_ratio": 0.071553,
+          "lower_bound": -221.0,
+          "upper_bound": 643.0,
+          "min": 0.0,
+          "max": 4918.0
+        },
+        "campaign": {
+          "outlier_count": 3064,
+          "outlier_ratio": 0.067771,
+          "lower_bound": -2.0,
+          "upper_bound": 6.0,
+          "min": 1.0,
+          "max": 63.0
+        },
+        "pdays": {
+          "outlier_count": 8257,
+          "outlier_ratio": 0.182633,
+          "lower_bound": -1.0,
+          "upper_bound": -1.0,
+          "min": -1.0,
+          "max": 871.0
+        },
+        "previous": {
+          "outlier_count": 8257,
+          "outlier_ratio": 0.182633,
+          "lower_bound": 0.0,
+          "upper_bound": 0.0,
+          "min": 0.0,
+          "max": 275.0
+        }
+      }
+    },
+    "type_issues": {
+      "numeric_like_object_columns": [],
+      "datetime_like_object_columns": [],
+      "category_columns": {
+        "job": {
+          "unique_count": 12,
+          "unique_ratio": 0.000265
+        },
+        "marital": {
+          "unique_count": 3,
+          "unique_ratio": 6.6e-05
+        },
+        "education": {
+          "unique_count": 4,
+          "unique_ratio": 8.8e-05
+        },
+        "default": {
+          "unique_count": 2,
+          "unique_ratio": 4.4e-05
+        },
+        "housing": {
+          "unique_count": 2,
+          "unique_ratio": 4.4e-05
+        },
+        "loan": {
+          "unique_count": 2,
+          "unique_ratio": 4.4e-05
+        },
+        "contact": {
+          "unique_count": 3,
+          "unique_ratio": 6.6e-05
+        },
+        "month": {
+          "unique_count": 12,
+          "unique_ratio": 0.000265
+        },
+        "poutcome": {
+          "unique_count": 4,
+          "unique_ratio": 8.8e-05
+        },
+        "y": {
+          "unique_count": 2,
+          "unique_ratio": 4.4e-05
+        }
+      },
+      "high_cardinality_columns": []
+    },
+    "drop_candidates": {
+      "empty_columns": [],
+      "constant_columns": [],
+      "id_like_columns": []
+    },
+    "sample_rows": [
+      {
+        "age": 58,
+        "job": "management",
+        "marital": "married",
+        "education": "tertiary",
+        "default": "no",
+        "balance": 2143,
+        "housing": "yes",
+        "loan": "no",
+        "contact": "unknown",
+        "day": 5,
+        "month": "may",
+        "duration": 261,
+        "campaign": 1,
+        "pdays": -1,
+        "previous": 0,
+        "poutcome": "unknown",
+        "y": "no"
+      },
+      {
+        "age": 44,
+        "job": "technician",
+        "marital": "single",
+        "education": "secondary",
+        "default": "no",
+        "balance": 29,
+        "housing": "yes",
+        "loan": "no",
+        "contact": "unknown",
+        "day": 5,
+        "month": "may",
+        "duration": 151,
+        "campaign": 1,
+        "pdays": -1,
+        "previous": 0,
+        "poutcome": "unknown",
+        "y": "no"
+      },
+      {
+        "age": 33,
+        "job": "entrepreneur",
+        "marital": "married",
+        "education": "secondary",
+        "default": "no",
+        "balance": 2,
+        "housing": "yes",
+        "loan": "yes",
+        "contact": "unknown",
+        "day": 5,
+        "month": "may",
+        "duration": 76,
+        "campaign": 1,
+        "pdays": -1,
+        "previous": 0,
+        "poutcome": "unknown",
+        "y": "no"
+      },
+      {
+        "age": 47,
+        "job": "blue-collar",
+        "marital": "married",
+        "education": "unknown",
+        "default": "no",
+        "balance": 1506,
+        "housing": "yes",
+        "loan": "no",
+        "contact": "unknown",
+        "day": 5,
+        "month": "may",
+        "duration": 92,
+        "campaign": 1,
+        "pdays": -1,
+        "previous": 0,
+        "poutcome": "unknown",
+        "y": "no"
+      },
+      {
+        "age": 33,
+        "job": "unknown",
+        "marital": "single",
+        "education": "unknown",
+        "default": "no",
+        "balance": 1,
+        "housing": "no",
+        "loan": "no",
+        "contact": "unknown",
+        "day": 5,
+        "month": "may",
+        "duration": 198,
+        "campaign": 1,
+        "pdays": -1,
+        "previous": 0,
+        "poutcome": "unknown",
+        "y": "no"
+      },
+      {
+        "age": 35,
+        "job": "management",
+        "marital": "married",
+        "education": "tertiary",
+        "default": "no",
+        "balance": 231,
+        "housing": "yes",
+        "loan": "no",
+        "contact": "unknown",
+        "day": 5,
+        "month": "may",
+        "duration": 139,
+        "campaign": 1,
+        "pdays": -1,
+        "previous": 0,
+        "poutcome": "unknown",
+        "y": "no"
+      },
+      {
+        "age": 28,
+        "job": "management",
+        "marital": "single",
+        "education": "tertiary",
+        "default": "no",
+        "balance": 447,
+        "housing": "yes",
+        "loan": "yes",
+        "contact": "unknown",
+        "day": 5,
+        "month": "may",
+        "duration": 217,
+        "campaign": 1,
+        "pdays": -1,
+        "previous": 0,
+        "poutcome": "unknown",
+        "y": "no"
+      },
+      {
+        "age": 42,
+        "job": "entrepreneur",
+        "marital": "divorced",
+        "education": "tertiary",
+        "default": "yes",
+        "balance": 2,
+        "housing": "yes",
+        "loan": "no",
+        "contact": "unknown",
+        "day": 5,
+        "month": "may",
+        "duration": 380,
+        "campaign": 1,
+        "pdays": -1,
+        "previous": 0,
+        "poutcome": "unknown",
+        "y": "no"
+      },
+      {
+        "age": 58,
+        "job": "retired",
+        "marital": "married",
+        "education": "primary",
+        "default": "no",
+        "balance": 121,
+        "housing": "yes",
+        "loan": "no",
+        "contact": "unknown",
+        "day": 5,
+        "month": "may",
+        "duration": 50,
+        "campaign": 1,
+        "pdays": -1,
+        "previous": 0,
+        "poutcome": "unknown",
+        "y": "no"
+      },
+      {
+        "age": 43,
+        "job": "technician",
+        "marital": "single",
+        "education": "secondary",
+        "default": "no",
+        "balance": 593,
+        "housing": "yes",
+        "loan": "no",
+        "contact": "unknown",
+        "day": 5,
+        "month": "may",
+        "duration": 55,
+        "campaign": 1,
+        "pdays": -1,
+        "previous": 0,
+        "poutcome": "unknown",
+        "y": "no"
+      }
+    ]
+  },
+  "dataset_id": "train_xgb",
+  "cleaning_plan": {
+    "summary": "Clean the Bank Marketing dataset for binary classification: no missing values, handle outliers in numeric columns, encode categorical variables, and prepare for model training.",
+    "column_name_actions": [
+      {
+        "column": "y",
+        "action": "rename",
+        "new_name": "subscribed",
+        "reason": "More descriptive name for the target variable"
+      }
+    ],
+    "type_conversions": [
+      {
+        "columns": [
+          "job",
+          "marital",
+          "education",
+          "default",
+          "housing",
+          "loan",
+          "contact",
+          "month",
+          "poutcome",
+          "y"
+        ],
+        "from_type": "str",
+        "to_type": "category",
+        "reason": "These are categorical variables that should be encoded for ML models"
+      }
+    ],
+    "missing_value_actions": [
+      {
+        "column": "all",
+        "action": "none_needed",
+        "reason": "No missing values found in any column"
+      }
+    ],
+    "outlier_actions": [
+      {
+        "column": "age",
+        "action": "cap",
+        "reason": "Age has some outliers (95 max) but they may be valid; capping at reasonable bounds",
+        "lower_bound": 18,
+        "upper_bound": 95
+      },
+      {
+        "column": "balance",
+        "action": "cap",
+        "reason": "High outliers in balance; will cap at 99th percentile to reduce impact",
+        "lower_bound": null,
+        "upper_bound": null
+      },
+      {
+        "column": "duration",
+        "action": "cap",
+        "reason": "Duration has outliers up to 4918; will cap at 99th percentile",
+        "lower_bound": null,
+        "upper_bound": null
+      },
+      {
+        "column": "campaign",
+        "action": "cap",
+        "reason": "Campaign count has outliers up to 63; will cap at 99th percentile",
+        "lower_bound": null,
+        "upper_bound": null
+      },
+      {
+        "column": "pdays",
+        "action": "keep",
+        "reason": "Value -1 means no previous contact; this is meaningful data, not an error"
+      },
+      {
+        "column": "previous",
+        "action": "keep",
+        "reason": "Value 0 means no previous contact; this is meaningful data"
+      }
+    ],
+    "drop_columns": [],
+    "notes": [
+      "pdays=-1 indicates client was not previously contacted - keep as is",
+      "The 'unknown' values in categorical columns (job, education, contact, poutcome) are legitimate categories",
+      "Duration should NOT be used in training as it's strongly correlated with the outcome (leakage) - but we'll keep it for EDA comparison",
+      "Target y is imbalanced - will need to handle with class weighting or resampling"
+    ]
+  },
+  "cleaned_data_path": "/Users/liamxue/Projects/ai/multi-agent-data-science/artifacts/workspace/2026-05-09-12-14/bank-full_cleaned.csv",
+  "cleaning_report": {
+    "steps": [
+      {
+        "tool": "load_dataset_to_store",
+        "result": {
+          "dataset_id": "dataset_d32f2c810d564f8d97ebcb24276af928",
+          "source_path": "/Users/liamxue/Projects/ai/multi-agent-data-science/datasets/bank-full.csv",
+          "shape": {
+            "rows": 45211,
+            "cols": 17
+          },
+          "columns": [
+            "age",
+            "job",
+            "marital",
+            "education",
+            "default",
+            "balance",
+            "housing",
+            "loan",
+            "contact",
+            "day",
+            "month",
+            "duration",
+            "campaign",
+            "pdays",
+            "previous",
+            "poutcome",
+            "y"
+          ]
+        }
+      },
+      {
+        "tool": "clean_data_types",
+        "result": {
+          "dataset_id": "dataset_d32f2c810d564f8d97ebcb24276af928",
+          "converted_columns": [],
+          "skipped_columns": [
+            {
+              "column": null,
+              "reason": "column_not_found"
+            }
+          ]
+        }
+      },
+      {
+        "tool": "clean_data_types",
+        "result": {
+          "dataset_id": "dataset_d32f2c810d564f8d97ebcb24276af928",
+          "converted_columns": [],
+          "skipped_columns": [
+            {
+              "column": null,
+              "reason": "column_not_found"
+            }
+          ]
+        }
+      },
+      {
+        "tool": "clean_missing_values",
+        "result": {
+          "dataset_id": "dataset_d32f2c810d564f8d97ebcb24276af928",
+          "filled_columns": [],
+          "dropped_rows": 0,
+          "skipped_columns": [],
+          "fallback_filled": {}
+        }
+      },
+      {
+        "tool": "clean_outliers",
+        "result": {
+          "dataset_id": "dataset_d32f2c810d564f8d97ebcb24276af928",
+          "processed_columns": [
+            "age",
+            "balance",
+            "duration",
+            "campaign"
+          ],
+          "skipped_columns": []
+        }
+      },
+      {
+        "tool": "clean_duplicates",
+        "result": {
+          "dataset_id": "dataset_d32f2c810d564f8d97ebcb24276af928",
+          "subset": null,
+          "keep": "first",
+          "dropped_rows": 0,
+          "rows": 45211
+        }
+      },
+      {
+        "tool": "save_dataset_from_store",
+        "result": {
+          "dataset_id": "dataset_d32f2c810d564f8d97ebcb24276af928",
+          "output_path": "/Users/liamxue/Projects/ai/multi-agent-data-science/artifacts/workspace/2026-05-09-12-14/bank-full_cleaned.csv",
+          "shape": {
+            "rows": 45211,
+            "cols": 17
+          },
+          "columns": [
+            "age",
+            "job",
+            "marital",
+            "education",
+            "default",
+            "balance",
+            "housing",
+            "loan",
+            "contact",
+            "day",
+            "month",
+            "duration",
+            "campaign",
+            "pdays",
+            "previous",
+            "poutcome",
+            "y"
+          ]
+        }
+      }
+    ]
+  },
+  "cleaning_passed": true,
+  "training_data_path": "/Users/liamxue/Projects/ai/multi-agent-data-science/artifacts/workspace/2026-05-09-12-14/bank-full_cleaned_train.csv",
+  "testing_data_path": "/Users/liamxue/Projects/ai/multi-agent-data-science/artifacts/workspace/2026-05-09-12-14/bank-full_cleaned_test.csv",
+  "split_report": {
+    "source_path": "/Users/liamxue/Projects/ai/multi-agent-data-science/artifacts/workspace/2026-05-09-12-14/bank-full_cleaned.csv",
+    "task_type": "classification",
+    "target_column": "y",
+    "test_size": 0.2,
+    "random_state": 42,
+    "train_rows": 36168,
+    "test_rows": 9043,
+    "train_path": "/Users/liamxue/Projects/ai/multi-agent-data-science/artifacts/workspace/2026-05-09-12-14/bank-full_cleaned_train.csv",
+    "test_path": "/Users/liamxue/Projects/ai/multi-agent-data-science/artifacts/workspace/2026-05-09-12-14/bank-full_cleaned_test.csv",
+    "stratify_requested": true,
+    "stratify_used": true,
+    "stratify_fallback_to_random": false
+  },
+  "eda_report": {
+    "steps": [
+      {
+        "tool": "profile_training_data",
+        "result": {
+          "dataset": {
+            "file_path": "/Users/liamxue/Projects/ai/multi-agent-data-science/artifacts/workspace/2026-05-09-12-14/bank-full_cleaned_train.csv",
+            "rows": 36168,
+            "cols": 17,
+            "columns": [
+              "age",
+              "job",
+              "marital",
+              "education",
+              "default",
+              "balance",
+              "housing",
+              "loan",
+              "contact",
+              "day",
+              "month",
+              "duration",
+              "campaign",
+              "pdays",
+              "previous",
+              "poutcome",
+              "y"
+            ],
+            "dtypes": {
+              "age": "float64",
+              "job": "str",
+              "marital": "str",
+              "education": "str",
+              "default": "str",
+              "balance": "int64",
+              "housing": "str",
+              "loan": "str",
+              "contact": "str",
+              "day": "int64",
+              "month": "str",
+              "duration": "int64",
+              "campaign": "int64",
+              "pdays": "int64",
+              "previous": "int64",
+              "poutcome": "str",
+              "y": "str"
+            }
+          },
+          "missing_values": {
+            "total_missing_cells": 0,
+            "total_missing_ratio": 0.0,
+            "high_missing_columns": [],
+            "columns": {
+              "age": {
+                "missing_count": 0,
+                "missing_ratio": 0.0
+              },
+              "job": {
+                "missing_count": 0,
+                "missing_ratio": 0.0
+              },
+              "marital": {
+                "missing_count": 0,
+                "missing_ratio": 0.0
+              },
+              "education": {
+                "missing_count": 0,
+                "missing_ratio": 0.0
+              },
+              "default": {
+                "missing_count": 0,
+                "missing_ratio": 0.0
+              },
+              "balance": {
+                "missing_count": 0,
+                "missing_ratio": 0.0
+              },
+              "housing": {
+                "missing_count": 0,
+                "missing_ratio": 0.0
+              },
+              "loan": {
+                "missing_count": 0,
+                "missing_ratio": 0.0
+              },
+              "contact": {
+                "missing_count": 0,
+                "missing_ratio": 0.0
+              },
+              "day": {
+                "missing_count": 0,
+                "missing_ratio": 0.0
+              },
+              "month": {
+                "missing_count": 0,
+                "missing_ratio": 0.0
+              },
+              "duration": {
+                "missing_count": 0,
+                "missing_ratio": 0.0
+              },
+              "campaign": {
+                "missing_count": 0,
+                "missing_ratio": 0.0
+              },
+              "pdays": {
+                "missing_count": 0,
+                "missing_ratio": 0.0
+              },
+              "previous": {
+                "missing_count": 0,
+                "missing_ratio": 0.0
+              },
+              "poutcome": {
+                "missing_count": 0,
+                "missing_ratio": 0.0
+              },
+              "y": {
+                "missing_count": 0,
+                "missing_ratio": 0.0
+              }
+            }
+          },
+          "outliers": {
+            "method": "iqr",
+            "columns": {
+              "age": {
+                "outlier_count": 0,
+                "outlier_ratio": 0.0,
+                "lower_bound": 10.5,
+                "upper_bound": 70.5,
+                "min": 18.0,
+                "max": 70.5
+              },
+              "balance": {
+                "outlier_count": 15,
+                "outlier_ratio": 0.000415,
+                "lower_bound": -1960.375,
+                "upper_bound": 3464.625,
+                "min": -1962.0,
+                "max": 3462.0
+              },
+              "day": {
+                "outlier_count": 0,
+                "outlier_ratio": 0.0,
+                "lower_bound": -11.5,
+                "upper_bound": 40.5,
+                "min": 1.0,
+                "max": 31.0
+              },
+              "duration": {
+                "outlier_count": 2632,
+                "outlier_ratio": 0.072772,
+                "lower_bound": -219.5,
+                "upper_bound": 640.5,
+                "min": 0.0,
+                "max": 643.0
+              },
+              "campaign": {
+                "outlier_count": 0,
+                "outlier_ratio": 0.0,
+                "lower_bound": -2.0,
+                "upper_bound": 6.0,
+                "min": 1.0,
+                "max": 6.0
+              },
+              "pdays": {
+                "outlier_count": 6584,
+                "outlier_ratio": 0.182039,
+                "lower_bound": -1.0,
+                "upper_bound": -1.0,
+                "min": -1.0,
+                "max": 871.0
+              },
+              "previous": {
+                "outlier_count": 6584,
+                "outlier_ratio": 0.182039,
+                "lower_bound": 0.0,
+                "upper_bound": 0.0,
+                "min": 0.0,
+                "max": 275.0
+              }
+            }
+          },
+          "type_issues": {
+            "numeric_like_object_columns": [],
+            "datetime_like_object_columns": [],
+            "category_columns": {
+              "job": {
+                "unique_count": 12,
+                "unique_ratio": 0.000332
+              },
+              "marital": {
+                "unique_count": 3,
+                "unique_ratio": 8.3e-05
+              },
+              "education": {
+                "unique_count": 4,
+                "unique_ratio": 0.000111
+              },
+              "default": {
+                "unique_count": 2,
+                "unique_ratio": 5.5e-05
+              },
+              "housing": {
+                "unique_count": 2,
+                "unique_ratio": 5.5e-05
+              },
+              "loan": {
+                "unique_count": 2,
+                "unique_ratio": 5.5e-05
+              },
+              "contact": {
+                "unique_count": 3,
+                "unique_ratio": 8.3e-05
+              },
+              "month": {
+                "unique_count": 12,
+                "unique_ratio": 0.000332
+              },
+              "poutcome": {
+                "unique_count": 4,
+                "unique_ratio": 0.000111
+              },
+              "y": {
+                "unique_count": 2,
+                "unique_ratio": 5.5e-05
+              }
+            },
+            "high_cardinality_columns": []
+          },
+          "drop_candidates": {
+            "empty_columns": [],
+            "constant_columns": [],
+            "id_like_columns": []
+          },
+          "sample_rows": [
+            {
+              "age": 36.0,
+              "job": "technician",
+              "marital": "divorced",
+              "education": "secondary",
+              "default": "no",
+              "balance": 861,
+              "housing": "no",
+              "loan": "no",
+              "contact": "telephone",
+              "day": 29,
+              "month": "aug",
+              "duration": 140,
+              "campaign": 2,
+              "pdays": -1,
+              "previous": 0,
+              "poutcome": "unknown",
+              "y": "no"
+            },
+            {
+              "age": 24.0,
+              "job": "student",
+              "marital": "single",
+              "education": "secondary",
+              "default": "no",
+              "balance": 3462,
+              "housing": "no",
+              "loan": "no",
+              "contact": "cellular",
+              "day": 5,
+              "month": "apr",
+              "duration": 643,
+              "campaign": 4,
+              "pdays": 185,
+              "previous": 7,
+              "poutcome": "failure",
+              "y": "yes"
+            },
+            {
+              "age": 44.0,
+              "job": "technician",
+              "marital": "single",
+              "education": "secondary",
+              "default": "no",
+              "balance": 244,
+              "housing": "yes",
+              "loan": "no",
+              "contact": "cellular",
+              "day": 12,
+              "month": "aug",
+              "duration": 643,
+              "campaign": 4,
+              "pdays": -1,
+              "previous": 0,
+              "poutcome": "unknown",
+              "y": "yes"
+            },
+            {
+              "age": 48.0,
+              "job": "unemployed",
+              "marital": "married",
+              "education": "secondary",
+              "default": "no",
+              "balance": 0,
+              "housing": "no",
+              "loan": "no",
+              "contact": "telephone",
+              "day": 31,
+              "month": "jul",
+              "duration": 35,
+              "campaign": 6,
+              "pdays": -1,
+              "previous": 0,
+              "poutcome": "unknown",
+              "y": "no"
+            },
+            {
+              "age": 38.0,
+              "job": "technician",
+              "marital": "married",
+              "education": "secondary",
+              "default": "no",
+              "balance": 257,
+              "housing": "no",
+              "loan": "no",
+              "contact": "cellular",
+              "day": 26,
+              "month": "aug",
+              "duration": 57,
+              "campaign": 6,
+              "pdays": -1,
+              "previous": 0,
+              "poutcome": "unknown",
+              "y": "no"
+            }
+          ]
+        }
+      },
+      {
+        "tool": "compute_correlation_matrix",
+        "result": {
+          "columns": [
+            "age",
+            "balance",
+            "day",
+            "duration",
+            "campaign",
+            "pdays",
+            "previous"
+          ],
+          "matrix": {
+            "age": {
+              "age": 1.0,
+              "balance": 0.1209,
+              "day": -0.0098,
+              "duration": -0.0142,
+              "campaign": 0.0303,
+              "pdays": -0.0261,
+              "previous": 0.0002
+            },
+            "balance": {
+              "age": 0.1209,
+              "balance": 1.0,
+              "day": 0.0106,
+              "duration": 0.0403,
+              "campaign": -0.0265,
+              "pdays": 0.0174,
+              "previous": 0.037
+            },
+            "day": {
+              "age": -0.0098,
+              "balance": 0.0106,
+              "day": 1.0,
+              "duration": -0.0394,
+              "campaign": 0.152,
+              "pdays": -0.0935,
+              "previous": -0.0494
+            },
+            "duration": {
+              "age": -0.0142,
+              "balance": 0.0403,
+              "day": -0.0394,
+              "duration": 1.0,
+              "campaign": -0.1015,
+              "pdays": 0.0052,
+              "previous": 0.0061
+            },
+            "campaign": {
+              "age": 0.0303,
+              "balance": -0.0265,
+              "day": 0.152,
+              "duration": -0.1015,
+              "campaign": 1.0,
+              "pdays": -0.0921,
+              "previous": -0.0201
+            },
+            "pdays": {
+              "age": -0.0261,
+              "balance": 0.0174,
+              "day": -0.0935,
+              "duration": 0.0052,
+              "campaign": -0.0921,
+              "pdays": 1.0,
+              "previous": 0.439
+            },
+            "previous": {
+              "age": 0.0002,
+              "balance": 0.037,
+              "day": -0.0494,
+              "duration": 0.0061,
+              "campaign": -0.0201,
+              "pdays": 0.439,
+              "previous": 1.0
+            }
+          }
+        }
+      },
+      {
+        "tool": "plot_distributions",
+        "result": {
+          "output_dir": "/Users/liamxue/Projects/ai/multi-agent-data-science/artifacts/workspace/2026-05-09-12-14/plots",
+          "plot_count": 7,
+          "plot_paths": [
+            "/Users/liamxue/Projects/ai/multi-agent-data-science/artifacts/workspace/2026-05-09-12-14/plots/age_distribution.png",
+            "/Users/liamxue/Projects/ai/multi-agent-data-science/artifacts/workspace/2026-05-09-12-14/plots/balance_distribution.png",
+            "/Users/liamxue/Projects/ai/multi-agent-data-science/artifacts/workspace/2026-05-09-12-14/plots/day_distribution.png",
+            "/Users/liamxue/Projects/ai/multi-agent-data-science/artifacts/workspace/2026-05-09-12-14/plots/duration_distribution.png",
+            "/Users/liamxue/Projects/ai/multi-agent-data-science/artifacts/workspace/2026-05-09-12-14/plots/campaign_distribution.png",
+            "/Users/liamxue/Projects/ai/multi-agent-data-science/artifacts/workspace/2026-05-09-12-14/plots/pdays_distribution.png",
+            "/Users/liamxue/Projects/ai/multi-agent-data-science/artifacts/workspace/2026-05-09-12-14/plots/previous_distribution.png"
+          ]
+        }
+      },
+      {
+        "tool": "select_candidate_models",
+        "result": {
+          "selected_models": [
+            "LogisticRegression",
+            "RandomForest",
+            "XGBoost"
+          ],
+          "feature_engineering_plan": {
+            "LogisticRegression": {
+              "scaling": true,
+              "encoding": "onehot",
+              "notes": "Linear model requires standardized numerical features and one-hot encoded categoricals. Handle class imbalance with class_weight='balanced'. Consider dropping 'duration' to avoid data leakage. Create binary flag for pdays==-1 (never contacted)."
+            },
+            "RandomForest": {
+              "scaling": false,
+              "encoding": "label",
+              "notes": "Tree-based ensemble handles non-linear relationships and doesn't need scaling. Label encode categoricals. Can capture interactions naturally. Use class_weight='balanced' for imbalance. Duration can be included cautiously since trees handle it well, but better to exclude for production."
+            },
+            "XGBoost": {
+              "scaling": false,
+              "encoding": "label",
+              "notes": "Gradient boosting typically outperforms random forest on structured data. Label encode categoricals. Use scale_pos_weight to handle class imbalance (ratio of negative/positive). Early stopping to prevent overfitting. Exclude 'duration' for production model, include for benchmark comparison."
+            }
+          },
+          "model_selection_plan": "Selected 3 models from the candidate pool based on EDA findings on the bank marketing dataset (binary classification, target='y'):\n\n1. **LogisticRegression** — Selected as the interpretable baseline. The dataset has 36K rows with mixed numerical/categorical features. Logistic regression provides coefficient interpretability (important for marketing insights) and serves as a strong linear benchmark. Requires one-hot encoding and scaling, which we'll apply. Class imbalance (~88/12) will be handled via class_weight='balanced'.\n\n2. **RandomForest** — Selected as the robust ensemble method. Handles non-linear relationships and feature interactions naturally (e.g., job × month, age × balance). No scaling needed, label encoding suffices for categoricals. The 'duration' leakage concern is less severe here as trees can isolate it. Outliers in pdays/previous are handled by tree-based splits. Class imbalance handled via class_weight='balanced_subsample'.\n\n3. **XGBoost** — Selected as the high-performance gradient boosting model. Typically outperforms RandomForest on structured tabular data like this. Supports scale_pos_weight for class imbalance. Handles missing values (none here) and mixed data types well. Early stopping prevents overfitting. Likely to achieve the highest ROC-AUC among the three.\n\n**Why not SVM?** SVM with RBF kernel requires extensive hyperparameter tuning, doesn't scale well to 36K rows with one-hot encoding (high dimensionality), and is sensitive to imbalanced data. It would be computationally expensive with limited performance gain over XGBoost.\n\n**Why not KNN?** KNN is distance-based and suffers from the curse of dimensionality with 12+ one-hot encoded categorical columns. It also requires scaling and performs poorly on imbalanced data where the majority class dominates nearest neighbors."
+        }
+      }
+    ]
+  },
+  "candidate_models": [
+    "LogisticRegression",
+    "RandomForest",
+    "XGBoost"
+  ],
+  "feature_engineering_plan": {
+    "LogisticRegression": {
+      "scaling": true,
+      "encoding": "onehot",
+      "notes": "Linear model requires standardized numerical features and one-hot encoded categoricals. Handle class imbalance with class_weight='balanced'. Consider dropping 'duration' to avoid data leakage. Create binary flag for pdays==-1 (never contacted)."
+    },
+    "RandomForest": {
+      "scaling": false,
+      "encoding": "label",
+      "notes": "Tree-based ensemble handles non-linear relationships and doesn't need scaling. Label encode categoricals. Can capture interactions naturally. Use class_weight='balanced' for imbalance. Duration can be included cautiously since trees handle it well, but better to exclude for production."
+    },
+    "XGBoost": {
+      "scaling": false,
+      "encoding": "label",
+      "notes": "Gradient boosting typically outperforms random forest on structured data. Label encode categoricals. Use scale_pos_weight to handle class imbalance (ratio of negative/positive). Early stopping to prevent overfitting. Exclude 'duration' for production model, include for benchmark comparison."
+    }
+  },
+  "model_selection_plan": "Selected 3 models from the candidate pool based on EDA findings on the bank marketing dataset (binary classification, target='y'):\n\n1. **LogisticRegression** — Selected as the interpretable baseline. The dataset has 36K rows with mixed numerical/categorical features. Logistic regression provides coefficient interpretability (important for marketing insights) and serves as a strong linear benchmark. Requires one-hot encoding and scaling, which we'll apply. Class imbalance (~88/12) will be handled via class_weight='balanced'.\n\n2. **RandomForest** — Selected as the robust ensemble method. Handles non-linear relationships and feature interactions naturally (e.g., job × month, age × balance). No scaling needed, label encoding suffices for categoricals. The 'duration' leakage concern is less severe here as trees can isolate it. Outliers in pdays/previous are handled by tree-based splits. Class imbalance handled via class_weight='balanced_subsample'.\n\n3. **XGBoost** — Selected as the high-performance gradient boosting model. Typically outperforms RandomForest on structured tabular data like this. Supports scale_pos_weight for class imbalance. Handles missing values (none here) and mixed data types well. Early stopping prevents overfitting. Likely to achieve the highest ROC-AUC among the three.\n\n**Why not SVM?** SVM with RBF kernel requires extensive hyperparameter tuning, doesn't scale well to 36K rows with one-hot encoding (high dimensionality), and is sensitive to imbalanced data. It would be computationally expensive with limited performance gain over XGBoost.\n\n**Why not KNN?** KNN is distance-based and suffers from the curse of dimensionality with 12+ one-hot encoded categorical columns. It also requires scaling and performs poorly on imbalanced data where the majority class dominates nearest neighbors.",
+  "feature_dataset_ids": {
+    "LogisticRegression": "/Users/liamxue/Projects/ai/multi-agent-data-science/artifacts/workspace/2026-05-09-12-14/features/LogisticRegression_train_featured.csv",
+    "RandomForest": "/Users/liamxue/Projects/ai/multi-agent-data-science/artifacts/workspace/2026-05-09-12-14/features/RandomForest_train_featured.csv",
+    "XGBoost": "/Users/liamxue/Projects/ai/multi-agent-data-science/artifacts/workspace/2026-05-09-12-14/features/XGBoost_train_featured.csv"
+  },
+  "feature_preprocessors": {
+    "LogisticRegression": {
+      "encoder_paths": {},
+      "encoding_method": "onehot",
+      "encoded_columns": [
+        "job",
+        "marital",
+        "education",
+        "default",
+        "housing",
+        "loan",
+        "contact",
+        "month",
+        "poutcome"
+      ],
+      "new_columns": [
+        "job_admin.",
+        "job_blue-collar",
+        "job_entrepreneur",
+        "job_housemaid",
+        "job_management",
+        "job_retired",
+        "job_self-employed",
+        "job_services",
+        "job_student",
+        "job_technician",
+        "job_unemployed",
+        "job_unknown",
+        "marital_divorced",
+        "marital_married",
+        "marital_single",
+        "education_primary",
+        "education_secondary",
+        "education_tertiary",
+        "education_unknown",
+        "default_no",
+        "default_yes",
+        "housing_no",
+        "housing_yes",
+        "loan_no",
+        "loan_yes",
+        "contact_cellular",
+        "contact_telephone",
+        "contact_unknown",
+        "month_apr",
+        "month_aug",
+        "month_dec",
+        "month_feb",
+        "month_jan",
+        "month_jul",
+        "month_jun",
+        "month_mar",
+        "month_may",
+        "month_nov",
+        "month_oct",
+        "month_sep",
+        "poutcome_failure",
+        "poutcome_other",
+        "poutcome_success",
+        "poutcome_unknown"
+      ],
+      "scaler_path": "/Users/liamxue/Projects/ai/multi-agent-data-science/artifacts/workspace/2026-05-09-12-14/features/scalers/train_lr_standard_scaler.pkl",
+      "scaler_method": "standard",
+      "scaled_columns": [
+        "age",
+        "balance",
+        "day",
+        "duration",
+        "campaign",
+        "pdays",
+        "previous"
+      ]
+    },
+    "RandomForest": {
+      "encoder_paths": {
+        "job": "/Users/liamxue/Projects/ai/multi-agent-data-science/artifacts/workspace/2026-05-09-12-14/features/encoders/train_rf_job_label_encoder.pkl",
+        "marital": "/Users/liamxue/Projects/ai/multi-agent-data-science/artifacts/workspace/2026-05-09-12-14/features/encoders/train_rf_marital_label_encoder.pkl",
+        "education": "/Users/liamxue/Projects/ai/multi-agent-data-science/artifacts/workspace/2026-05-09-12-14/features/encoders/train_rf_education_label_encoder.pkl",
+        "default": "/Users/liamxue/Projects/ai/multi-agent-data-science/artifacts/workspace/2026-05-09-12-14/features/encoders/train_rf_default_label_encoder.pkl",
+        "housing": "/Users/liamxue/Projects/ai/multi-agent-data-science/artifacts/workspace/2026-05-09-12-14/features/encoders/train_rf_housing_label_encoder.pkl",
+        "loan": "/Users/liamxue/Projects/ai/multi-agent-data-science/artifacts/workspace/2026-05-09-12-14/features/encoders/train_rf_loan_label_encoder.pkl",
+        "contact": "/Users/liamxue/Projects/ai/multi-agent-data-science/artifacts/workspace/2026-05-09-12-14/features/encoders/train_rf_contact_label_encoder.pkl",
+        "month": "/Users/liamxue/Projects/ai/multi-agent-data-science/artifacts/workspace/2026-05-09-12-14/features/encoders/train_rf_month_label_encoder.pkl",
+        "poutcome": "/Users/liamxue/Projects/ai/multi-agent-data-science/artifacts/workspace/2026-05-09-12-14/features/encoders/train_rf_poutcome_label_encoder.pkl"
+      },
+      "encoding_method": "label",
+      "encoded_columns": [
+        "job",
+        "marital",
+        "education",
+        "default",
+        "housing",
+        "loan",
+        "contact",
+        "month",
+        "poutcome"
+      ],
+      "new_columns": []
+    },
+    "XGBoost": {
+      "target_encoder_path": "/Users/liamxue/Projects/ai/multi-agent-data-science/artifacts/workspace/2026-05-09-12-14/features/encoders/train_xgb_XGBoost_target_encoder.pkl",
+      "target_original_classes": [
+        "no",
+        "yes"
+      ],
+      "encoder_paths": {
+        "job": "/Users/liamxue/Projects/ai/multi-agent-data-science/artifacts/workspace/2026-05-09-12-14/features/encoders/train_xgb_job_label_encoder.pkl",
+        "marital": "/Users/liamxue/Projects/ai/multi-agent-data-science/artifacts/workspace/2026-05-09-12-14/features/encoders/train_xgb_marital_label_encoder.pkl",
+        "education": "/Users/liamxue/Projects/ai/multi-agent-data-science/artifacts/workspace/2026-05-09-12-14/features/encoders/train_xgb_education_label_encoder.pkl",
+        "default": "/Users/liamxue/Projects/ai/multi-agent-data-science/artifacts/workspace/2026-05-09-12-14/features/encoders/train_xgb_default_label_encoder.pkl",
+        "housing": "/Users/liamxue/Projects/ai/multi-agent-data-science/artifacts/workspace/2026-05-09-12-14/features/encoders/train_xgb_housing_label_encoder.pkl",
+        "loan": "/Users/liamxue/Projects/ai/multi-agent-data-science/artifacts/workspace/2026-05-09-12-14/features/encoders/train_xgb_loan_label_encoder.pkl",
+        "contact": "/Users/liamxue/Projects/ai/multi-agent-data-science/artifacts/workspace/2026-05-09-12-14/features/encoders/train_xgb_contact_label_encoder.pkl",
+        "month": "/Users/liamxue/Projects/ai/multi-agent-data-science/artifacts/workspace/2026-05-09-12-14/features/encoders/train_xgb_month_label_encoder.pkl",
+        "poutcome": "/Users/liamxue/Projects/ai/multi-agent-data-science/artifacts/workspace/2026-05-09-12-14/features/encoders/train_xgb_poutcome_label_encoder.pkl"
+      },
+      "encoding_method": "label",
+      "encoded_columns": [
+        "job",
+        "marital",
+        "education",
+        "default",
+        "housing",
+        "loan",
+        "contact",
+        "month",
+        "poutcome"
+      ],
+      "new_columns": []
+    },
+    "null": {
+      "target_encoder_path": "/Users/liamxue/Projects/ai/multi-agent-data-science/artifacts/workspace/2026-05-09-12-14/features/encoders/train_xgb_XGBoost_target_encoder.pkl",
+      "target_original_classes": [
+        "no",
+        "yes"
+      ],
+      "encoder_paths": {
+        "job": "/Users/liamxue/Projects/ai/multi-agent-data-science/artifacts/workspace/2026-05-09-12-14/features/encoders/train_xgb_job_label_encoder.pkl",
+        "marital": "/Users/liamxue/Projects/ai/multi-agent-data-science/artifacts/workspace/2026-05-09-12-14/features/encoders/train_xgb_marital_label_encoder.pkl",
+        "education": "/Users/liamxue/Projects/ai/multi-agent-data-science/artifacts/workspace/2026-05-09-12-14/features/encoders/train_xgb_education_label_encoder.pkl",
+        "default": "/Users/liamxue/Projects/ai/multi-agent-data-science/artifacts/workspace/2026-05-09-12-14/features/encoders/train_xgb_default_label_encoder.pkl",
+        "housing": "/Users/liamxue/Projects/ai/multi-agent-data-science/artifacts/workspace/2026-05-09-12-14/features/encoders/train_xgb_housing_label_encoder.pkl",
+        "loan": "/Users/liamxue/Projects/ai/multi-agent-data-science/artifacts/workspace/2026-05-09-12-14/features/encoders/train_xgb_loan_label_encoder.pkl",
+        "contact": "/Users/liamxue/Projects/ai/multi-agent-data-science/artifacts/workspace/2026-05-09-12-14/features/encoders/train_xgb_contact_label_encoder.pkl",
+        "month": "/Users/liamxue/Projects/ai/multi-agent-data-science/artifacts/workspace/2026-05-09-12-14/features/encoders/train_xgb_month_label_encoder.pkl",
+        "poutcome": "/Users/liamxue/Projects/ai/multi-agent-data-science/artifacts/workspace/2026-05-09-12-14/features/encoders/train_xgb_poutcome_label_encoder.pkl"
+      },
+      "encoding_method": "label",
+      "encoded_columns": [
+        "job",
+        "marital",
+        "education",
+        "default",
+        "housing",
+        "loan",
+        "contact",
+        "month",
+        "poutcome"
+      ],
+      "new_columns": []
+    }
+  },
+  "model_results": {
+    "LogisticRegression": {
+      "model_path": "/Users/liamxue/Projects/ai/multi-agent-data-science/artifacts/workspace/2026-05-09-12-14/models/LogisticRegression_model.pkl",
+      "metrics": {
+        "accuracy": 0.8834,
+        "f1_macro": 0.5925,
+        "f1_weighted": 0.8563
+      }
+    },
+    "RandomForest": {
+      "model_path": "/Users/liamxue/Projects/ai/multi-agent-data-science/artifacts/workspace/2026-05-09-12-14/models/RandomForest_model.pkl",
+      "metrics": {
+        "accuracy": 0.9053,
+        "f1_macro": 0.727,
+        "f1_weighted": 0.896
+      }
+    },
+    "XGBoost": {
+      "model_path": "/Users/liamxue/Projects/ai/multi-agent-data-science/artifacts/workspace/2026-05-09-12-14/models/XGBoost_model.pkl",
+      "metrics": {
+        "accuracy": 0.9019,
+        "f1_macro": 0.7395,
+        "f1_weighted": 0.8971
+      }
+    }
+  },
+  "current_stage": "compare_done",
+  "next_action": "run_feature_engineering",
+  "run_dir": "/Users/liamxue/Projects/ai/multi-agent-data-science/artifacts/workspace/2026-05-09-12-14",
+  "best_model": {
+    "model_name": "XGBoost",
+    "model_path": "/Users/liamxue/Projects/ai/multi-agent-data-science/artifacts/workspace/2026-05-09-12-14/models/XGBoost_model.pkl",
+    "metrics": {
+      "accuracy": 0.9019,
+      "f1_macro": 0.7395,
+      "f1_weighted": 0.8971
+    },
+    "task_type": "classification"
+  }
+}
