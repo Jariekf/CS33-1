@@ -116,26 +116,31 @@ def build_full_pipeline(show_graph: bool = False):
     graph.add_node("compare", compare_models_node)
     graph.set_entry_point("init_run")
     graph.add_edge("init_run", "agent_manager")
-    graph.add_conditional_edges(
-        "agent_manager",
-        _route_after_agent_manager,
-        {"data_clean_agent": "data_clean_agent", END: END},
-    )
-    graph.add_conditional_edges(
-        "data_clean_agent",
-        _route_after_data_clean,
-        {"split": "split", END: END},
-    )
-    graph.add_conditional_edges(
-        "split",
-        _route_after_split,
-        {"eda_agent": "eda_agent", END: END},
-    )
-    graph.add_conditional_edges(
-        "eda_agent",
-        _route_after_eda,
-        {"feature_agent": "feature_agent", END: END},
-    )
+    # graph.add_conditional_edges(
+    #     "agent_manager",
+    #     _route_after_agent_manager,
+    #     {"data_clean_agent": "data_clean_agent", END: END},
+    # )
+    # graph.add_conditional_edges(
+    #     "data_clean_agent",
+    #     _route_after_data_clean,
+    #     {"split": "split", END: END},
+    # )
+    # graph.add_conditional_edges(
+    #     "split",
+    #     _route_after_split,
+    #     {"eda_agent": "eda_agent", END: END},
+    # )
+    # graph.add_conditional_edges(
+    #     "eda_agent",
+    #     _route_after_eda,
+    #     {"feature_agent": "feature_agent", END: END},
+    # )
+    graph.add_edge("agent_manager", "data_clean_agent")
+    graph.add_edge("data_clean_agent", "split")
+    graph.add_edge("split", "eda_agent")
+    graph.add_edge("eda_agent", "feature_agent")
+
     graph.add_conditional_edges(
         "feature_agent",
         _route_after_feature,
@@ -146,6 +151,7 @@ def build_full_pipeline(show_graph: bool = False):
         _route_after_model,
         {"model_agent": "model_agent", "compare": "compare"},
     )
+
     graph.add_edge("compare", END)
     compiled = graph.compile()
     _show_graph_if_needed(compiled, show_graph=show_graph)
