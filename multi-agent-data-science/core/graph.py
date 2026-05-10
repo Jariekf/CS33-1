@@ -126,26 +126,31 @@ def build_full_pipeline(show_graph: bool = False):
     graph.add_node("business_translator", business_translator_graph)
     graph.set_entry_point("init_run")
     graph.add_edge("init_run", "agent_manager")
-    graph.add_conditional_edges(
-        "agent_manager",
-        _route_after_agent_manager,
-        {"data_clean_agent": "data_clean_agent", END: END},
-    )
-    graph.add_conditional_edges(
-        "data_clean_agent",
-        _route_after_data_clean,
-        {"split": "split", END: END},
-    )
-    graph.add_conditional_edges(
-        "split",
-        _route_after_split,
-        {"eda_agent": "eda_agent", END: END},
-    )
-    graph.add_conditional_edges(
-        "eda_agent",
-        _route_after_eda,
-        {"feature_agent": "feature_agent", END: END},
-    )
+    # graph.add_conditional_edges(
+    #     "agent_manager",
+    #     _route_after_agent_manager,
+    #     {"data_clean_agent": "data_clean_agent", END: END},
+    # )
+    # graph.add_conditional_edges(
+    #     "data_clean_agent",
+    #     _route_after_data_clean,
+    #     {"split": "split", END: END},
+    # )
+    # graph.add_conditional_edges(
+    #     "split",
+    #     _route_after_split,
+    #     {"eda_agent": "eda_agent", END: END},
+    # )
+    # graph.add_conditional_edges(
+    #     "eda_agent",
+    #     _route_after_eda,
+    #     {"feature_agent": "feature_agent", END: END},
+    # )
+    graph.add_edge("agent_manager", "data_clean_agent")
+    graph.add_edge("data_clean_agent", "split")
+    graph.add_edge("split", "eda_agent")
+    graph.add_edge("eda_agent", "feature_agent")
+
     graph.add_conditional_edges(
         "feature_agent",
         _route_after_feature,

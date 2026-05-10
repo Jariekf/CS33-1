@@ -39,6 +39,7 @@ class GlobalState(TypedDict, total=False):
 
     # eda
     eda_report: dict[str, Any]
+    eda_charts: list[dict[str, Any]]
     candidate_models: list[str]
     feature_engineering_plan: dict[str, Any]
     model_selection_plan: str
