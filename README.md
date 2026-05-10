@@ -122,10 +122,30 @@ The active LLM is selected in `core/my_llm.py`. By default the pipeline uses `ll
 
 ## Quick Start
 
+**Linux / macOS (bash / zsh):**
+
 ```bash
 python main.py \
   --data datasets/bank-full.csv \
   --description "Binary classification: predict whether a client subscribes to a term deposit (target column: y)" \
+  --request "Please run the full pipeline — clean the data, split it, perform EDA, engineer features, train models, and select the best classifier"
+```
+
+**Windows PowerShell** — use a backtick `` ` `` for line continuation (no trailing spaces), or put everything on one line. The bash `\` continuation does **not** work in PowerShell:
+
+```powershell
+python main.py `
+  --data datasets/bank-full.csv `
+  --description "Binary classification: predict whether a client subscribes to a term deposit (target column: y)" `
+  --request "Please run the full pipeline — clean the data, split it, perform EDA, engineer features, train models, and select the best classifier"
+```
+
+**Windows CMD** — use `^` for line continuation, or run as a single line:
+
+```bat
+python main.py ^
+  --data datasets/bank-full.csv ^
+  --description "Binary classification: predict whether a client subscribes to a term deposit (target column: y)" ^
   --request "Please run the full pipeline — clean the data, split it, perform EDA, engineer features, train models, and select the best classifier"
 ```
 
