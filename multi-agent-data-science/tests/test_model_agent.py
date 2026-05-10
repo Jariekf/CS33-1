@@ -23,6 +23,7 @@ from core.compare_node import compare_models_node
 from core.env_utils import DEEPSEEK_API_KEY
 from tools.model_tools.evaluate_model import evaluate_model
 from tools.model_tools.train_model import train_model
+from tools.model_tools.tune_and_select_model import tune_and_select_model
 
 TESTENV = Path(__file__).resolve().parent / "testenv"
 FEATURE_DIR = TESTENV / "feature"
@@ -129,6 +130,23 @@ def test_train_model_classification(tmp_path):
     assert Path(result["model_path"]).exists()
 
 
+def test_train_model_with_model_params(tmp_path):
+    csv_path = tmp_path / "train.csv"
+    pd.DataFrame({"a": range(60), "b": range(60), "label": [0] * 30 + [1] * 30}).to_csv(csv_path, index=False)
+
+    result = json.loads(train_model.invoke({
+        "featured_train_path": str(csv_path),
+        "model_name": "RandomForest",
+        "task_type": "classification",
+        "target_column": "label",
+        "output_dir": str(tmp_path),
+        "model_params": {"n_estimators": 50, "max_depth": 5},
+    }))
+    assert "error" not in result
+    assert result["model_params"]["n_estimators"] == 50
+    assert Path(result["model_path"]).exists()
+
+
 def test_train_model_missing_target_column(tmp_path):
     csv_path = tmp_path / "train.csv"
     pd.DataFrame({"a": range(10)}).to_csv(csv_path, index=False)
@@ -141,6 +159,36 @@ def test_train_model_missing_target_column(tmp_path):
         "output_dir": str(tmp_path),
     }))
     assert "error" in result
+
+
+def test_tune_and_select_model_regression(tmp_path):
+    ridge_csv = tmp_path / "ridge_train.csv"
+    rf_csv = tmp_path / "rf_train.csv"
+    pd.DataFrame(
+        {"x1": range(120), "x2": range(120), "target": [i * 1.5 + 2 for i in range(120)]}
+    ).to_csv(ridge_csv, index=False)
+    pd.DataFrame(
+        {"x1": range(120), "x2": range(120), "target": [i * 1.5 + 2 for i in range(120)]}
+    ).to_csv(rf_csv, index=False)
+
+    result = json.loads(
+        tune_and_select_model.invoke(
+            {
+                "feature_dataset_ids": {
+                    "Ridge": str(ridge_csv),
+                    "RandomForestRegressor": str(rf_csv),
+                },
+                "candidate_models": ["Ridge", "RandomForestRegressor"],
+                "task_type": "regression",
+                "target_column": "target",
+                "cv_folds": 3,
+                "max_iter_per_model": 4,
+            }
+        )
+    )
+    assert "error" not in result
+    assert result["best_model_name"] in {"Ridge", "RandomForestRegressor"}
+    assert "per_model_summary" in result
 
 
 # ── evaluate_model 工具 ──────────────────────────────────────────────────────
