@@ -19,6 +19,7 @@ from agent.data_clean_agent import build_data_clean_agent
 from agent.eda_agent import build_eda_agent
 from agent.feature_agent import build_feature_agent, _get_current_model
 from agent.model_agent import build_model_agent, _get_current_model as _get_current_model_for_eval
+from agent.supervisor_agent import build_supervisor_agent
 from core.compare_node import compare_models_node
 from core.dataset_split import split_dataset_node
 from core.global_state import GlobalState
@@ -33,50 +34,87 @@ def _init_run_node(state: GlobalState) -> GlobalState:
 
 
 def _route_after_agent_manager(state: GlobalState) -> str:
-    """Manager 结束后：若已生成清洗计划且约定下一步为清洗，则进入 Data Clean。"""
+    """Manager 结束后：若已生成清洗计划，则进入 Supervisor 验收。"""
     plan = state.get("cleaning_plan")
     if (
         state.get("next_action") == "run_data_cleaning"
         and isinstance(plan, dict)
         and bool(plan)
     ):
-        return "data_clean_agent"
+        return "supervisor_agent"
     return END
 
 
 def _route_after_data_clean(state: GlobalState) -> str:
-    """Data Clean 结束后：清洗通过则进入 split，否则结束。"""
-    if state.get("cleaning_passed"):
-        return "split"
+    """Data Clean 结束后：清洗通过则进入 Supervisor 验收，否则结束。"""
+    if state.get("current_stage") == "cleaning_saved" and state.get("cleaning_passed"):
+        return "supervisor_agent"
     return END
 
 
 def _route_after_split(state: GlobalState) -> str:
-    """Split 结束后：成功则进入 EDA，否则结束。"""
+    """Split 是 deterministic 节点，跳过 Supervisor 直接进入 EDA。"""
     if state.get("current_stage") == "split_done":
         return "eda_agent"
     return END
 
 
 def _route_after_eda(state: GlobalState) -> str:
-    """EDA 结束后：有候选模型则进入 Feature Agent，否则结束。"""
-    if state.get("candidate_models"):
-        return "feature_agent"
+    """EDA 结束后：有候选模型则进入 Supervisor 验收，否则结束。"""
+    if state.get("current_stage") == "eda_done" and state.get("candidate_models"):
+        return "supervisor_agent"
     return END
 
 
 def _route_after_feature(state: GlobalState) -> str:
-    """Feature Agent 结束后：还有未处理的模型则循环，否则进入 Model Agent。"""
-    if _get_current_model(state) is not None:
-        return "feature_agent"
-    return "model_agent"
+    """Feature Agent 每处理完一个模型后进入 Supervisor 验收。"""
+    if state.get("current_stage") == "feature_saved":
+        return "supervisor_agent"
+    return END
 
 
 def _route_after_model(state: GlobalState) -> str:
-    """Model Agent 结束后：还有未评估的模型则循环，否则进入 Compare。"""
-    if _get_current_model_for_eval(state) is not None:
-        return "model_agent"
-    return "compare"
+    """Model Agent 每评估完一个模型后进入 Supervisor 验收。"""
+    if state.get("current_stage") == "model_evaluated":
+        return "supervisor_agent"
+    return END
+
+
+def _route_after_compare(state: GlobalState) -> str:
+    """Compare 是 deterministic 节点，跳过 Supervisor 直接结束。"""
+    return END
+
+
+def _route_after_supervisor(state: GlobalState) -> str:
+    """Supervisor 通过则放行；不通过则重跑，超过上限按防死锁策略放行。"""
+    review = state.get("supervisor_review") or {}
+    reviewed_stage = review.get("reviewed_stage") or state.get("current_stage", "")
+    next_action = state.get("next_action") or review.get("next_action", "")
+
+    if next_action == "stop":
+        return END
+
+    if not state.get("supervisor_passed") and not review.get("retry_exhausted"):
+        retry_routes = {
+            "cleaning_plan_created": "agent_manager",
+            "cleaning_saved": "data_clean_agent",
+            "eda_done": "eda_agent",
+            "feature_saved": "feature_agent",
+            "model_evaluated": "model_agent",
+        }
+        return retry_routes.get(reviewed_stage, END)
+
+    if reviewed_stage == "cleaning_plan_created":
+        return "data_clean_agent"
+    if reviewed_stage == "cleaning_saved":
+        return "split"
+    if reviewed_stage == "eda_done":
+        return "feature_agent"
+    if reviewed_stage == "feature_saved":
+        return "feature_agent" if _get_current_model(state) is not None else "model_agent"
+    if reviewed_stage == "model_evaluated":
+        return "model_agent" if _get_current_model_for_eval(state) is not None else "compare"
+    return END
 
 
 def _show_graph_if_needed(compiled, show_graph: bool) -> None:
@@ -104,6 +142,7 @@ def build_full_pipeline(show_graph: bool = False):
     eda_graph = build_eda_agent(show_graph=False)
     feature_graph = build_feature_agent(show_graph=False)
     model_graph = build_model_agent(show_graph=False)
+    supervisor_graph = build_supervisor_agent(show_graph=False)
 
     graph = StateGraph(GlobalState)
     graph.add_node("init_run", _init_run_node)
@@ -114,17 +153,18 @@ def build_full_pipeline(show_graph: bool = False):
     graph.add_node("feature_agent", feature_graph)
     graph.add_node("model_agent", model_graph)
     graph.add_node("compare", compare_models_node)
+    graph.add_node("supervisor_agent", supervisor_graph)
     graph.set_entry_point("init_run")
     graph.add_edge("init_run", "agent_manager")
     graph.add_conditional_edges(
         "agent_manager",
         _route_after_agent_manager,
-        {"data_clean_agent": "data_clean_agent", END: END},
+        {"supervisor_agent": "supervisor_agent", END: END},
     )
     graph.add_conditional_edges(
         "data_clean_agent",
         _route_after_data_clean,
-        {"split": "split", END: END},
+        {"supervisor_agent": "supervisor_agent", END: END},
     )
     graph.add_conditional_edges(
         "split",
@@ -134,19 +174,31 @@ def build_full_pipeline(show_graph: bool = False):
     graph.add_conditional_edges(
         "eda_agent",
         _route_after_eda,
-        {"feature_agent": "feature_agent", END: END},
+        {"supervisor_agent": "supervisor_agent", END: END},
     )
     graph.add_conditional_edges(
         "feature_agent",
         _route_after_feature,
-        {"feature_agent": "feature_agent", "model_agent": "model_agent"},
+        {"supervisor_agent": "supervisor_agent", END: END},
     )
     graph.add_conditional_edges(
         "model_agent",
         _route_after_model,
-        {"model_agent": "model_agent", "compare": "compare"},
+        {"supervisor_agent": "supervisor_agent", END: END},
     )
     graph.add_edge("compare", END)
+    graph.add_conditional_edges(
+        "supervisor_agent",
+        _route_after_supervisor,
+        {
+            "agent_manager": "agent_manager",
+            "data_clean_agent": "data_clean_agent",
+            "eda_agent": "eda_agent",
+            "feature_agent": "feature_agent",
+            "model_agent": "model_agent",
+            END: END,
+        },
+    )
     compiled = graph.compile()
     _show_graph_if_needed(compiled, show_graph=show_graph)
     return compiled

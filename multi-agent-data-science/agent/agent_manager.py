@@ -144,7 +144,7 @@ def _route_after_manager(state: GlobalState) -> str:
     last_msg = state["messages"][-1]
     if isinstance(last_msg, AIMessage) and last_msg.tool_calls:
         return "tools"
-    save_agent_report("agent_manager", last_msg)
+    save_agent_report("agent_manager", last_msg, run_dir=state.get("run_dir") or "")
     return END
 
 

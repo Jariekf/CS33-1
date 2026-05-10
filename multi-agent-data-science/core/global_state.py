@@ -58,6 +58,12 @@ class GlobalState(TypedDict, total=False):
     best_model: dict[str, Any]
     model_report: dict[str, Any]
 
+    # supervision
+    supervisor_artifact_validation: dict[str, Any]
+    supervisor_review: dict[str, Any]
+    supervisor_passed: bool
+    supervisor_feedback: str
+
     # final report
     business_report: str
 
