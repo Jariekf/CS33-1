@@ -22,6 +22,7 @@ from agent.eda_agent import (
 )
 from core.env_utils import DEEPSEEK_API_KEY
 from tools.eda_tools.compute_correlation_matrix import compute_correlation_matrix
+from tools.eda_tools.generate_eda_charts import generate_eda_charts
 from tools.eda_tools.profile_training_data import profile_training_data
 from tools.eda_tools.select_candidate_models import (
     CLASSIFICATION_POOL,
@@ -156,6 +157,33 @@ def test_handle_eda_step_merges_report():
     assert len(update["eda_report"]["steps"]) == 2
 
 
+def test_handle_generate_eda_charts_writes_chart_state():
+    payload = {
+        "output_dir": "artifacts/workspace/run/plots",
+        "plot_count": 1,
+        "charts": [
+            {
+                "name": "numeric_distributions.png",
+                "path": "artifacts/workspace/run/plots/numeric_distributions.png",
+                "rel_path": "plots/numeric_distributions.png",
+                "desc": "Histograms for numeric features",
+            }
+        ],
+    }
+    update = _tool_state_update_node({
+        "messages": [
+            ToolMessage(
+                content=json.dumps(payload),
+                name="generate_eda_charts",
+                tool_call_id="test-id",
+            )
+        ]
+    })
+    assert update["current_stage"] == "eda_step_done"
+    assert update["eda_charts"] == payload["charts"]
+    assert update["eda_report"]["charts"] == payload["charts"]
+
+
 def test_handle_eda_step_records_error():
     payload = {"error": {"type": "FileNotFoundError", "message": "文件不存在"}}
     update = _tool_state_update_node({
@@ -206,6 +234,64 @@ def test_compute_correlation_matrix_no_numeric(tmp_path):
 
     result = json.loads(compute_correlation_matrix.invoke({"file_path": str(csv_path)}))
     assert "error" in result
+
+
+def test_generate_eda_charts_writes_pngs_to_requested_output_dir(tmp_path):
+    train_csv = tmp_path / "train.csv"
+    test_csv = tmp_path / "test.csv"
+    pd.DataFrame({
+        "age": [22, 35, 41, 58, 62, 29, 47, 51],
+        "balance": [100, 250, 310, 125, 500, 75, 420, 390],
+        "job": ["admin", "tech", "admin", "retired", "tech", "student", "admin", "retired"],
+        "subscribed": ["no", "yes", "no", "yes", "yes", "no", "yes", "no"],
+    }).to_csv(train_csv, index=False)
+    pd.DataFrame({
+        "age": [31, 44, 53, 27],
+        "balance": [120, 330, 275, 90],
+        "job": ["tech", "admin", "retired", "student"],
+        "subscribed": ["no", "yes", "yes", "no"],
+    }).to_csv(test_csv, index=False)
+
+    plots_dir = tmp_path / "plots"
+    result = json.loads(generate_eda_charts.invoke({
+        "file_path": str(train_csv),
+        "output_dir": str(plots_dir),
+        "target_column": "subscribed",
+        "test_file_path": str(test_csv),
+    }))
+
+    assert "error" not in result
+    assert result["output_dir"] == str(plots_dir)
+    assert result["plot_count"] >= 4
+    chart_names = {chart["name"] for chart in result["charts"]}
+    assert "numeric_distributions.png" in chart_names
+    assert "categorical_distributions.png" in chart_names
+    assert "corr_heatmap.png" in chart_names
+    assert "class_balance.png" in chart_names
+    for chart in result["charts"]:
+        assert Path(chart["path"]).is_file()
+
+
+def test_generate_eda_charts_uses_explicit_task_type_over_heuristic(tmp_path):
+    csv_path = tmp_path / "regression_train.csv"
+    pd.DataFrame({
+        "feature_a": [1, 2, 3, 4, 5, 6, 7, 8],
+        "feature_b": [2, 4, 6, 8, 10, 12, 14, 16],
+        "score": [1, 2, 2, 3, 3, 4, 4, 5],
+    }).to_csv(csv_path, index=False)
+
+    result = json.loads(generate_eda_charts.invoke({
+        "file_path": str(csv_path),
+        "output_dir": str(tmp_path / "plots"),
+        "target_column": "score",
+        "task_type": "regression",
+    }))
+
+    assert "error" not in result
+    chart_names = {chart["name"] for chart in result["charts"]}
+    assert "target_distribution.png" in chart_names
+    assert "numeric_vs_target_regression.png" in chart_names
+    assert "class_balance.png" not in chart_names
 
 
 # ── 候选池常量 ──────────────────────────────────────────────────────────────

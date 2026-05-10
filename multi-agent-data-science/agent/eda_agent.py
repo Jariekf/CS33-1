@@ -17,7 +17,7 @@ from core.global_state import GlobalState
 from core.my_llm import llm_deepseek
 from core.report_writer import save_agent_report
 from tools.eda_tools.compute_correlation_matrix import compute_correlation_matrix
-from tools.eda_tools.plot_distributions import plot_distributions
+from tools.eda_tools.generate_eda_charts import generate_eda_charts
 from tools.eda_tools.profile_training_data import profile_training_data
 from tools.eda_tools.select_candidate_models import (
     CLASSIFICATION_POOL,
@@ -28,7 +28,7 @@ from tools.eda_tools.select_candidate_models import (
 tools = [
     profile_training_data,
     compute_correlation_matrix,
-    plot_distributions,
+    generate_eda_charts,
     select_candidate_models,
 ]
 llm_with_tools = llm_deepseek.bind_tools(tools)
@@ -39,6 +39,9 @@ def _merge_eda_report(state: GlobalState, tool_name: str, payload: dict[str, Any
     steps = list(existing.get("steps", []))
     steps.append({"tool": tool_name, "result": payload})
     existing["steps"] = steps
+    if tool_name == "generate_eda_charts" and isinstance(payload.get("charts"), list):
+        existing["charts"] = payload["charts"]
+        existing["chart_output_dir"] = payload.get("output_dir", "")
     return existing
 
 
@@ -48,6 +51,7 @@ def _eda_node(state: GlobalState) -> GlobalState:
     task_type = (state.get("task_type") or "unknown").lower()
     target_column = state.get("target_column") or ""
     description = state.get("description") or ""
+    testing_data_path = state.get("testing_data_path") or ""
 
     pool = CLASSIFICATION_POOL if task_type == "classification" else REGRESSION_POOL
     pool_str = "、".join(pool)
@@ -64,7 +68,10 @@ def _eda_node(state: GlobalState) -> GlobalState:
         "工作流程（按顺序执行）：\n"
         "1. 调用 profile_training_data 获取训练集数据画像；\n"
         "2. 调用 compute_correlation_matrix 计算特征相关矩阵（传入目标列名）；\n"
-        f"3. 调用 plot_distributions 生成数值列分布图，output_dir 传入：{run_dir + '/plots' if run_dir else ''}（为空则使用默认路径）；\n"
+        "3. 调用 generate_eda_charts 生成完整 EDA 图表："
+        f"file_path 传入训练集路径，target_column 传入目标列，task_type 传入 `{task_type}`，"
+        f"test_file_path 传入测试集路径 `{testing_data_path}`，"
+        f"output_dir 传入：{run_dir + '/plots' if run_dir else ''}（为空则使用默认路径）；\n"
         "4. 结合以上信息，制定各模型的特征工程方案和模型选择理由，"
         "调用 select_candidate_models 提交最终决策。\n"
         f"候选模型池（{task_type}）：{pool_str}。\n"
@@ -84,7 +91,7 @@ def _tool_state_update_node(state: GlobalState) -> GlobalState:
     handlers = {
         "profile_training_data": _handle_eda_step,
         "compute_correlation_matrix": _handle_eda_step,
-        "plot_distributions": _handle_eda_step,
+        "generate_eda_charts": _handle_eda_step,
         "select_candidate_models": _handle_select_models,
     }
     handler = handlers.get(last_msg.name)
@@ -108,10 +115,13 @@ def _handle_eda_step(state: GlobalState, tool_message: ToolMessage) -> GlobalSta
             "errors": (state.get("errors") or [])
             + [{"stage": "eda", "tool": tool_message.name, **payload["error"]}],
         }
-    return {
+    update: GlobalState = {
         "eda_report": report,
         "current_stage": "eda_step_done",
     }
+    if tool_message.name == "generate_eda_charts" and isinstance(payload.get("charts"), list):
+        update["eda_charts"] = payload["charts"]
+    return update
 
 
 def _handle_select_models(state: GlobalState, tool_message: ToolMessage) -> GlobalState:
