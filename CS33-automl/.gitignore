@@ -1,0 +1,15 @@
+../.idea/
+__pycache__/
+*.pyc
+.gemini/
+logs/
+
+.env
+.venv/
+docs/rules.md
+.vscode/
+workspace/
+!workspace/.gitkeep
+debug-*.log
+
+.DS_Store
