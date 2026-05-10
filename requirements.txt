@@ -1,60 +1,21 @@
-# Multi-agent data analytics stack — dependency list
+# Core framework
+langgraph==1.1.10
+langchain-core==1.3.2
+langchain-openai==1.2.1
+langsmith==0.8.0
+openai==2.33.0
 
-# ---- LangGraph core ----
-langgraph>=0.2.0
-langchain-core>=0.3.0
-langchain-openai>=0.2.0
-langchain-community>=0.3.0
-langchain-text-splitters>=0.3.0
-langchain-chroma>=0.1.0
-chromadb>=0.5.0
+# Data science
+pandas==3.0.2
+numpy==2.4.4
+scikit-learn==1.8.0
+xgboost==3.2.0
 
-# ---- Data processing ----
-numpy>=1.24.0
-scipy>=1.10.0          # Core stack for sklearn / statsmodels; sparse matrices, hypothesis tests, etc.
-pandas>=2.0.0
-pyarrow>=14.0.0        # Recommended backend for pandas 2.x; faster CSV I/O (read_csv engine='pyarrow')
-openpyxl>=3.1.0        # XLSX data dictionaries in tools/description_loader.py (.pdf/.docx: optional pypdf / python-docx)
-tabulate>=0.9.0        # Required by pandas .to_markdown() (table previews in description_loader)
-# ---- Machine learning ----
-scikit-learn>=1.4.0
-xgboost>=2.0.0         # Gradient boosting
-lightgbm>=4.0.0        # Gradient boosting
-catboost>=1.2.0        # Gradient boosting with native categorical support (no manual encoding)
+# Visualisation (optional — used for graph export)
+matplotlib>=3.9.0
 
-imbalanced-learn>=0.12.0 # Imbalanced learning utilities, e.g. SMOTE oversampling / undersampling
-statsmodels>=0.14.0    # Classical stats & time series: ARIMA / SARIMAX / OLS, etc.
-prophet>=1.1.0         # Meta OSS; trend + seasonality forecasting
-optuna>=3.0.0          # Bayesian optimization; typically 3-10x more sample-efficient than blind grid search
-scikit-optimize>=0.10.0  # Alternative Bayesian tuner; sklearn-style API (BayesSearchCV)
-# ---- Deep learning ----
-# tensorflow>=2.13.0              # Optional TensorFlow stack (use either TF or Torch, not both required)
-# ---- Model interpretability ----
-shap>=0.44.0           # SHAP for arbitrary models; handy for Business Action Translator narratives
-joblib>=1.3.0          # Parallel backend for sklearn; pinned to limit version drift
-# ---- Visualization (evaluation plots) ----
-matplotlib>=3.7.0      # Confusion matrices, learning curves, feature-importance bars
-seaborn>=0.13.0        # Correlation heatmaps, distribution plots; less boilerplate than raw matplotlib
-# ---- Literature retrieval ----
-arxiv>=2.1.0
-duckduckgo-search>=6.0.0
-# Optional: Kaggle kernel metadata (needs ~/.kaggle/kaggle.json)
-kaggle>=1.6.0
+# Environment
+python-dotenv==1.2.2
 
-# ---- McKinsey RAG corpus prep ----
-pyyaml>=6.0           # manifest.yaml / manifest.lock.yaml
-requests>=2.31.0      # Fetch pages via Jina Reader (r.jina.ai)
-pymupdf4llm>=0.0.17   # Local PDF -> Markdown while preserving headings (H1-H4) and lists
-
-# ---- Environment variables ----
-python-dotenv>=1.0.0
-
-# ---- Structured output ----
-pydantic>=2.0.0
-
-# ---- RAG reranking (optional but recommended) ----
-sentence-transformers>=3.0.0
-
-# ---- Optional: advanced tuning ----
-# optuna>=3.0.0
-# flaml>=2.0.0
+# Testing
+pytest==9.0.3

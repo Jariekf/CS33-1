@@ -1,0 +1,257 @@
+from __future__ import annotations
+
+import json
+import sys
+from pathlib import Path
+from typing import Any
+
+PROJECT_ROOT = Path(__file__).resolve().parents[1]
+if str(PROJECT_ROOT) not in sys.path:
+    sys.path.insert(0, str(PROJECT_ROOT))
+
+from langchain_core.messages import AIMessage, HumanMessage, SystemMessage, ToolMessage
+from langgraph.graph import END, StateGraph
+from langgraph.prebuilt import ToolNode
+
+from core.global_state import GlobalState
+from core.my_llm import llm_deepseek
+from core.report_writer import save_agent_report
+from tools.dataclean_tools.clean_data_types import clean_data_types
+from tools.dataclean_tools.clean_duplicates import clean_duplicates
+from tools.dataclean_tools.clean_missing_values import clean_missing_values
+from tools.dataclean_tools.clean_outliers import clean_outliers
+from tools.dataclean_tools.load_dataset_to_store import load_dataset_to_store
+from tools.dataclean_tools.save_dataset_from_store import save_dataset_from_store
+
+tools = [
+    load_dataset_to_store,
+    save_dataset_from_store,
+    clean_data_types,
+    clean_missing_values,
+    clean_outliers,
+    clean_duplicates,
+]
+llm_with_tools = llm_deepseek.bind_tools(tools)
+
+
+def _merge_cleaning_report(
+    state: GlobalState, tool_name: str, payload: dict[str, Any]
+) -> dict[str, Any]:
+    existing = dict(state.get("cleaning_report") or {})
+    steps = list(existing.get("steps", []))
+    steps.append({"tool": tool_name, "result": payload})
+    existing["steps"] = steps
+    return existing
+
+
+def _data_clean_node(state: GlobalState) -> GlobalState:
+    messages = state["messages"]
+    data_path = state.get("data_path")
+    cleaning_plan = state.get("cleaning_plan")
+    dataset_id = state.get("dataset_id")
+    user_request = state.get("user_request")
+    description = state.get("description")
+    cleaned_data_path_hint = state.get("cleaned_data_path")
+    run_dir = state.get("run_dir") or ""
+
+    plan_text = (
+        json.dumps(cleaning_plan, ensure_ascii=False, indent=2, default=str)
+        if cleaning_plan
+        else "未提供（请根据用户说明自行决定清洗步骤）。"
+    )
+
+    default_save_path = (
+        f"{run_dir}/<filename>_cleaned.csv"
+        if run_dir
+        else cleaned_data_path_hint or "(项目根下 artifacts/cleaned_<dataset_id>.csv 等合理路径)"
+    )
+
+    system_parts = [
+        "你是数据清洗执行 Agent（ReAct）：通过调用工具在内存 dataset_store 中完成清洗并落盘。",
+        f"默认原始数据路径：{data_path or '未提供'}。",
+        f"当前内存 dataset_id：{dataset_id or '尚未加载'}。",
+        f"数据集描述：{description or '未提供'}。",
+        f"用户诉求：{user_request or '未提供'}。",
+        f"本次运行工作目录：{run_dir or '未设置'}。所有输出文件应保存至此目录下。",
+        "若尚未加载数据，应优先调用 load_dataset_to_store(file_path=...)；路径缺失时使用上面的默认路径。",
+        "后续按清洗计划依次调用 clean_data_types、clean_missing_values、clean_outliers、clean_duplicates；"
+        "所有清洗工具的 dataset_id 必须与 load 返回的 dataset_id 一致。",
+        "计划中若有 drop_columns：当前工具集不包含删列工具，请在最终回复中列出建议删除的列及原因，不要编造已删除。",
+        f"完成后必须调用 save_dataset_from_store 写出 CSV，output_path 使用：{default_save_path}。",
+        "\n--- cleaning_plan ---\n",
+        plan_text,
+    ]
+
+    messages = [SystemMessage(content="".join(system_parts)), *messages]
+    response = llm_with_tools.invoke(messages)
+    return {"messages": [response]}
+
+
+def _tool_state_update_node(state: GlobalState) -> GlobalState:
+    last_msg = state["messages"][-1]
+    if not isinstance(last_msg, ToolMessage) or not last_msg.name:
+        return {}
+
+    handlers = {
+        "load_dataset_to_store": _handle_load_dataset,
+        "save_dataset_from_store": _handle_save_dataset,
+        "clean_data_types": _handle_clean_step,
+        "clean_missing_values": _handle_clean_step,
+        "clean_outliers": _handle_clean_step,
+        "clean_duplicates": _handle_clean_step,
+    }
+    handler = handlers.get(last_msg.name)
+    if handler is None:
+        return {}
+    return handler(state, last_msg)
+
+
+def _parse_tool_payload(tool_message: ToolMessage) -> dict[str, Any]:
+    try:
+        return json.loads(str(tool_message.content))
+    except json.JSONDecodeError:
+        return {
+            "error": {
+                "type": "JSONDecodeError",
+                "message": "工具输出不是合法 JSON",
+            }
+        }
+
+
+def _handle_load_dataset(state: GlobalState, tool_message: ToolMessage) -> GlobalState:
+    payload = _parse_tool_payload(tool_message)
+    report = _merge_cleaning_report(state, tool_message.name, payload)
+    if "error" in payload:
+        return {
+            "cleaning_report": report,
+            "current_stage": "cleaning_load_failed",
+            "errors": (state.get("errors") or [])
+            + [{"stage": "cleaning_load", **payload["error"]}],
+        }
+    return {
+        "dataset_id": payload["dataset_id"],
+        "cleaning_report": report,
+        "current_stage": "dataset_loaded",
+    }
+
+
+def _handle_save_dataset(state: GlobalState, tool_message: ToolMessage) -> GlobalState:
+    payload = _parse_tool_payload(tool_message)
+    report = _merge_cleaning_report(state, tool_message.name, payload)
+    if "error" in payload:
+        return {
+            "cleaning_report": report,
+            "current_stage": "cleaning_save_failed",
+            "errors": (state.get("errors") or [])
+            + [{"stage": "cleaning_save", **payload["error"]}],
+        }
+    return {
+        "cleaned_data_path": payload["output_path"],
+        "cleaning_report": report,
+        "cleaning_passed": True,
+        "current_stage": "cleaning_saved",
+        "next_action": "",
+    }
+
+
+def _handle_clean_step(state: GlobalState, tool_message: ToolMessage) -> GlobalState:
+    payload = _parse_tool_payload(tool_message)
+    report = _merge_cleaning_report(state, tool_message.name, payload)
+    if "error" in payload:
+        return {
+            "cleaning_report": report,
+            "current_stage": "cleaning_step_failed",
+            "errors": (state.get("errors") or [])
+            + [{"stage": "cleaning_step", "tool": tool_message.name, **payload["error"]}],
+        }
+    return {
+        "cleaning_report": report,
+        "current_stage": "cleaning_step_done",
+    }
+
+
+def _route_after_agent(state: GlobalState) -> str:
+    last_msg = state["messages"][-1]
+    if isinstance(last_msg, AIMessage) and last_msg.tool_calls:
+        return "tools"
+    save_agent_report("data_clean_agent", last_msg, run_dir=state.get("run_dir") or "")
+    return END
+
+
+def _show_graph_if_needed(agent_graph, show_graph: bool) -> None:
+    if not show_graph:
+        return
+    try:
+        output_dir = PROJECT_ROOT / "artifacts"
+        output_dir.mkdir(parents=True, exist_ok=True)
+        image_path = output_dir / "data_clean_agent_graph.png"
+        image_bytes = agent_graph.get_graph().draw_mermaid_png()
+        image_path.write_bytes(image_bytes)
+        print(f"Graph 图片已保存: {image_path}")
+        try:
+            from IPython.display import Image, display
+
+            display(Image(filename=str(image_path)))
+        except Exception:
+            pass
+    except Exception as exc:
+        print(f"图渲染失败: {exc}")
+
+
+def _pretty_print_message(message) -> None:
+    try:
+        message.pretty_print()
+    except UnicodeEncodeError:
+        encoding = sys.stdout.encoding or "utf-8"
+        text = message.pretty_repr()
+        safe_text = text.encode(encoding, errors="replace").decode(encoding)
+        print(safe_text)
+
+
+def build_data_clean_agent(show_graph: bool = False):
+    graph = StateGraph(GlobalState)
+    graph.add_node("data_clean_agent", _data_clean_node)
+    graph.add_node("tools", ToolNode(tools))
+    graph.add_node("tool_state_update", _tool_state_update_node)
+    graph.set_entry_point("data_clean_agent")
+    graph.add_conditional_edges(
+        "data_clean_agent", _route_after_agent, {"tools": "tools", END: END}
+    )
+    graph.add_edge("tools", "tool_state_update")
+    graph.add_edge("tool_state_update", "data_clean_agent")
+    compiled = graph.compile()
+    _show_graph_if_needed(compiled, show_graph=show_graph)
+    return compiled
+
+
+data_clean_agent = build_data_clean_agent()
+
+
+if __name__ == "__main__":
+    data_clean_agent = build_data_clean_agent(show_graph=True)
+    user_input = input("请输入：")
+    events = data_clean_agent.stream(
+        {
+            "messages": [HumanMessage(content=user_input)],
+            "user_request": user_input,
+            "data_path": str(PROJECT_ROOT / "datasets" / "Financials.csv"),
+            "description": "这是一个金融行业销售数据集，包含销售、折扣、利润、国家、产品和时间字段。",
+            "cleaning_plan": {
+                "summary": "示例：先做数值列货币字符串转数值，再将 Date 转为日期（可按画像扩展）。",
+                "column_name_actions": [],
+                "type_conversions": [
+                    {"column": "Year", "target_type": "numeric"},
+                    {"column": "Date", "target_type": "datetime"},
+                ],
+                "missing_value_actions": [],
+                "outlier_actions": [],
+                "drop_columns": [],
+                "notes": "",
+            },
+            "cleaned_data_path": str(PROJECT_ROOT / "artifacts" / "Financials_cleaned.csv"),
+        },
+        stream_mode="values",
+    )
+    for event in events:
+        if "messages" in event:
+            _pretty_print_message(event["messages"][-1])

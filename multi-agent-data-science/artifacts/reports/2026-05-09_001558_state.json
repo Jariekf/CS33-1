@@ -1,0 +1,32 @@
+{
+  "task_type": "classification",
+  "model_results": {
+    "LogisticRegression": {
+      "model_path": "/a.pkl",
+      "metrics": {
+        "f1_weighted": 0.78
+      }
+    },
+    "RandomForest": {
+      "model_path": "/b.pkl",
+      "metrics": {
+        "f1_weighted": 0.91
+      }
+    },
+    "XGBoost": {
+      "model_path": "/c.pkl",
+      "metrics": {
+        "f1_weighted": 0.85
+      }
+    }
+  },
+  "best_model": {
+    "model_name": "RandomForest",
+    "model_path": "/b.pkl",
+    "metrics": {
+      "f1_weighted": 0.91
+    },
+    "task_type": "classification"
+  },
+  "current_stage": "compare_done"
+}
