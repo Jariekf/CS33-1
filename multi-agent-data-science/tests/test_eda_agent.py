@@ -24,10 +24,10 @@ from core.env_utils import DEEPSEEK_API_KEY
 from tools.eda_tools.compute_correlation_matrix import compute_correlation_matrix
 from tools.eda_tools.generate_eda_charts import generate_eda_charts
 from tools.eda_tools.profile_training_data import profile_training_data
-from tools.eda_tools.select_candidate_models import (
+from tools.eda_tools.select_candidate_models_and_metrics import (
     CLASSIFICATION_POOL,
     REGRESSION_POOL,
-    select_candidate_models,
+    select_candidate_models_and_metrics,
 )
 
 TESTENV = Path(__file__).resolve().parent / "testenv"
@@ -49,44 +49,58 @@ def test_eda_agent_graph_structure():
     assert ("tool_state_update", "eda_agent") in edges
 
 
-# ── select_candidate_models 工具校验 ────────────────────────────────────────
+# ── select_candidate_models_and_metrics 工具校验 ────────────────────────────
+
+_VALID_CLF_INVOKE = {
+    "task_type": "classification",
+    "selected_models": ["LogisticRegression", "RandomForest", "XGBoost"],
+    "feature_engineering_plan": {
+        "LogisticRegression": {"scaling": True, "encoding": "onehot"},
+        "RandomForest": {"scaling": False, "encoding": "label"},
+        "XGBoost": {"scaling": False, "encoding": "label"},
+    },
+    "model_selection_plan": "基于数据集规模和特征类型选择",
+    "primary_metric": "f1_weighted",
+    "evaluation_metrics": ["accuracy", "f1_weighted", "roc_auc"],
+    "metrics_rationale": "类别基本均衡，f1_weighted 为主指标，roc_auc 辅助排序评估。",
+}
+
+_VALID_REG_INVOKE = {
+    "task_type": "regression",
+    "selected_models": ["LinearRegression", "Ridge", "XGBoostRegressor"],
+    "feature_engineering_plan": {},
+    "model_selection_plan": "回归任务，目标列连续分布",
+    "primary_metric": "r2",
+    "evaluation_metrics": ["r2", "rmse", "mae"],
+    "metrics_rationale": "回归标准三件套，r2 为主指标。",
+}
+
 
 def test_select_models_classification_valid():
     result = json.loads(
-        select_candidate_models.invoke({
-            "task_type": "classification",
-            "selected_models": ["LogisticRegression", "RandomForest", "XGBoost"],
-            "feature_engineering_plan": {
-                "LogisticRegression": {"scaling": True, "encoding": "onehot"},
-                "RandomForest": {"scaling": False, "encoding": "label"},
-                "XGBoost": {"scaling": False, "encoding": "label"},
-            },
-            "model_selection_plan": "基于数据集规模和特征类型选择",
-        })
+        select_candidate_models_and_metrics.invoke(_VALID_CLF_INVOKE)
     )
     assert result["selected_models"] == ["LogisticRegression", "RandomForest", "XGBoost"]
+    assert result["primary_metric"] == "f1_weighted"
+    assert result["evaluation_metrics"] == ["accuracy", "f1_weighted", "roc_auc"]
     assert "error" not in result
 
 
 def test_select_models_regression_valid():
     result = json.loads(
-        select_candidate_models.invoke({
-            "task_type": "regression",
-            "selected_models": ["LinearRegression", "Ridge", "XGBoostRegressor"],
-            "feature_engineering_plan": {},
-            "model_selection_plan": "回归任务，目标列连续分布",
-        })
+        select_candidate_models_and_metrics.invoke(_VALID_REG_INVOKE)
     )
     assert result["selected_models"] == ["LinearRegression", "Ridge", "XGBoostRegressor"]
+    assert result["primary_metric"] == "r2"
+    assert "r2" in result["evaluation_metrics"]
+    assert "error" not in result
 
 
 def test_select_models_invalid_name_rejected():
     result = json.loads(
-        select_candidate_models.invoke({
-            "task_type": "classification",
+        select_candidate_models_and_metrics.invoke({
+            **_VALID_CLF_INVOKE,
             "selected_models": ["LogisticRegression", "RandomForest", "xgboost"],
-            "feature_engineering_plan": {},
-            "model_selection_plan": "test",
         })
     )
     assert "error" in result
@@ -94,11 +108,9 @@ def test_select_models_invalid_name_rejected():
 
 def test_select_models_wrong_count_rejected():
     result = json.loads(
-        select_candidate_models.invoke({
-            "task_type": "regression",
+        select_candidate_models_and_metrics.invoke({
+            **_VALID_REG_INVOKE,
             "selected_models": ["LinearRegression", "Ridge"],
-            "feature_engineering_plan": {},
-            "model_selection_plan": "test",
         })
     )
     assert "error" in result
@@ -106,11 +118,56 @@ def test_select_models_wrong_count_rejected():
 
 def test_select_models_cross_pool_rejected():
     result = json.loads(
-        select_candidate_models.invoke({
-            "task_type": "classification",
+        select_candidate_models_and_metrics.invoke({
+            **_VALID_CLF_INVOKE,
             "selected_models": ["LogisticRegression", "RandomForest", "LinearRegression"],
-            "feature_engineering_plan": {},
-            "model_selection_plan": "test",
+        })
+    )
+    assert "error" in result
+
+
+# ── metrics 校验 ────────────────────────────────────────────────────────────
+
+def test_invalid_primary_metric_rejected():
+    """primary_metric 不在白名单内应返回 error。"""
+    result = json.loads(
+        select_candidate_models_and_metrics.invoke({
+            **_VALID_CLF_INVOKE,
+            "primary_metric": "neg_root_mean_squared_error",  # 不允许 sklearn 内部名
+        })
+    )
+    assert "error" in result
+
+
+def test_invalid_evaluation_metric_rejected():
+    """evaluation_metrics 含非法项应返回 error。"""
+    result = json.loads(
+        select_candidate_models_and_metrics.invoke({
+            **_VALID_CLF_INVOKE,
+            "evaluation_metrics": ["f1_weighted", "rmse"],  # rmse 是回归专属
+        })
+    )
+    assert "error" in result
+
+
+def test_primary_metric_not_in_evaluation_metrics_rejected():
+    """primary_metric 不包含在 evaluation_metrics 中应返回 error。"""
+    result = json.loads(
+        select_candidate_models_and_metrics.invoke({
+            **_VALID_CLF_INVOKE,
+            "primary_metric": "roc_auc",
+            "evaluation_metrics": ["accuracy", "f1_weighted"],  # 缺少 roc_auc
+        })
+    )
+    assert "error" in result
+
+
+def test_empty_evaluation_metrics_rejected():
+    """evaluation_metrics 为空列表应返回 error。"""
+    result = json.loads(
+        select_candidate_models_and_metrics.invoke({
+            **_VALID_CLF_INVOKE,
+            "evaluation_metrics": [],
         })
     )
     assert "error" in result
@@ -123,12 +180,15 @@ def test_handle_select_models_writes_state():
         "selected_models": ["XGBoost", "RandomForest", "LogisticRegression"],
         "feature_engineering_plan": {"XGBoost": {"scaling": False}},
         "model_selection_plan": "XGBoost 在表格数据上表现好",
+        "primary_metric": "roc_auc",
+        "evaluation_metrics": ["roc_auc", "f1_weighted", "accuracy"],
+        "metrics_rationale": "类别不平衡，优先 roc_auc。",
     }
     update = _tool_state_update_node({
         "messages": [
             ToolMessage(
                 content=json.dumps(payload),
-                name="select_candidate_models",
+                name="select_candidate_models_and_metrics",
                 tool_call_id="test-id",
             )
         ]
@@ -136,6 +196,9 @@ def test_handle_select_models_writes_state():
     assert update["candidate_models"] == ["XGBoost", "RandomForest", "LogisticRegression"]
     assert update["feature_engineering_plan"] == payload["feature_engineering_plan"]
     assert update["model_selection_plan"] == payload["model_selection_plan"]
+    assert update["primary_metric"] == "roc_auc"
+    assert update["evaluation_metrics"] == ["roc_auc", "f1_weighted", "accuracy"]
+    assert update["metrics_rationale"] == "类别不平衡，优先 roc_auc。"
     assert update["current_stage"] == "eda_done"
     assert update["next_action"] == "run_feature_engineering"
 

@@ -43,6 +43,11 @@ def _model_node(state: GlobalState) -> GlobalState:
     best_model = state.get("best_model") or {}
     current_stage = state.get("current_stage") or ""
 
+    # EDA Agent 决定的指标
+    primary_metric = state.get("primary_metric") or ""
+    evaluation_metrics = state.get("evaluation_metrics") or []
+    metrics_rationale = state.get("metrics_rationale") or ""
+
     chosen_model = best_model.get("model_name") or ""
     chosen_preprocessor = feature_preprocessors.get(chosen_model, {})
     preprocessor_text = (
@@ -55,31 +60,44 @@ def _model_node(state: GlobalState) -> GlobalState:
     output_dir = f"{run_dir}/models" if run_dir else ""
 
     system_content = (
-        "你是模型训练与评估 Agent。请严格遵循传统数据科学工作流："
-        "先在训练集上做候选模型调参和选择，再用全量训练集重训最佳模型，最后仅一次使用测试集做最终评估。\n"
+        "你是模型训练与评估 Agent。请严格遵循传统数据科学工作流：\n"
+        "先在训练集上做 CV 调参与模型选择，分析结果后再用全量训练集重训最佳模型，最后仅一次使用测试集做最终评估。\n\n"
+        "【任务信息】\n"
         f"任务类型：{task_type}。目标列：{target_column or '未提供'}。\n"
-        f"全部候选模型：{candidate_models}。\n"
+        f"候选模型：{candidate_models}。\n"
         f"当前阶段：{current_stage or '未开始'}。已有 model_results 键：{list(model_results.keys())}。\n"
         f"本次运行工作目录：{run_dir or '未设置'}。\n"
-        f"\n各候选模型对应的特征训练集路径：{json.dumps(feature_dataset_ids, ensure_ascii=False)}。\n"
+        f"各候选模型特征训练集路径：{json.dumps(feature_dataset_ids, ensure_ascii=False)}。\n"
         f"测试集路径：{testing_data_path or '未提供'}。\n"
-        f"\n已选最佳模型：{chosen_model or '尚未选择'}，其预处理参数（最终评估时使用）：\n{preprocessor_text}\n"
-        "按以下顺序执行，不要跳步，不要重复：\n"
-        "1) 若还未完成模型选择（current_stage 不是 model_selected / model_trained / model_evaluated），"
-        "先调用 tune_and_select_model："
-        "传入 feature_dataset_ids、candidate_models、task_type、target_column，"
-        "并使用 cv_folds=5、max_iter_per_model=12；\n"
-        "2) 若已选出 best_model 且尚未训练最终模型（current_stage 不是 model_trained / model_evaluated），"
-        "调用 train_model："
-        "featured_train_path 使用 feature_dataset_ids[best_model_name]，"
-        "model_name 使用 best_model_name，"
-        "model_params 使用 best_model_params，"
-        f"output_dir 传入 {output_dir!r}；\n"
-        "3) 若已训练最终模型且尚未最终评估（current_stage 不是 model_evaluated），调用 evaluate_model："
-        "传入 model_path、feature_columns_path、test_data_path、model_name、task_type、target_column，"
-        "并传入最佳模型对应的预处理参数（scaler_path、scaled_columns、encoder_paths、encoding_method、encoded_columns）；"
-        "若预处理参数中含 target_encoder_path，必须传给 evaluate_model 的 target_encoder_path；\n"
-        "4) 当 current_stage 为 model_evaluated 时，不再调用工具，直接给出一句完成说明。"
+        f"已选最佳模型：{chosen_model or '尚未选择'}，其预处理参数（最终评估时使用）：\n{preprocessor_text}\n\n"
+        "【EDA Agent 已确定的评估指标（直接使用，无需重新判断）】\n"
+        f"primary_metric（CV 调优指标）：{primary_metric or '未设置，请使用任务默认值'}。\n"
+        f"evaluation_metrics（综合评估指标列表）：{evaluation_metrics or '未设置，请使用任务默认指标'}。\n"
+        f"metrics 选择理由：{metrics_rationale or '未提供'}。\n\n"
+        "【执行步骤，按顺序完成，不跳步，不重复】\n\n"
+        "步骤 1 — 若 current_stage 不是 model_selected / model_trained / model_evaluated，\n"
+        "调用 tune_and_select_model，参数说明：\n"
+        f"  · scoring = '{primary_metric or '留空使用默认'}'\n"
+        "  · cv_strategy：检查特征中是否有时序特征，有则用 timeseries，否则用 auto\n"
+        "  · cv_folds=5、max_iter_per_model=12\n"
+        "  · feature_dataset_ids、candidate_models、task_type、target_column 从上方任务信息传入\n\n"
+        "步骤 2 — 收到 tune_and_select_model 结果后，先输出一段分析（不调用工具）：\n"
+        "  · 对比各模型 cv_best_score 和 cv_score_std，判断最佳模型优势是否显著\n"
+        "  · 若最优与次优分数差 < 0.01，需说明选择依据\n"
+        "  · 若某模型 cv_score_std > 0.03，需指出 CV 不稳定\n"
+        "  · 给出最终采用哪个模型的结论和理由\n"
+        "  分析完成后，调用 train_model：\n"
+        "  featured_train_path = feature_dataset_ids[best_model_name]，\n"
+        "  model_name = best_model_name，model_params = best_model_params，\n"
+        f"  output_dir = {output_dir!r}。\n\n"
+        "步骤 3 — 若 current_stage 为 model_trained，调用 evaluate_model：\n"
+        "  传入 model_path、feature_columns_path、test_data_path、model_name、task_type、target_column，\n"
+        "  以及最佳模型对应的预处理参数（scaler_path、scaled_columns、encoder_paths、encoding_method、encoded_columns）；\n"
+        "  若含 target_encoder_path 必须一并传入。\n"
+        f"  同时传入 evaluation_metrics={evaluation_metrics} 和 primary_metric='{primary_metric}'。\n\n"
+        "步骤 4 — 当 current_stage 为 model_evaluated 时，不再调用工具，\n"
+        "  输出简短总结：最终模型名称、cv_best_score vs final_test_metrics 中各指标对比、\n"
+        "  以及对泛化能力的简要判断（CV 分与 test 分差距是否合理）。"
     )
 
     messages = [SystemMessage(content=system_content), *messages]
@@ -127,8 +145,8 @@ def _handle_train(state: GlobalState, tool_message: ToolMessage) -> GlobalState:
     )
     existing = dict(state.get("model_results") or {})
     name = payload.get("model_name", "")
-    if name and name in existing:
-        merged = dict(existing[name])
+    if name:
+        merged = dict(existing.get(name) or {})
         merged["model_path"] = payload.get("model_path", "")
         merged["feature_columns_path"] = payload.get("feature_columns_path", "")
         merged["model_params"] = payload.get("model_params", {})

@@ -75,6 +75,11 @@ class GlobalState(TypedDict, total=False):
     best_model: dict[str, Any]
     model_report: dict[str, Any]
 
+    # evaluation metrics (decided by EDA agent, used throughout modeling)
+    primary_metric: str           # CV 选型指标，如 "f1_weighted"、"roc_auc"、"r2"、"rmse"
+    evaluation_metrics: list[str] # 综合评估指标列表，如 ["accuracy", "f1_weighted", "roc_auc"]
+    metrics_rationale: str        # 选择这组 metrics 的理由
+
     # final report
     business_report: str
 
