@@ -19,6 +19,7 @@ pandas==3.0.2
 numpy==2.4.4
 scikit-learn==1.8.0
 xgboost==3.2.0
+lightgbm>=4.0.0
 
 # Visualisation (optional — used for graph export)
 matplotlib>=3.9.0
