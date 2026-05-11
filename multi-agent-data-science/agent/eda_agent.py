@@ -19,17 +19,19 @@ from core.report_writer import save_agent_report
 from tools.eda_tools.compute_correlation_matrix import compute_correlation_matrix
 from tools.eda_tools.generate_eda_charts import generate_eda_charts
 from tools.eda_tools.profile_training_data import profile_training_data
-from tools.eda_tools.select_candidate_models import (
+from tools.eda_tools.select_candidate_models_and_metrics import (
+    CLASSIFICATION_METRICS,
     CLASSIFICATION_POOL,
+    REGRESSION_METRICS,
     REGRESSION_POOL,
-    select_candidate_models,
+    select_candidate_models_and_metrics,
 )
 
 tools = [
     profile_training_data,
     compute_correlation_matrix,
     generate_eda_charts,
-    select_candidate_models,
+    select_candidate_models_and_metrics,
 ]
 llm_with_tools = llm_deepseek.bind_tools(tools)
 
@@ -54,12 +56,15 @@ def _eda_node(state: GlobalState) -> GlobalState:
     testing_data_path = state.get("testing_data_path") or ""
 
     pool = CLASSIFICATION_POOL if task_type == "classification" else REGRESSION_POOL
-    pool_str = "、".join(pool)
+    pool_str = ", ".join(pool)
+    metrics_allowed = CLASSIFICATION_METRICS if task_type == "classification" else REGRESSION_METRICS
+    metrics_str = ", ".join(sorted(metrics_allowed))
 
     run_dir = state.get("run_dir") or ""
 
     system_content = (
-        "你是 EDA（探索性数据分析）Agent，负责分析训练集、制定特征工程计划并选出三个候选模型。\n"
+        "你是 EDA（探索性数据分析）Agent，负责分析训练集、制定特征工程计划、选出三个候选模型，"
+        "并决定本次任务的评估指标。\n"
         f"训练集路径：{training_data_path or '未提供'}。\n"
         f"数据集描述：{description or '未提供'}。\n"
         f"任务类型：{task_type}。\n"
@@ -72,10 +77,17 @@ def _eda_node(state: GlobalState) -> GlobalState:
         f"file_path 传入训练集路径，target_column 传入目标列，task_type 传入 `{task_type}`，"
         f"test_file_path 传入测试集路径 `{testing_data_path}`，"
         f"output_dir 传入：{run_dir + '/plots' if run_dir else ''}（为空则使用默认路径）；\n"
-        "4. 结合以上信息，制定各模型的特征工程方案和模型选择理由，"
-        "调用 select_candidate_models 提交最终决策。\n"
-        f"候选模型池（{task_type}）：{pool_str}。\n"
-        "select_candidate_models 中模型名必须精确匹配候选池，恰好选 3 个。"
+        "4. 综合以上分析，调用 select_candidate_models_and_metrics 提交最终决策，需同时确定：\n"
+        f"   【模型选择】候选模型池（{task_type}）：{pool_str}，恰好选 3 个，名称须精确匹配；\n"
+        f"   【评估指标】可选指标：{metrics_str}。\n"
+        "   需确定两项指标决策（须使用上方列出的合法指标名，不得使用其他字符串）：\n"
+        "   · primary_metric（1 个）：CV 参数调优的优化目标，根据以下原则选择：\n"
+        "     - 类别均衡 → f1_weighted；类别严重不平衡 → roc_auc 或 recall\n"
+        "     - 回归无明显异常值 → r2；存在明显异常值 → mae\n"
+        "     - 业务目标是排序/概率校准 → roc_auc\n"
+        "   · evaluation_metrics（2~4 个列表）：最终 test set 综合报告的指标，"
+        "     primary_metric 必须包含在内，可加 1~2 个互补指标\n"
+        "   · metrics_rationale：结合数据画像和业务目标，说明选择上述指标的原因。"
     )
 
     messages = [SystemMessage(content=system_content), *messages]
@@ -92,7 +104,7 @@ def _tool_state_update_node(state: GlobalState) -> GlobalState:
         "profile_training_data": _handle_eda_step,
         "compute_correlation_matrix": _handle_eda_step,
         "generate_eda_charts": _handle_eda_step,
-        "select_candidate_models": _handle_select_models,
+        "select_candidate_models_and_metrics": _handle_select_models,
     }
     handler = handlers.get(last_msg.name)
     return handler(state, last_msg) if handler else {}
@@ -139,6 +151,9 @@ def _handle_select_models(state: GlobalState, tool_message: ToolMessage) -> Glob
         "candidate_models": payload["selected_models"],
         "feature_engineering_plan": payload["feature_engineering_plan"],
         "model_selection_plan": payload["model_selection_plan"],
+        "primary_metric": payload.get("primary_metric", ""),
+        "evaluation_metrics": payload.get("evaluation_metrics", []),
+        "metrics_rationale": payload.get("metrics_rationale", ""),
         "current_stage": "eda_done",
         "next_action": "run_feature_engineering",
     }

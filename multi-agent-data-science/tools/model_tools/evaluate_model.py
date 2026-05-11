@@ -59,11 +59,13 @@ def evaluate_model(
     task_type: str,
     target_column: str,
     scaler_path: str = "",
-    scaled_columns: list[str] = [],
-    encoder_paths: dict[str, str] = {},
+    scaled_columns: list[str] | None = None,
+    encoder_paths: dict[str, str] | None = None,
     encoding_method: str = "",
-    encoded_columns: list[str] = [],
+    encoded_columns: list[str] | None = None,
     target_encoder_path: str = "",
+    evaluation_metrics: list[str] | None = None,
+    primary_metric: str = "",
 ) -> str:
     """在测试集上评估训练好的模型，返回评估指标。
 
@@ -82,19 +84,28 @@ def evaluate_model(
       target_encoder_path (str)：encode_target_column 保存的目标列 LabelEncoder pkl 路径。
         XGBoost 等模型训练时对目标列做了 0/1 编码，评估时必须用同一 encoder 对测试集目标列做相同转换，
         否则 y_test 仍是字符串，导致指标计算错误。无目标列编码则留空 ""。
+      evaluation_metrics (list)：EDA Agent 指定的综合评估指标列表（如 ["roc_auc", "f1_weighted"]）。
+        工具始终计算所有基础指标，此参数额外触发 roc_auc（分类）的计算，并在返回结果中标注。
+      primary_metric (str)：EDA Agent 指定的主要指标（CV 选型所用），写入结果便于下游追踪。
+
 
     返回 JSON，包含：
       model_name：模型名称。
       model_path：模型文件路径。
-      metrics：评估指标 dict。
-        - 分类：accuracy、f1_macro、f1_weighted
+      primary_metric：主要指标名称。
+      metrics：全量评估指标 dict。
+        - 分类基础：accuracy、f1_macro、f1_weighted、confusion_matrix（始终计算）；
+          若 evaluation_metrics 含 roc_auc/recall/precision 则额外计算对应指标。
         - 回归：rmse、mae、r2
     """
+    eval_metrics_set = set(evaluation_metrics or [])
     tool_inputs = {
         "model_path": model_path,
         "test_data_path": test_data_path,
         "model_name": model_name,
         "task_type": task_type,
+        "primary_metric": primary_metric,
+        "evaluation_metrics": sorted(eval_metrics_set),
     }
     try:
         with open(model_path, "rb") as f:
@@ -118,10 +129,10 @@ def evaluate_model(
             test_df,
             target_column=target_column,
             scaler_path=scaler_path,
-            scaled_columns=scaled_columns,
-            encoder_paths=encoder_paths,
+            scaled_columns=scaled_columns or [],
+            encoder_paths=encoder_paths or {},
             encoding_method=encoding_method,
-            encoded_columns=encoded_columns,
+            encoded_columns=encoded_columns or [],
             feature_columns=feature_columns,
         )
 
@@ -133,9 +144,33 @@ def evaluate_model(
             metrics["accuracy"] = round(float(accuracy_score(y_test, y_pred)), 4)
             metrics["f1_macro"] = round(float(f1_score(y_test, y_pred, average="macro", zero_division=0)), 4)
             metrics["f1_weighted"] = round(float(f1_score(y_test, y_pred, average="weighted", zero_division=0)), 4)
+            if "recall" in eval_metrics_set:
+                from sklearn.metrics import recall_score
+                metrics["recall"] = round(float(recall_score(y_test, y_pred, average="weighted", zero_division=0)), 4)
+            if "precision" in eval_metrics_set:
+                from sklearn.metrics import precision_score
+                metrics["precision"] = round(float(precision_score(y_test, y_pred, average="weighted", zero_division=0)), 4)
+            if "roc_auc" in eval_metrics_set:
+                try:
+                    from sklearn.metrics import roc_auc_score
+                    if hasattr(model, "predict_proba"):
+                        y_prob = model.predict_proba(X_test)
+                        n_classes = y_prob.shape[1] if y_prob.ndim > 1 else 1
+                        if n_classes == 2:
+                            metrics["roc_auc"] = round(float(roc_auc_score(y_test, y_prob[:, 1])), 4)
+                        else:
+                            metrics["roc_auc"] = round(float(roc_auc_score(
+                                y_test, y_prob, multi_class="ovr", average="weighted"
+                            )), 4)
+                except Exception:
+                    metrics["roc_auc"] = None
+
+            # 混淆矩阵：始终计算，以嵌套列表形式返回
+            from sklearn.metrics import confusion_matrix
+            metrics["confusion_matrix"] = confusion_matrix(y_test, y_pred).tolist()
         else:
-            from sklearn.metrics import mean_absolute_error, mean_squared_error, r2_score
             import math
+            from sklearn.metrics import mean_absolute_error, mean_squared_error, r2_score
             metrics["rmse"] = round(float(math.sqrt(mean_squared_error(y_test, y_pred))), 4)
             metrics["mae"] = round(float(mean_absolute_error(y_test, y_pred)), 4)
             metrics["r2"] = round(float(r2_score(y_test, y_pred)), 4)
@@ -143,6 +178,7 @@ def evaluate_model(
         result = {
             "model_name": model_name,
             "model_path": model_path,
+            "primary_metric": primary_metric or "",
             "metrics": metrics,
         }
         output = json.dumps(result, ensure_ascii=False, indent=2)
