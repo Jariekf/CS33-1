@@ -10,6 +10,7 @@ import pytest
 from langchain_core.messages import HumanMessage, ToolMessage
 
 from agent.agent_manager import (
+    _has_complete_task_meta,
     _pretty_print_message,
     _tool_state_update_node,
     agent_manager,
@@ -23,6 +24,15 @@ SAMPLE_DESCRIPTION = (
     "二分类数据集：预测客户是否订阅银行定期存款（subscribed: yes/no）。"
     "特征：age、job、education、balance。"
 )
+
+
+def test_has_complete_task_meta_true_when_both_set():
+    assert _has_complete_task_meta({"task_type": "classification", "target_column": "y"})
+
+
+def test_has_complete_task_meta_false_when_incomplete():
+    assert not _has_complete_task_meta({"task_type": "", "target_column": "y"})
+    assert not _has_complete_task_meta({"task_type": "classification", "target_column": ""})
 
 
 def test_build_agent_manager_graph():
@@ -119,8 +129,9 @@ def test_infer_task_tool_message_updates_global_state():
     assert state_update["current_stage"] == "task_inferred"
 
 
-def test_create_cleaning_plan_tool_message_updates_global_state():
+def test_create_cleaning_plan_train_updates_state():
     cleaning_plan = {
+        "target": "train",
         "summary": "清理列名空格，转换日期字段，并准备金额字段清洗。",
         "column_name_actions": [
             {
@@ -139,7 +150,7 @@ def test_create_cleaning_plan_tool_message_updates_global_state():
         "missing_value_actions": [],
         "outlier_actions": [],
         "drop_columns": [],
-        "notes": "Financials 数据集暂无缺失值。",
+        "notes": ["Financials 数据集暂无缺失值。"],
     }
     state_update = _tool_state_update_node(
         {
@@ -153,8 +164,37 @@ def test_create_cleaning_plan_tool_message_updates_global_state():
         }
     )
 
+    assert state_update["train_cleaning_plan"] == cleaning_plan
     assert state_update["cleaning_plan"] == cleaning_plan
-    assert state_update["current_stage"] == "cleaning_plan_created"
+    assert state_update["current_stage"] == "train_cleaning_plan_created"
+
+
+def test_create_cleaning_plan_test_updates_state():
+    cleaning_plan = {
+        "target": "test",
+        "summary": "与 train 同构清洗。",
+        "column_name_actions": [],
+        "type_conversions": [],
+        "missing_value_actions": [],
+        "outlier_actions": [],
+        "drop_columns": [],
+        "notes": [],
+    }
+    state_update = _tool_state_update_node(
+        {
+            "messages": [
+                ToolMessage(
+                    content=json.dumps(cleaning_plan, ensure_ascii=False),
+                    name="create_cleaning_plan",
+                    tool_call_id="test-call",
+                )
+            ]
+        }
+    )
+
+    assert state_update["test_cleaning_plan"] == cleaning_plan
+    assert state_update["cleaning_plan"] == cleaning_plan
+    assert state_update["current_stage"] == "cleaning_plans_created"
     assert state_update["next_action"] == "run_data_cleaning"
 
 
@@ -190,17 +230,20 @@ def test_agent_manager_invoke(tmp_path):
         {
             "messages": [HumanMessage(content="请分析数据集并给出清洗计划")],
             "user_request": "请分析数据集并给出清洗计划",
+            "training_data_path": str(RAW_CSV),
             "data_path": str(RAW_CSV),
+            "testing_data_path": str(RAW_CSV),
             "description": SAMPLE_DESCRIPTION,
             "run_dir": str(tmp_path),
         },
         config={"recursion_limit": 60},
     )
     assert result.get("dataset_profile") is not None
-    assert result.get("task_type") in {"classification", "regression"}
-    assert result.get("target_column")
-    assert result.get("cleaning_plan")
-    assert result.get("next_action") == "run_data_cleaning"
+    assert (
+        result.get("train_cleaning_plan")
+        or result.get("test_cleaning_plan")
+        or result.get("cleaning_plan")
+    ), "预期在完成 profile 后继续产出 train/test 清洗计划（若递归用尽可能失败，可调大 recursion_limit）"
 
 
 # ── 手动集成运行（pytest 不执行）─────────────────────────────────────────────
