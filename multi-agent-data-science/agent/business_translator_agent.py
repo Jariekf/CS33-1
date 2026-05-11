@@ -151,6 +151,86 @@ def _format_eda_placeholder(eda_report: Any) -> str:
         return str(eda_report)[:12000]
 
 
+def _resolve_chart_rel_paths(state: GlobalState) -> list[dict[str, str]]:
+    """Return chart metadata with Markdown-friendly relative paths from ``reports/`` to ``plots/``."""
+    raw_charts: list[dict[str, Any]] = list(state.get("eda_charts") or [])
+    if not raw_charts:
+        eda = state.get("eda_report") or {}
+        raw_charts = list(eda.get("charts") or [])
+    if not raw_charts:
+        return []
+
+    run_dir = state.get("run_dir") or ""
+    eda_report = state.get("eda_report") or {}
+    chart_output_dir = eda_report.get("chart_output_dir", "")
+
+    resolved: list[dict[str, str]] = []
+    for chart in raw_charts:
+        name = chart.get("name", "")
+        desc = chart.get("desc", "")
+        if not name:
+            continue
+
+        if run_dir:
+            rel = f"../plots/{name}"
+        elif chart_output_dir:
+            rel = f"{chart_output_dir}/{name}"
+        else:
+            abs_path = chart.get("path", "")
+            rel = abs_path if abs_path else name
+
+        resolved.append({"name": name, "rel_path": rel, "desc": desc})
+    return resolved
+
+
+def _build_eda_charts_prompt_block(charts: list[dict[str, str]]) -> str:
+    """Build a prompt section listing available EDA charts for the LLM."""
+    if not charts:
+        return "(no EDA charts available from upstream pipeline.)"
+    lines = [
+        "The following EDA charts have been generated and saved. "
+        "Embed them in the report using standard Markdown image syntax.",
+        "",
+        "| Chart file | Markdown embed | Description |",
+        "|---|---|---|",
+    ]
+    for c in charts:
+        embed = f'![{c["desc"]}]({c["rel_path"]})'
+        lines.append(f'| {c["name"]} | `{embed}` | {c["desc"]} |')
+    return "\n".join(lines)
+
+
+def _inject_remaining_charts(report: str, charts: list[dict[str, str]]) -> str:
+    """Append unreferenced charts as an appendix section at the end of the report."""
+    if not charts:
+        return report
+    unreferenced = [c for c in charts if c["name"] not in report]
+    if not unreferenced:
+        return report
+    appendix_lines = [
+        "",
+        "## Appendix: Additional EDA Visualizations",
+        "",
+    ]
+    for c in unreferenced:
+        appendix_lines.append(f"### {c['desc']}")
+        appendix_lines.append("")
+        appendix_lines.append(f'![{c["desc"]}]({c["rel_path"]})')
+        appendix_lines.append("")
+    return report.rstrip() + "\n" + "\n".join(appendix_lines)
+
+
+def _build_charts_fallback_section(charts: list[dict[str, str]]) -> str:
+    """Build a standalone charts section for the fallback template."""
+    if not charts:
+        return ""
+    lines = ["## EDA Visualizations", ""]
+    for c in charts:
+        lines.append(f'![{c["desc"]}]({c["rel_path"]})')
+        lines.append("")
+    return "\n".join(lines)
+
+
 def _default_rag_buckets(state: GlobalState) -> dict[str, list[dict[str, Any]]]:
     """Fallback when the agent never called RAG tools."""
     from tools.business_tools.bat_tools import retrieve_mckinsey_context_impl
@@ -170,6 +250,9 @@ def _draft_business_report_markdown(state: GlobalState) -> str:
     eda_block = _format_eda_placeholder(state.get("eda_report"))
     model_summary = _build_model_validation_summary(state)
     feat_block, pred_block = _build_feature_and_predictions_section(state)
+
+    charts = _resolve_chart_rel_paths(state)
+    charts_prompt_block = _build_eda_charts_prompt_block(charts)
 
     buckets = state.get("bat_rag_buckets") or {}
     if not buckets or sum(len(v) for v in buckets.values()) == 0:
@@ -214,7 +297,9 @@ def _draft_business_report_markdown(state: GlobalState) -> str:
         "Apply the Pyramid Principle (top-down, answer-first), open with SCQA, "
         "structure findings into 3-5 MECE themes, and close with concrete sequenced actions. "
         "CRITICAL: be concise; ground every claim in model evidence or retrieved external context. "
-        "Output MUST be plain Markdown in English (no YAML front matter)."
+        "Output MUST be plain Markdown in English (no YAML front matter). "
+        "When EDA charts are available, embed them in relevant sections using standard Markdown "
+        "image syntax `![description](path)` to strengthen evidence presentation."
     )
 
     user_prompt = f"""
@@ -228,6 +313,9 @@ Produce a **Business Strategy & Insight Report** as Markdown only (English).
 
 # EDA / profiling context (may be JSON from upstream agents)
 {eda_block}
+
+# EDA Visualization Charts
+{charts_prompt_block}
 
 # Model Validation Summary
 {model_summary}
@@ -251,20 +339,22 @@ Produce a **Business Strategy & Insight Report** as Markdown only (English).
 
 # Required Output Structure (in this exact order)
 1. **Executive Summary** — bottom-line answer + three bullet takeaways.
-2. **Situation & Complication** — SCQA opening.
-3. **Key Findings** — 3 to 5 MECE themes; claim → evidence → implication.
+2. **Situation & Complication** — SCQA opening; if a target distribution or class balance chart is available, embed it here.
+3. **Key Findings** — 3 to 5 MECE themes; claim → evidence → implication. After each theme's evidence paragraph, embed the most relevant EDA chart(s) from the list above (e.g. correlation heatmap for correlation themes, feature importance for model themes, distribution charts for data profile themes). Use each chart at most once.
 4. **Strategic Implications** — business meaning; cite external sources as [1], [2] where applicable.
 5. **Recommended Actions** — sequenced 90-day priorities; concrete owners/metrics/timeframe where possible.
 
 Style rules:
 - Match the tone of the McKinsey Reports section where relevant.
 - Do NOT invent statistics absent from the model summary or retrieved context.
+- Embed EDA chart images inline where they support the narrative. Use the exact Markdown syntax from the chart table above. Each chart should be used at most once across the entire report.
 """
 
     reply = call_llm(sys_prompt, user_prompt, agent_name="business_translator")
     if reply:
-        return reply
+        return _inject_remaining_charts(reply, charts)
 
+    fallback_charts = _build_charts_fallback_section(charts)
     return f"""# Business Insight Analysis Report
 
 ## Executive Summary
@@ -273,7 +363,7 @@ User goal: {user_goal}
 ## Model Validation
 {model_summary}
 
-## External Context
+{fallback_charts}## External Context
 {mck_block}
 {eq_block}
 {tb_block}
