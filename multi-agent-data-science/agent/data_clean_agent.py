@@ -55,13 +55,20 @@ def _data_clean_node(state: GlobalState) -> GlobalState:
     user_request = state.get("user_request", "")
 
     if target == "train":
-        source_path = state.get("training_data_path") or state.get("data_path") or ""
         cleaning_plan = state.get("train_cleaning_plan") or state.get("cleaning_plan")
         prefix = "train_cleaned"
+        source_path = (
+            (state.get("raw_training_data_path") or "").strip()
+            or (state.get("training_data_path") or "").strip()
+            or (state.get("data_path") or "").strip()
+        )
     else:
-        source_path = state.get("testing_data_path") or ""
         cleaning_plan = state.get("test_cleaning_plan") or state.get("cleaning_plan")
         prefix = "test_cleaned"
+        source_path = (
+            (state.get("raw_testing_data_path") or "").strip()
+            or (state.get("testing_data_path") or "").strip()
+        )
 
     plan_text = (
         json.dumps(cleaning_plan, ensure_ascii=False, indent=2, default=str)
@@ -69,11 +76,10 @@ def _data_clean_node(state: GlobalState) -> GlobalState:
         else "未提供（请根据画像自行决定清洗步骤）。"
     )
 
-    from pathlib import Path as _Path
-    stem = _Path(source_path).stem if source_path else "dataset"
-    default_save_path = (
-        f"{run_dir}/{prefix}_{stem}.csv" if run_dir else f"artifacts/{prefix}_{stem}.csv"
-    )
+    if run_dir:
+        default_save_path = f"{run_dir}/{prefix}.csv"
+    else:
+        default_save_path = f"artifacts/{prefix}.csv"
 
     system_parts = [
         f"你是数据清洗执行 Agent（ReAct），当前处理：{target} 数据集。",

@@ -95,11 +95,23 @@ def _show_graph_if_needed(compiled, show_graph: bool) -> None:
 
 
 def _set_clean_train(state: GlobalState) -> GlobalState:
-    return {"cleaning_target": "train", "dataset_id": ""}
+    """进入 train 清洗子图：冻结当前 train 路径为 raw（供多轮 ReAct 提示与固定落盘名）。"""
+    cur = (state.get("training_data_path") or "").strip()
+    raw = (state.get("raw_training_data_path") or "").strip()
+    out: GlobalState = {"cleaning_target": "train", "dataset_id": ""}
+    if cur and not raw:
+        out["raw_training_data_path"] = cur
+    return out
 
 
 def _set_clean_test(state: GlobalState) -> GlobalState:
-    return {"cleaning_target": "test", "dataset_id": ""}
+    """进入 test 清洗子图：冻结当前 test 路径为 raw。"""
+    cur = (state.get("testing_data_path") or "").strip()
+    raw = (state.get("raw_testing_data_path") or "").strip()
+    out: GlobalState = {"cleaning_target": "test", "dataset_id": ""}
+    if cur and not raw:
+        out["raw_testing_data_path"] = cur
+    return out
 
 
 def build_full_pipeline(show_graph: bool = False):
