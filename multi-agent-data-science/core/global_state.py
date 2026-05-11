@@ -38,6 +38,10 @@ class GlobalState(TypedDict, total=False):
     testing_data_path: str
     split_report: dict[str, Any]
 
+    # split / cleaning originals (never overwritten by save_dataset handlers)
+    raw_training_data_path: str
+    raw_testing_data_path: str
+
     # per-target cleaning
     cleaning_target: str  # "train" or "test"
     train_cleaning_plan: dict[str, Any]

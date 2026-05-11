@@ -13,12 +13,20 @@ from core.global_state import GlobalState
 from core.my_llm import llm_deepseek
 
 from tools.agentmanager_tools.create_cleaning_plan import create_cleaning_plan
+from tools.agentmanager_tools.infer_task import infer_task
 from tools.agentmanager_tools.profile_dataset import profile_dataset
 from core.report_writer import save_agent_report
 
 
-tools = [profile_dataset, create_cleaning_plan]
+tools = [profile_dataset, infer_task, create_cleaning_plan]
 llm_with_tools = llm_deepseek.bind_tools(tools)
+
+
+def _has_complete_task_meta(state: GlobalState) -> bool:
+    """已由 split_agent 或 CLI 注入时，跳过 infer_task，避免重复推断。"""
+    tt = (state.get("task_type") or "").strip().lower()
+    tc = (state.get("target_column") or "").strip()
+    return tt in {"classification", "regression"} and bool(tc)
 
 
 def _manager_node(state: GlobalState) -> GlobalState:
@@ -27,21 +35,40 @@ def _manager_node(state: GlobalState) -> GlobalState:
     description = state.get("description", "")
     user_request = state.get("user_request", "")
     testing_data_path = state.get("testing_data_path") or ""
+    has_meta = _has_complete_task_meta(state)
+
+    if has_meta:
+        workflow = (
+            "工作流要求（严格按顺序执行）：\n"
+            f"1. 调用 profile_dataset(file_path='{training_data_path}') 获取训练集数据画像；\n"
+            "2. 调用 create_cleaning_plan(target='train', ...) 制定训练集清洗计划；\n"
+            "3. 调用 create_cleaning_plan(target='test', ...) 制定测试集清洗计划"
+            "   （测试集通常与训练集步骤相同，但不做基于标签分布的操作）。\n"
+            "说明：当前 state 已包含有效的 task_type 与 target_column（来自 split_agent 或用户指定），"
+            "不要调用 infer_task。\n"
+            "完成以上三步后停止。"
+        )
+    else:
+        workflow = (
+            "工作流要求（严格按顺序执行）：\n"
+            f"1. 调用 profile_dataset(file_path='{training_data_path}') 获取训练集数据画像；\n"
+            "2. 调用 infer_task，结合画像结果、数据集描述与用户问题判断"
+            " task_type（classification/regression）与 target_column（列名须与实际 CSV 列一致）；\n"
+            "3. 调用 create_cleaning_plan(target='train', ...) 制定训练集清洗计划；\n"
+            "4. 调用 create_cleaning_plan(target='test', ...) 制定测试集清洗计划"
+            "   （测试集步骤与 train 对齐，不写基于标签分布的特殊操作）。\n"
+            "完成以上四步后停止。"
+        )
 
     messages = [
         SystemMessage(
             content=(
-                "你是一个数据分析 Agent。数据集已完成切分，训练集和测试集路径如下：\n"
+                "你是一个数据分析 Agent。数据集已完成路径约定：训练集与测试集已分开或即将使用下列路径。\n"
                 f"训练集路径：{training_data_path or '未提供'}。\n"
                 f"测试集路径：{testing_data_path or '未提供'}。\n"
                 f"数据集描述：{description or '未提供'}。\n"
                 f"用户的问题：{user_request or '未提供'}。\n"
-                "工作流要求（严格按顺序执行）：\n"
-                f"1. 调用 profile_dataset(file_path='{training_data_path}') 获取训练集数据画像；\n"
-                "2. 调用 create_cleaning_plan(target='train', ...) 制定训练集清洗计划；\n"
-                "3. 调用 create_cleaning_plan(target='test', ...) 制定测试集清洗计划"
-                "   （测试集通常与训练集步骤相同，但不做基于标签分布的操作）。\n"
-                "完成以上三步后停止。"
+                + workflow
             )
         ),
         *messages,
@@ -56,6 +83,8 @@ def _tool_state_update_node(state: GlobalState) -> GlobalState:
         return {}
     if last_msg.name == "profile_dataset":
         return _update_profile_state(state, last_msg)
+    if last_msg.name == "infer_task":
+        return _update_task_state(last_msg)
     if last_msg.name == "create_cleaning_plan":
         return _update_cleaning_plan_state(last_msg)
     return {}

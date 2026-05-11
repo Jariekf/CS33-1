@@ -1,4 +1,4 @@
-"""Agent Manager → Data Clean Agent 顺序流水线（同一 GlobalState）。"""
+"""局部演示子图：agent_manager → data_clean_agent（用于快速验证清洗子图，非主仓库图）。"""
 
 from __future__ import annotations
 
@@ -18,7 +18,16 @@ from core.global_state import GlobalState
 
 
 def _route_after_agent_manager(state: GlobalState) -> str:
-    """Manager 子图结束后：若已生成清洗计划且约定下一步为清洗，则进入 Data Clean 子图。"""
+    """Manager 子图结束后：若已有 train+test 清洗计划（或旧版 next_action），则进入 Data Clean。"""
+    train_plan = state.get("train_cleaning_plan")
+    test_plan = state.get("test_cleaning_plan")
+    if (
+        isinstance(train_plan, dict)
+        and train_plan
+        and isinstance(test_plan, dict)
+        and test_plan
+    ):
+        return "data_clean_agent"
     plan = state.get("cleaning_plan")
     if (
         state.get("next_action") == "run_data_cleaning"
@@ -35,7 +44,8 @@ def _show_pipeline_graph_if_needed(compiled, show_graph: bool) -> None:
     try:
         output_dir = PROJECT_ROOT / "artifacts"
         output_dir.mkdir(parents=True, exist_ok=True)
-        image_path = output_dir / "agentmanager_dataclean_pipeline.png"
+        image_path = output_dir / "graphs" / "agentmanager_dataclean_pipeline.png"
+        image_path.parent.mkdir(parents=True, exist_ok=True)
         image_bytes = compiled.get_graph().draw_mermaid_png()
         image_path.write_bytes(image_bytes)
         print(f"Pipeline Graph 图片已保存: {image_path}")

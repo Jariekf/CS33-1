@@ -1,8 +1,14 @@
 """项目启动入口：运行完整多智能体数据科学流水线。
 
-用法：
-  python main.py --data datasets/bank-full.csv --description "二分类任务，预测客户是否订阅定期存款"
-  python main.py --data datasets/my_data.csv --description "回归任务，预测房价" --show-graph
+用法（单 CSV，图内再划分 train/test）：
+  python main.py --data datasets/bank-full.csv --description "..." --request "..."
+  或：python main.py --data ... --description-file datasets/desc.txt --request "..."
+
+用法（已提供 train / test，跳过 split_agent；建议显式给定目标列与任务类型）：
+  python main.py --train datasets/train.csv --test datasets/test.csv \\
+                 --task-type classification --target y \\
+                 --description "..." --request "..."
+  或使用 --description-file 代替 --description
 """
 
 import argparse
@@ -27,15 +33,24 @@ def run_pipeline(
     user_request: str,
     show_graph: bool = False,
     recursion_limit: int = 200,
+    *,
+    training_data_path: str = "",
+    testing_data_path: str = "",
+    target_column: str = "",
+    task_type: str = "",
 ) -> dict:
     """运行完整多智能体数据科学流水线并返回最终 state。
 
     Args:
         data_path:       原始数据集路径（CSV）。
-        description:     数据集描述，帮助 Agent 理解任务背景和目标列。
+        description:     数据集描述正文（或由 CLI `--description-file` 从 .txt 读入）；注入 state 供 Agent 使用。
         user_request:    用户指令，描述本次任务目标。
-        show_graph:      是否将流水线结构图保存为 PNG（artifacts/full_pipeline.png）。
+        show_graph:      为 True 时将 Mermaid 与 PNG 写入 artifacts/graphs/（full_pipeline.mmd / full_pipeline.png）。
         recursion_limit: LangGraph 最大递归步数，流程较长时可适当调大。
+        training_data_path: 若与 testing_data_path 同时非空，init_run 将 is_split=True，跳过 split_agent。
+        testing_data_path: 同上。
+        target_column:   可选。与 task_type 同时为非空且合法时写入 state，Agent Manager 将跳过 infer_task。
+        task_type:       classification 或 regression；须与 target_column 配对使用。
 
     Returns:
         流水线结束时的完整 GlobalState dict。
@@ -44,18 +59,39 @@ def run_pipeline(
 
     print(f"\n{_DIVIDER}")
     print("多智能体数据科学流水线 — 启动")
-    print(f"数据集：{data_path}")
+    train_t = (training_data_path or "").strip()
+    test_t = (testing_data_path or "").strip()
+    if train_t and test_t:
+        print("模式：预切分（train / test 已给定，不经过 split_agent）")
+        print(f"train CSV：{train_t}")
+        print(f"test CSV ：{test_t}")
+    else:
+        print(f"模式：单文件 → split_agent 内划分")
+        print(f"数据集：{data_path}")
+
+    tc = (target_column or "").strip()
+    tt = (task_type or "").strip().lower()
+    if tc and tt in {"classification", "regression"}:
+        print(f"任务元数据（跳过 Manager 内 infer_task）：task_type={tt}  target_column={tc}")
     print(_DIVIDER)
 
     final_state: dict = {}
 
+    initial: dict = {
+        "messages": [HumanMessage(content=user_request)],
+        "user_request": user_request,
+        "data_path": data_path,
+        "description": description,
+    }
+    if train_t and test_t:
+        initial["training_data_path"] = train_t
+        initial["testing_data_path"] = test_t
+    if tc and tt in {"classification", "regression"}:
+        initial["target_column"] = tc
+        initial["task_type"] = tt
+
     for event in pipeline.stream(
-        {
-            "messages": [HumanMessage(content=user_request)],
-            "user_request": user_request,
-            "data_path": data_path,
-            "description": description,
-        },
+        initial,
         stream_mode="values",
         config={"recursion_limit": recursion_limit},
     ):
@@ -95,10 +131,23 @@ def _build_arg_parser() -> argparse.ArgumentParser:
         description="多智能体数据科学流水线",
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog="""
+数据来源（二选一）：
+  • 单 CSV：--data <path>（流水线内 split_agent 再划分）
+  • 已切分：--train <path> --test <path>（跳过 split_agent）
+
+数据集描述（二选一）：
+  • --description "TEXT"
+  • --description-file <path/to/file.txt>（UTF-8）
+
 示例：
   python main.py --data datasets/bank-full.csv \\
                  --description "二分类任务，预测客户是否订阅银行定期存款（目标列 y）" \\
                  --request "请执行全流程分析，清洗数据、切分数据集、特征工程并训练模型，选出最优分类模型"
+
+  python main.py --train datasets/train.csv --test datasets/test.csv \\
+                 --task-type regression --target SalePrice \\
+                 --description-file datasets/dataset_desc.txt \\
+                 --request "请全流程分析并训练模型"
 
   python main.py --data datasets/housing.csv \\
                  --description "回归任务，预测房价（目标列 price）" \\
@@ -106,17 +155,38 @@ def _build_arg_parser() -> argparse.ArgumentParser:
                  --show-graph --recursion-limit 300
 """,
     )
-    parser.add_argument(
+    src = parser.add_mutually_exclusive_group(required=True)
+    src.add_argument(
         "--data",
-        required=True,
+        default="",
         metavar="PATH",
-        help="原始数据集路径（CSV 文件）",
+        help="单文件 CSV：原始数据集路径，将由 split_agent 切分为 train/test",
+    )
+    src.add_argument(
+        "--train",
+        default="",
+        metavar="PATH",
+        help="与 --test 成对使用：训练集 CSV 路径（预切分模式，跳过 split_agent）",
     )
     parser.add_argument(
+        "--test",
+        default="",
+        metavar="PATH",
+        help="与 --train 成对使用：测试集 / hold-out CSV 路径",
+    )
+    desc = parser.add_mutually_exclusive_group(required=True)
+    desc.add_argument(
         "--description",
-        required=True,
+        default=None,
         metavar="TEXT",
-        help="数据集描述，包含任务类型、目标列名等背景信息",
+        help="数据集描述（纯文本）；与 --description-file 二选一",
+    )
+    desc.add_argument(
+        "--description-file",
+        default=None,
+        dest="description_file",
+        metavar="PATH",
+        help="数据集描述 TXT（UTF-8）；与 --description 二选一",
     )
     parser.add_argument(
         "--request",
@@ -125,9 +195,22 @@ def _build_arg_parser() -> argparse.ArgumentParser:
         help="用户指令，描述本次任务目标（例如：请执行全流程分析并选出最优模型）",
     )
     parser.add_argument(
+        "--target",
+        default="",
+        metavar="COLUMN",
+        help="目标列名；与 --task-type 同时提供时写入 state，Agent Manager 跳过 infer_task",
+    )
+    parser.add_argument(
+        "--task-type",
+        default="",
+        dest="task_type",
+        metavar="classification|regression",
+        help="与 --target 成对使用：classification 或 regression",
+    )
+    parser.add_argument(
         "--show-graph",
         action="store_true",
-        help="将流水线结构图保存为 artifacts/full_pipeline.png",
+        help="导出流水线图：artifacts/graphs/full_pipeline.mmd 与 full_pipeline.png（可粘贴 mermaid.live 查看）",
     )
     parser.add_argument(
         "--recursion-limit",
@@ -139,12 +222,104 @@ def _build_arg_parser() -> argparse.ArgumentParser:
     return parser
 
 
+def _cli_task_meta_or_exit(args: argparse.Namespace) -> tuple[str, str]:
+    tc = (getattr(args, "target", "") or "").strip()
+    tt = (getattr(args, "task_type", "") or "").strip().lower()
+    if not tc and not tt:
+        return "", ""
+    if not tc or not tt:
+        print(
+            "[!] --target 与 --task-type 须同时提供或同时省略。",
+            file=sys.stderr,
+        )
+        sys.exit(2)
+    if tt not in {"classification", "regression"}:
+        print(
+            f"[!] --task-type 只能是 classification 或 regression，收到：{args.task_type!r}",
+            file=sys.stderr,
+        )
+        sys.exit(2)
+    return tc, tt
+
+
+def _description_from_cli_or_exit(args: argparse.Namespace) -> str:
+    """CLI：--description 与 --description-file 二选一，由 mutually_exclusive_group 保证。"""
+    path = getattr(args, "description_file", None)
+    if path:
+        p = Path(path).expanduser().resolve()
+        if not p.is_file():
+            print(f"[!] --description-file 不是有效文件：{p}", file=sys.stderr)
+            sys.exit(2)
+        if p.suffix.lower() != ".txt":
+            print(
+                "[!] --description-file 目前仅支持 .txt 后缀。",
+                file=sys.stderr,
+            )
+            sys.exit(2)
+        try:
+            text = p.read_text(encoding="utf-8")
+        except OSError as exc:
+            print(f"[!] 无法读取描述文件：{exc}", file=sys.stderr)
+            sys.exit(2)
+        stripped = text.strip()
+        if not stripped:
+            print("[!] 描述文件为空或仅空白。", file=sys.stderr)
+            sys.exit(2)
+        return stripped
+    raw = args.description
+    if raw is None:
+        print("[!] 必须提供 --description 或 --description-file。", file=sys.stderr)
+        sys.exit(2)
+    return str(raw).strip()
+
+
 if __name__ == "__main__":
     args = _build_arg_parser().parse_args()
-    run_pipeline(
-        data_path=args.data,
-        description=args.description,
-        user_request=args.request,
-        show_graph=args.show_graph,
-        recursion_limit=args.recursion_limit,
-    )
+    tc_cli, tt_cli = _cli_task_meta_or_exit(args)
+    desc_text = _description_from_cli_or_exit(args)
+    train_p = (args.train or "").strip()
+    test_p = (args.test or "").strip()
+    data_p = (args.data or "").strip()
+
+    if train_p or test_p:
+        if not train_p or not test_p:
+            print(
+                "[!] 预切分模式须同时提供 --train 与 --test。",
+                file=sys.stderr,
+            )
+            sys.exit(2)
+        p_train = Path(train_p).expanduser().resolve()
+        p_test = Path(test_p).expanduser().resolve()
+        for label, p in (("--train", p_train), ("--test", p_test)):
+            if not p.is_file():
+                print(f"[!] {label} 不是有效文件：{p}", file=sys.stderr)
+                sys.exit(2)
+        data_path_eff = str(p_train)
+        run_pipeline(
+            data_path=data_path_eff,
+            description=desc_text,
+            user_request=args.request,
+            show_graph=args.show_graph,
+            recursion_limit=args.recursion_limit,
+            training_data_path=str(p_train),
+            testing_data_path=str(p_test),
+            target_column=tc_cli,
+            task_type=tt_cli,
+        )
+    else:
+        if not data_p:
+            print("[!] 请提供 --data，或同时提供 --train 与 --test。", file=sys.stderr)
+            sys.exit(2)
+        p_data = Path(data_p).expanduser().resolve()
+        if not p_data.is_file():
+            print(f"[!] --data 不是有效文件：{p_data}", file=sys.stderr)
+            sys.exit(2)
+        run_pipeline(
+            data_path=str(p_data),
+            description=desc_text,
+            user_request=args.request,
+            show_graph=args.show_graph,
+            recursion_limit=args.recursion_limit,
+            target_column=tc_cli,
+            task_type=tt_cli,
+        )

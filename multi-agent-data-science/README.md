@@ -7,24 +7,36 @@ A LangGraph-powered multi-agent pipeline that automates the full machine learnin
 ## Pipeline Overview
 
 ```
-init_run            (creates timestamped workspace under artifacts/workspace/)
+init_run            (timestamped workspace under artifacts/workspace/)
     |
-agent_manager       (profiles dataset, infers task type & target column, produces cleaning plan)
+    +--[single CSV]--> split_agent  (infer_task + split_dataset tool → train/test paths on disk)
     |
-data_clean_agent    (executes cleaning: missing values, outliers, type fixes)
+    +--[--train + --test already set]--> (skip split_agent)
     |
-split               (train / test split, stratified for classification)
+agent_manager       (profile_dataset on TRAIN only; infer_task if task_type/target not set;
+    |                create_cleaning_plan for train + for test)
     |
-eda_agent           (correlation analysis, distribution profiling, selects 3 candidate models)
+set_clean_train -> data_clean_train -> set_clean_test -> data_clean_test
     |
-feature_agent       (encodes & scales features — one loop iteration per candidate model)
+eda_agent           (EDA, correlation, charts, select 3 candidate models)
+    |
+feature_agent       (encodes & scales — one loop iteration per candidate model)
     |
 model_agent         (trains & evaluates — one loop iteration per candidate model)
     |
-compare             (picks best model by R2 for regression, F1-weighted for classification)
+compare             (best model: R2 / F1-weighted)
     |
-business_translator (McKinsey KB RAG + arXiv fallback → Markdown business insight report)
+business_translator (optional: KB RAG + arXiv → Markdown business report, if best_model exists)
 ```
+
+CLI data source (see `main.py --help`):
+
+- Single file: `--data path.csv` (split_agent runs inside the graph).
+- Pre-split files: `--train train.csv --test test.csv` (skips split_agent).
+- Optional explicit supervision metadata: `--task-type classification|regression --target <column>` (skips infer_task inside agent_manager).
+- Dataset description as text: `--description "..."` **or** `--description-file path/to/file.txt` (UTF-8 `.txt` only).
+
+Pipeline diagrams: enable `--show-graph` → writes `artifacts/graphs/full_pipeline.mmd` and `full_pipeline.png`.
 
 All intermediate files and reports are written to the run's workspace directory (`artifacts/workspace/YYYY-MM-DD-HH-MM/`), so parallel or back-to-back runs never overwrite each other.
 
@@ -145,17 +157,24 @@ python main.py \
   --data datasets/bank-full.csv \
   --description "Binary classification: predict whether a client subscribes to a term deposit (target column: y)" \
   --request "Please run the full pipeline — clean the data, split it, perform EDA, engineer features, train models, and select the best classifier"
+
+# Or load the same context from a UTF-8 .txt file:
+python main.py \
+  --data datasets/bank-full.csv \
+  --description-file datasets/dataset_description.txt \
+  --request "Please run the full pipeline and select the best classifier"
 ```
 
-**All arguments are required:**
+**Required arguments**
 
 | Argument | Description |
 |---|---|
-| `--data` | Path to the raw CSV dataset |
-| `--description` | Dataset context — task type, target column, domain background |
-| `--request` | Natural-language instruction given to the first agent |
-| `--show-graph` | *(optional)* Save pipeline graph as `artifacts/full_pipeline.png` |
-| `--recursion-limit` | *(optional)* LangGraph max recursion steps (default `200`) |
+| `--data` *or* `--train` + `--test` | CSV path(s) — see `--help` |
+| `--description` *or* `--description-file` | Dataset context (inline text or `.txt` UTF-8 path) |
+| `--request` | Natural-language instruction |
+| *(optional)* `--target` + `--task-type` | Skips `infer_task` in Agent Manager when both set |
+| *(optional)* `--show-graph` | Save `artifacts/graphs/full_pipeline.{mmd,png}` |
+| *(optional)* `--recursion-limit` | LangGraph max steps (default `200`) |
 
 ### Use as a library
 

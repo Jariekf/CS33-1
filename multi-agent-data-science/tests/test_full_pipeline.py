@@ -1,9 +1,8 @@
-"""集成测试：Agent Manager → Data Clean Agent → Split 完整流水线结构验证。"""
+"""集成测试：主图结构、路由与 dataset_split 节点（工具层仍为 split_dataset_tool 使用）。"""
 
 import sys
 from pathlib import Path
 
-import pandas as pd
 import pytest
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
@@ -13,12 +12,10 @@ if str(PROJECT_ROOT) not in sys.path:
 from langchain_core.messages import HumanMessage
 from langgraph.graph import END
 
-from core.dataset_split import split_dataset_node
 from core.env_utils import DEEPSEEK_API_KEY
 from core.graph import (
-    _route_after_agent_manager,
     _route_after_compare,
-    _route_after_data_clean,
+    _route_after_init,
     build_full_pipeline,
 )
 
@@ -32,14 +29,18 @@ SAMPLE_DESCRIPTION = (
 
 # ── 图结构 ──────────────────────────────────────────────────────────────────
 
+
 def test_pipeline_graph_contains_all_nodes():
     pipeline = build_full_pipeline(show_graph=False)
     graph = pipeline.get_graph()
     for node in [
         "init_run",
+        "split_agent",
         "agent_manager",
-        "data_clean_agent",
-        "split",
+        "set_clean_train",
+        "data_clean_train",
+        "set_clean_test",
+        "data_clean_test",
         "eda_agent",
         "feature_agent",
         "model_agent",
@@ -51,6 +52,10 @@ def test_pipeline_graph_contains_all_nodes():
     edges = {(edge.source, edge.target) for edge in graph.edges}
     assert ("__start__", "init_run") in edges
     assert ("init_run", "agent_manager") in edges
+    assert ("init_run", "split_agent") in edges
+    assert ("split_agent", "agent_manager") in edges
+    assert ("agent_manager", "set_clean_train") in edges
+    assert ("data_clean_test", "eda_agent") in edges
 
 
 def test_route_compare_to_business_translator_when_best_model():
@@ -61,108 +66,25 @@ def test_route_compare_to_end_without_best_model():
     assert _route_after_compare({}) == END
 
 
-# ── 路由：Manager → Data Clean ───────────────────────────────────────────────
+# ── 路由：init_run → split_agent / agent_manager ─────────────────────────────
 
-def test_route_manager_to_clean_when_plan_ready():
+
+def test_route_init_skips_split_when_presplit_paths():
     assert (
-        _route_after_agent_manager(
-            {"next_action": "run_data_cleaning", "cleaning_plan": {"summary": "x"}}
+        _route_after_init(
+            {"is_split": True, "training_data_path": "t.csv", "testing_data_path": "v.csv"}
         )
-        == "data_clean_agent"
+        == "agent_manager"
     )
 
 
-def test_route_manager_ends_without_plan():
-    assert (
-        _route_after_agent_manager(
-            {"next_action": "run_data_cleaning", "cleaning_plan": {}}
-        )
-        == END
-    )
+def test_route_init_goes_split_agent_when_not_presplit():
+    assert _route_after_init({"is_split": False}) == "split_agent"
+    assert _route_after_init({}) == "split_agent"
 
 
-def test_route_manager_ends_without_next_action():
-    assert (
-        _route_after_agent_manager(
-            {"next_action": "", "cleaning_plan": {"summary": "x"}}
-        )
-        == END
-    )
+# ── 图：start → init_run ─────────────────────────────────────────────────────
 
-
-# ── 路由：Data Clean → Split ─────────────────────────────────────────────────
-
-def test_route_clean_to_split_when_passed():
-    assert _route_after_data_clean({"cleaning_passed": True}) == "split"
-
-
-def test_route_clean_ends_when_not_passed():
-    assert _route_after_data_clean({"cleaning_passed": False}) == END
-
-
-def test_route_clean_ends_when_key_missing():
-    assert _route_after_data_clean({}) == END
-
-
-# ── Split 节点（衔接清洗输出的路径写入）────────────────────────────────────────
-
-def test_split_node_classification_writes_paths(tmp_path):
-    cleaned = tmp_path / "cleaned.csv"
-    pd.DataFrame({"x": range(50), "label": ["a"] * 25 + ["b"] * 25}).to_csv(cleaned, index=False)
-
-    update = split_dataset_node(
-        {
-            "cleaned_data_path": str(cleaned),
-            "task_type": "classification",
-            "target_column": "label",
-        }
-    )
-
-    assert update["current_stage"] == "split_done"
-    assert Path(update["training_data_path"]).exists()
-    assert Path(update["testing_data_path"]).exists()
-    assert update["split_report"]["stratify_used"] is True
-
-
-def test_split_node_regression_writes_paths(tmp_path):
-    cleaned = tmp_path / "reg.csv"
-    pd.DataFrame({"x": range(100), "y": range(100)}).to_csv(cleaned, index=False)
-
-    update = split_dataset_node(
-        {
-            "cleaned_data_path": str(cleaned),
-            "task_type": "regression",
-        }
-    )
-
-    assert update["current_stage"] == "split_done"
-    assert Path(update["training_data_path"]).exists()
-    assert Path(update["testing_data_path"]).exists()
-    assert update["split_report"]["stratify_used"] is False
-
-
-def test_split_node_fallback_to_data_path_when_no_cleaned(tmp_path):
-    raw = tmp_path / "raw.csv"
-    pd.DataFrame({"a": range(20)}).to_csv(raw, index=False)
-
-    update = split_dataset_node(
-        {
-            "data_path": str(raw),
-            "task_type": "regression",
-        }
-    )
-
-    assert update["current_stage"] == "split_done"
-    assert Path(update["training_data_path"]).exists()
-
-
-def test_split_node_fails_without_any_path():
-    update = split_dataset_node({"task_type": "regression"})
-    assert update["current_stage"] == "split_failed"
-    assert update["errors"]
-
-
-# ── 图结构（包含 init_run 节点）─────────────────────────────────────────────
 
 def test_pipeline_graph_contains_init_run_node():
     pipeline = build_full_pipeline(show_graph=False)
@@ -171,13 +93,25 @@ def test_pipeline_graph_contains_init_run_node():
     edges = {(e.source, e.target) for e in graph.edges}
     assert ("__start__", "init_run") in edges
     assert ("init_run", "agent_manager") in edges
+    assert ("init_run", "split_agent") in edges
 
 
 # ── LLM invoke 集成测试（需要 API Key）────────────────────────────────────────
 
-@pytest.mark.skipif(not DEEPSEEK_API_KEY, reason="需要配置 DEEPSEEK_API_KEY")
-def test_full_pipeline_invoke_to_split(tmp_path):
-    """集成测试：从原始数据到 split 完成（Manager → Clean → Split）。"""
+
+def _configured_deepseek_key() -> bool:
+    k = (DEEPSEEK_API_KEY or "").strip()
+    if not k or k == "your_deepseek_api_key":
+        return False
+    return not k.lower().startswith("your_")
+
+
+@pytest.mark.skipif(
+    not _configured_deepseek_key(),
+    reason="需要配置有效的 DEEPSEEK_API_KEY（非 .env 示例占位符）",
+)
+def test_full_pipeline_invoke_progresses_from_raw_csv():
+    """集成测试：从单 CSV 进入流水线，至少完成 init；若 LLM 走完则应有 split 路径等。"""
     pipeline = build_full_pipeline(show_graph=False)
     user_input = "请分析数据集，执行清洗，并切分训练集和测试集。"
     result = pipeline.invoke(
@@ -192,16 +126,20 @@ def test_full_pipeline_invoke_to_split(tmp_path):
     assert result.get("run_dir"), "init_run 应当生成 run_dir"
     assert Path(result["run_dir"]).exists()
 
-    if result.get("cleaning_passed"):
-        assert result.get("cleaned_data_path")
-        assert Path(result["cleaned_data_path"]).exists()
+    tp = result.get("training_data_path") or ""
+    sp = result.get("testing_data_path") or ""
+    if tp and sp:
+        assert Path(tp).exists()
+        assert Path(sp).exists()
 
-    if result.get("current_stage") == "split_done":
-        assert Path(result["training_data_path"]).exists()
-        assert Path(result["testing_data_path"]).exists()
+    if result.get("cleaning_passed"):
+        cdp = result.get("cleaned_data_path") or result.get("train_cleaned_data_path")
+        if cdp:
+            assert Path(cdp).exists()
 
 
 # ── 手动集成运行（pytest 不执行）─────────────────────────────────────────────
+
 
 def _run_full_pipeline():
     from agent.agent_manager import _pretty_print_message
