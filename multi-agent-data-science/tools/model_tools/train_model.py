@@ -1,4 +1,5 @@
 import json
+import math
 import pickle
 from pathlib import Path
 from typing import Any
@@ -8,6 +9,54 @@ from langchain_core.tools import tool
 
 from core.env_utils import PROJECT_ROOT
 from tools.tool_trace import trace_tool_call
+
+
+def _compute_train_score(
+    model: Any, X: Any, y: Any, scoring: str
+) -> tuple[float | None, str]:
+    """Compute in-sample score using the specified metric name (human-readable).
+
+    Returns (score, metric_name). Falls back to (None, "skipped") for metrics
+    that require probability estimates (roc_auc) when the model does not support
+    predict_proba, or for unrecognised scoring strings.
+    """
+    try:
+        y_pred = model.predict(X)
+        if scoring in ("f1_weighted", "f1_macro"):
+            from sklearn.metrics import f1_score
+            avg = "weighted" if scoring == "f1_weighted" else "macro"
+            return round(float(f1_score(y, y_pred, average=avg, zero_division=0)), 4), scoring
+        if scoring == "accuracy":
+            from sklearn.metrics import accuracy_score
+            return round(float(accuracy_score(y, y_pred)), 4), scoring
+        if scoring == "recall":
+            from sklearn.metrics import recall_score
+            return round(float(recall_score(y, y_pred, average="weighted", zero_division=0)), 4), scoring
+        if scoring == "precision":
+            from sklearn.metrics import precision_score
+            return round(float(precision_score(y, y_pred, average="weighted", zero_division=0)), 4), scoring
+        if scoring == "roc_auc":
+            if hasattr(model, "predict_proba"):
+                from sklearn.metrics import roc_auc_score
+                y_prob = model.predict_proba(X)
+                n_classes = y_prob.shape[1] if y_prob.ndim > 1 else 1
+                if n_classes == 2:
+                    score = roc_auc_score(y, y_prob[:, 1])
+                else:
+                    score = roc_auc_score(y, y_prob, multi_class="ovr", average="weighted")
+                return round(float(score), 4), scoring
+        if scoring == "r2":
+            from sklearn.metrics import r2_score
+            return round(float(r2_score(y, y_pred)), 4), scoring
+        if scoring == "rmse":
+            from sklearn.metrics import mean_squared_error
+            return round(float(math.sqrt(mean_squared_error(y, y_pred))), 4), scoring
+        if scoring == "mae":
+            from sklearn.metrics import mean_absolute_error
+            return round(float(mean_absolute_error(y, y_pred)), 4), scoring
+    except Exception:
+        pass
+    return None, "skipped"
 
 
 def _get_model(model_name: str, model_params: dict[str, Any] | None = None) -> Any:
@@ -113,6 +162,7 @@ def train_model(
     target_column: str,
     output_dir: str = "",
     model_params: dict[str, Any] | None = None,
+    scoring: str = "",
 ) -> str:
     """在特征工程完成后的训练集上训练指定模型，保存模型和特征列表。
 
@@ -123,12 +173,16 @@ def train_model(
       target_column (str)：目标列名，训练时会从特征中排除。
       output_dir (str)：模型保存目录，默认 artifacts/models/。
       model_params (dict)：可选，模型参数（通常来自 tune_and_select_model 的 best_params）。
+      scoring (str)：与 CV 调参一致的评分指标名（即 primary_metric，如 f1_weighted、roc_auc、r2、rmse）。
+        传入后 train_score 将使用该指标计算，便于与 cv_best_score 和 test 指标做三点对比。
+        留空则跳过计算，train_score 返回 null。
 
     返回 JSON，包含：
       model_path：保存的模型 pkl 路径。
       feature_columns_path：训练特征列名 JSON 路径（评估测试集时用于对齐列）。
       model_name：模型名称。
-      train_score：训练集上的评分（分类为 accuracy，回归为 R²）。
+      train_score：训练集上使用 scoring 指标的得分；若 scoring 留空或不支持则为 null。
+      train_score_metric：实际使用的指标名，"skipped" 表示未计算。
       rows_trained：训练样本数。
     """
     tool_inputs = {
@@ -137,6 +191,7 @@ def train_model(
         "task_type": task_type,
         "target_column": target_column,
         "model_params": model_params or {},
+        "scoring": scoring,
     }
     try:
         df = pd.read_csv(featured_train_path)
@@ -150,7 +205,7 @@ def train_model(
 
         model = _get_model(model_name, model_params=model_params)
         model.fit(X, y)
-        train_score = round(float(model.score(X, y)), 4)
+        train_score, train_score_metric = _compute_train_score(model, X, y, scoring)
 
         out_dir = Path(output_dir) if output_dir else PROJECT_ROOT / "artifacts" / "models"
         out_dir.mkdir(parents=True, exist_ok=True)
@@ -167,6 +222,7 @@ def train_model(
             "feature_columns_path": str(feat_cols_path),
             "model_name": model_name,
             "train_score": train_score,
+            "train_score_metric": train_score_metric,
             "rows_trained": int(len(df)),
             "model_params": model_params or {},
         }
