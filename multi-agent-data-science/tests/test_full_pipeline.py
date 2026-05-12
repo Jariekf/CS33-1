@@ -14,8 +14,8 @@ from langgraph.graph import END
 
 from core.env_utils import DEEPSEEK_API_KEY
 from core.graph import (
-    _route_after_compare,
     _route_after_init,
+    _route_after_model,
     build_full_pipeline,
 )
 
@@ -44,7 +44,6 @@ def test_pipeline_graph_contains_all_nodes():
         "eda_agent",
         "feature_agent",
         "model_agent",
-        "compare",
         "business_translator",
     ]:
         assert node in graph.nodes
@@ -58,12 +57,19 @@ def test_pipeline_graph_contains_all_nodes():
     assert ("data_clean_test", "eda_agent") in edges
 
 
-def test_route_compare_to_business_translator_when_best_model():
-    assert _route_after_compare({"best_model": {"model_name": "X"}}) == "business_translator"
+def test_route_model_to_business_translator_when_best_model():
+    assert _route_after_model({
+        "candidate_models": ["X"],
+        "model_results": {"X": {}},
+        "best_model": {"model_name": "X"},
+    }) == "business_translator"
 
 
-def test_route_compare_to_end_without_best_model():
-    assert _route_after_compare({}) == END
+def test_route_model_to_end_without_best_model():
+    assert _route_after_model({
+        "candidate_models": ["X"],
+        "model_results": {"X": {}},
+    }) == END
 
 
 # ── 路由：init_run → split_agent / agent_manager ─────────────────────────────

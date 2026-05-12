@@ -64,7 +64,7 @@ def _manager_node(state: GlobalState) -> GlobalState:
             "说明：当前 state 已包含有效的 task_type 与 target_column（来自 split_agent 或用户指定），"
             "不要调用 infer_task。\n"
             "制定清洗计划时把 Manager RAP context 作为背景知识参考，但以实际数据画像为准。\n"
-            "完成以上步骤后停止。"
+            "完成以上步骤后停止，生成报告。"
         )
     else:
         rap_step = (
@@ -83,7 +83,7 @@ def _manager_node(state: GlobalState) -> GlobalState:
             "5. 调用 create_cleaning_plan(target='test', ...) 制定测试集清洗计划"
             "   （测试集步骤与 train 对齐，不写基于标签分布的特殊操作）。\n"
             "制定清洗计划时把 Manager RAP context 作为背景知识参考，但以实际数据画像为准。\n"
-            "完成以上步骤后停止。"
+            "完成以上步骤后停止，生成报告。"
         )
 
     messages = [

@@ -5,6 +5,7 @@ from __future__ import annotations
 import json
 import logging
 import os
+import time
 from typing import Any
 
 from langchain_core.tools import tool
@@ -19,31 +20,54 @@ MCKINSEY_COLLECTION = os.getenv("MCKINSEY_COLLECTION", "mckinsey_kb")
 MCKINSEY_SOURCE_TYPES = ("mckinsey", "equity_research", "textbook")
 MCKINSEY_PER_BUCKET_TOP_K = int(os.getenv("MCKINSEY_PER_BUCKET_TOP_K", "3"))
 
+RAG_RETRY_COUNT = int(os.getenv("RAG_RETRY_COUNT", "2"))
+RAG_FALLBACK_TO_ARXIV = os.getenv("RAG_FALLBACK_TO_ARXIV", "true").lower() in {
+    "1", "true", "yes", "on",
+}
+
 # Resolved relative to multi-agent-data-science package root (parent of tools/)
 _PROJECT_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", ".."))
 STYLE_SKELETONS_PATH = os.path.join(_PROJECT_ROOT, "data", "mckinsey_kb", "style_skeletons.md")
 
 
 def retrieve_mckinsey_context_impl(queries: list[str]) -> dict[str, list[dict[str, Any]]]:
-    """Shared retrieval logic: dedupe by content prefix per source_type bucket."""
+    """Shared retrieval logic: dedupe by content prefix per source_type bucket.
+
+    Retries each ``retrieve_knowledge`` call up to ``RAG_RETRY_COUNT`` times
+    with exponential back-off before giving up on that query/source_type pair.
+    """
     buckets: dict[str, list[dict]] = {st: [] for st in MCKINSEY_SOURCE_TYPES}
     seen_keys: dict[str, set[str]] = {st: set() for st in MCKINSEY_SOURCE_TYPES}
 
     for query in queries:
         for source_type in MCKINSEY_SOURCE_TYPES:
-            try:
-                hits = retrieve_knowledge(
-                    query=query,
-                    top_k=MCKINSEY_PER_BUCKET_TOP_K,
-                    collection_name=MCKINSEY_COLLECTION,
-                    metadata_filter={"source_type": source_type},
-                )
-            except Exception as e:
+            hits: list[dict[str, Any]] = []
+            last_err: Exception | None = None
+
+            for attempt in range(1 + RAG_RETRY_COUNT):
+                try:
+                    hits = retrieve_knowledge(
+                        query=query,
+                        top_k=MCKINSEY_PER_BUCKET_TOP_K,
+                        collection_name=MCKINSEY_COLLECTION,
+                        metadata_filter={"source_type": source_type},
+                    )
+                    last_err = None
+                    break
+                except Exception as e:
+                    last_err = e
+                    if attempt < RAG_RETRY_COUNT:
+                        wait = 1.0 * (attempt + 1)
+                        logger.info(
+                            "RAG retry %d/%d for query=%r source_type=%s in %.1fs",
+                            attempt + 1, RAG_RETRY_COUNT, query, source_type, wait,
+                        )
+                        time.sleep(wait)
+
+            if last_err:
                 logger.warning(
-                    "McKinsey RAG retrieval failed for query=%r, source_type=%s: %s",
-                    query,
-                    source_type,
-                    e,
+                    "RAG failed after %d retries for query=%r, source_type=%s: %s",
+                    RAG_RETRY_COUNT, query, source_type, last_err,
                 )
                 continue
 
@@ -66,6 +90,7 @@ def retrieve_mckinsey_knowledge(queries: list[str]) -> str:
 
     Call with 2–4 English search queries derived from the user goal and top predictive features.
     Returns JSON with bucket hit counts and short previews for planning next steps.
+    If RAG is unavailable after retries, automatically falls back to arXiv.
     """
     if not queries:
         return json.dumps(
@@ -74,22 +99,42 @@ def retrieve_mckinsey_knowledge(queries: list[str]) -> str:
         )
     buckets = retrieve_mckinsey_context_impl(queries)
     total = sum(len(v) for v in buckets.values())
+
+    fallback_source: str | None = None
+    arxiv_papers: list[dict[str, Any]] = []
+
+    if total == 0 and RAG_FALLBACK_TO_ARXIV:
+        logger.warning(
+            "RAG returned 0 hits after retries; falling back to arXiv for queries=%r", queries,
+        )
+        fallback_source = "arxiv"
+        seen_titles: set[str] = set()
+        for q in queries[:5]:
+            for paper in search_arxiv(q):
+                t = str(paper.get("title", ""))
+                if t and t not in seen_titles:
+                    seen_titles.add(t)
+                    arxiv_papers.append(paper)
+
     preview_lines: list[str] = []
     for st, items in buckets.items():
         for item in items[:1]:
             meta = (item.get("metadata") or {}).get("title", "")
             body = (item.get("content") or "")[:160].replace("\n", " ")
             preview_lines.append(f"[{st}] {meta}: {body}...")
-    return json.dumps(
-        {
-            "buckets": buckets,
-            "total_hits": total,
-            "queries_used": queries,
-            "preview": "\n".join(preview_lines) if preview_lines else "(no hits)",
-        },
-        ensure_ascii=False,
-        default=str,
-    )
+
+    result: dict[str, Any] = {
+        "buckets": buckets,
+        "total_hits": total,
+        "queries_used": queries,
+        "preview": "\n".join(preview_lines) if preview_lines else "(no hits)",
+    }
+    if fallback_source:
+        result["fallback"] = fallback_source
+        result["arxiv_papers"] = arxiv_papers[:20]
+        result["arxiv_count"] = len(arxiv_papers[:20])
+
+    return json.dumps(result, ensure_ascii=False, default=str)
 
 
 @tool

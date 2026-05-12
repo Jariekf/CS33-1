@@ -1,6 +1,6 @@
 # Multi-Agent Data Science Pipeline
 
-A LangGraph-powered multi-agent pipeline that automates the full machine learning workflow — from raw CSV to trained, evaluated, and compared models — using LLM agents for every reasoning step.
+A LangGraph-powered multi-agent pipeline that automates the full machine learning workflow — from raw CSV to trained and evaluated models — using LLM agents for every reasoning step.
 
 ---
 
@@ -23,8 +23,6 @@ eda_agent           (EDA, correlation, charts, select 3 candidate models)
 feature_agent       (encodes & scales — one loop iteration per candidate model)
     |
 model_agent         (trains & evaluates — one loop iteration per candidate model)
-    |
-compare             (best model: R2 / F1-weighted)
     |
 business_translator (optional: KB RAG + arXiv → Markdown business report, if best_model exists)
 ```
@@ -134,7 +132,7 @@ The active LLM is selected in `core/my_llm.py`. By default the pipeline uses `ll
 
 ### Business Action Translator (BAT) — McKinsey RAG
 
-After `compare`, the **business_translator** subgraph generates `reports/business_report.md` using:
+After `model_agent`, the **business_translator** subgraph generates `reports/business_report.md` using:
 
 - Retrieval from Chroma collection **`mckinsey_kb`** (three buckets: `mckinsey`, `equity_research`, `textbook`)
 - **arXiv** fallback when bucket hits fall below `MCKINSEY_MIN_HITS`
@@ -249,7 +247,7 @@ python -m pytest tests/test_model_agent.py::test_train_model_regression -v
 | `test_full_pipeline.py` | Full graph nodes & edges, split node, pipeline routing |
 | `test_eda_agent.py` | Graph structure, model selection validation, EDA tools |
 | `test_feature_agent.py` | Graph structure, encode/scale tools, state updates |
-| `test_model_agent.py` | Graph structure, train/evaluate tools, compare node |
+| `test_model_agent.py` | Graph structure, train/evaluate tools, model routing |
 
 ### LLM invoke tests (API key required)
 
@@ -326,7 +324,6 @@ You can inspect any intermediate result without re-running the pipeline — open
 |   |-- global_state.py            # GlobalState TypedDict (shared across all nodes)
 |   |-- graph.py                   # Pipeline assembly (build_full_pipeline)
 |   |-- dataset_split.py           # Split node (pure function)
-|   |-- compare_node.py            # Compare node (pure function, picks best model)
 |   |-- dataset_store.py           # In-memory dataset cache (dataset_id -> DataFrame)
 |   |-- report_writer.py           # Saves per-agent reports to run_dir
 |   |-- my_llm.py                  # LLM instances (one per provider)
