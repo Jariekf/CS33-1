@@ -15,13 +15,13 @@ from langgraph.graph import END, StateGraph
 from langgraph.prebuilt import ToolNode
 
 from core.global_state import GlobalState
-from core.my_llm import llm_deepseek
+from core.my_llm import llm_for
 from core.report_writer import save_agent_report
 from tools.agentmanager_tools.infer_task import infer_task
 from tools.split_tools.split_dataset_tool import split_dataset
 
 tools = [infer_task, split_dataset]
-llm_with_tools = llm_deepseek.bind_tools(tools)
+llm_with_tools = llm_for("split").bind_tools(tools)
 
 
 def _split_agent_node(state: GlobalState) -> GlobalState:

@@ -14,7 +14,7 @@ from langgraph.graph import END, StateGraph
 from langgraph.prebuilt import ToolNode
 
 from core.global_state import GlobalState
-from core.my_llm import llm_deepseek
+from core.my_llm import llm_for
 from core.report_writer import save_agent_report
 from tools.eda_tools.compute_correlation_matrix import compute_correlation_matrix
 from tools.eda_tools.generate_eda_charts import generate_eda_charts
@@ -33,7 +33,7 @@ tools = [
     generate_eda_charts,
     select_candidate_models_and_metrics,
 ]
-llm_with_tools = llm_deepseek.bind_tools(tools)
+llm_with_tools = llm_for("eda").bind_tools(tools)
 
 
 def _merge_eda_report(state: GlobalState, tool_name: str, payload: dict[str, Any]) -> dict[str, Any]:

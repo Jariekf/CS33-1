@@ -10,7 +10,7 @@ from langchain_core.messages import AIMessage, HumanMessage, SystemMessage, Tool
 from langgraph.graph import END, StateGraph
 from langgraph.prebuilt import ToolNode
 from core.global_state import GlobalState
-from core.my_llm import llm_deepseek
+from core.my_llm import llm_for
 
 from tools.agentmanager_tools.create_cleaning_plan import create_cleaning_plan
 from tools.agentmanager_tools.infer_task import infer_task
@@ -19,7 +19,7 @@ from core.report_writer import save_agent_report
 
 
 tools = [profile_dataset, infer_task, create_cleaning_plan]
-llm_with_tools = llm_deepseek.bind_tools(tools)
+llm_with_tools = llm_for("agent_manager").bind_tools(tools)
 
 
 def _has_complete_task_meta(state: GlobalState) -> bool:

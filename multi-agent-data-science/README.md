@@ -334,9 +334,9 @@ You can inspect any intermediate result without re-running the pipeline — open
 |-- tools/
 |   |-- agentmanager_tools/        # profile_dataset, infer_task, create_cleaning_plan
 |   |-- dataclean_tools/           # handle_missing, remove_duplicates, fix_types, ...
-|   |-- eda_tools/                 # profile_training_data, correlation_matrix, select_candidate_models_and_metrics
+|   |-- eda_tools/                 # profile_training_data, correlation_matrix, select_candidate_models
 |   |-- feature_tools/             # encode_categorical, scale_features, save_featured_dataset
-|   |-- model_tools/               # tune_and_select_model, train_model, evaluate_model
+|   |-- model_tools/               # train_model, evaluate_model
 |   `-- business_tools/            # arxiv_tool, file_reader (BAT)
 |-- tests/
 |   |-- conftest.py                # Shared path constants
@@ -354,29 +354,8 @@ You can inspect any intermediate result without re-running the pipeline — open
 
 ## Candidate Model Pools
 
-The EDA Agent selects exactly **3 models** from the relevant pool based on dataset characteristics and business goals.
+The EDA Agent selects exactly **3 models** from the relevant pool based on dataset characteristics.
 
-**Classification (11 models):**
-`LogisticRegression`, `RandomForest`, `XGBoost`, `LightGBM`, `GradientBoosting`,
-`ExtraTrees`, `AdaBoost`, `SVM`, `KNN`, `GaussianNB`, `MLPClassifier`
+**Classification:** `LogisticRegression`, `RandomForest`, `XGBoost`, `SVM`, `KNN`
 
-**Regression (12 models):**
-`LinearRegression`, `Ridge`, `Lasso`, `ElasticNet`, `HuberRegressor`,
-`RandomForestRegressor`, `XGBoostRegressor`, `LightGBMRegressor`, `GradientBoostingRegressor`,
-`ExtraTreesRegressor`, `SVR`, `MLPRegressor`
-
-## Evaluation Metrics
-
-The EDA Agent also decides evaluation metrics alongside model selection, stored in `GlobalState` and used throughout the modeling pipeline.
-
-| Field | Type | Description |
-|---|---|---|
-| `primary_metric` | `str` | Single metric used as CV optimisation objective in `tune_and_select_model` |
-| `evaluation_metrics` | `list[str]` | Full set of metrics reported on the test set (must include `primary_metric`) |
-| `metrics_rationale` | `str` | Explanation of the metric choices |
-
-**Classification options:** `accuracy`, `f1_macro`, `f1_weighted`, `roc_auc`, `precision`, `recall`
-
-**Regression options:** `r2`, `rmse`, `mae`
-
-> `confusion_matrix` is always computed for classification tasks regardless of `evaluation_metrics`.
+**Regression:** `LinearRegression`, `Ridge`, `RandomForestRegressor`, `XGBoostRegressor`, `SVR`
