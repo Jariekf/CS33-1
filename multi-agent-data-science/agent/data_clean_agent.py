@@ -18,6 +18,7 @@ from core.my_llm import llm_for
 from core.report_writer import save_agent_report
 from tools.dataclean_tools.clean_data_types import clean_data_types
 from tools.dataclean_tools.clean_duplicates import clean_duplicates
+from tools.dataclean_tools.clean_drop_columns import clean_drop_columns
 from tools.dataclean_tools.clean_missing_values import clean_missing_values
 from tools.dataclean_tools.clean_outliers import clean_outliers
 from tools.dataclean_tools.load_dataset_to_store import load_dataset_to_store
@@ -29,6 +30,7 @@ tools = [
     clean_data_types,
     clean_missing_values,
     clean_outliers,
+    clean_drop_columns,
     clean_duplicates,
 ]
 llm_with_tools = llm_for("data_clean").bind_tools(tools)
@@ -89,9 +91,9 @@ def _data_clean_node(state: GlobalState) -> GlobalState:
         f"用户诉求：{user_request or '未提供'}。",
         f"本次运行工作目录：{run_dir or '未设置'}。所有输出文件应保存至此目录下。",
         "若尚未加载数据，应优先调用 load_dataset_to_store(file_path=...)；路径缺失时使用上面的源文件路径。",
-        "后续按清洗计划依次调用 clean_data_types、clean_missing_values、clean_outliers、clean_duplicates；"
+        "后续按清洗计划依次调用 clean_data_types、clean_missing_values、clean_outliers、clean_drop_columns、clean_duplicates；"
         "所有清洗工具的 dataset_id 必须与 load 返回的 dataset_id 一致。",
-        "计划中若有 drop_columns：当前工具集不包含删列工具，请在最终回复中列出建议删除的列及原因，不要编造已删除。",
+        "计划中若有 drop_columns，必须调用 clean_drop_columns(dataset_id=..., columns=...) 执行删列。",
         f"完成后必须调用 save_dataset_from_store 写出 CSV，output_path 使用：{default_save_path}。",
         f"\n--- cleaning_plan ({target}) ---\n",
         plan_text,
@@ -113,6 +115,7 @@ def _tool_state_update_node(state: GlobalState) -> GlobalState:
         "clean_data_types": _handle_clean_step,
         "clean_missing_values": _handle_clean_step,
         "clean_outliers": _handle_clean_step,
+        "clean_drop_columns": _handle_clean_step,
         "clean_duplicates": _handle_clean_step,
     }
     handler = handlers.get(last_msg.name)

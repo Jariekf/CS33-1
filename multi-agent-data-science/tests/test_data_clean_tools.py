@@ -5,6 +5,7 @@ import pandas as pd
 from core.dataset_store import get_dataset, put_dataset
 from tools.dataclean_tools.clean_data_types import clean_data_types
 from tools.dataclean_tools.clean_duplicates import clean_duplicates
+from tools.dataclean_tools.clean_drop_columns import clean_drop_columns
 from tools.dataclean_tools.clean_missing_values import clean_missing_values
 from tools.dataclean_tools.clean_outliers import clean_outliers
 from tools.dataclean_tools.load_dataset_to_store import load_dataset_to_store
@@ -93,7 +94,19 @@ def test_data_clean_tools_update_dataset_store():
     )
     assert duplicate_report["dropped_rows"] == 2
 
+    drop_report = json.loads(
+        clean_drop_columns.invoke(
+            {
+                "dataset_id": dataset_id,
+                "columns": ["date", "not_exists"],
+            }
+        )
+    )
+    assert drop_report["dropped_columns"] == ["date"]
+    assert drop_report["missing_columns"] == ["not_exists"]
+
     cleaned = get_dataset(dataset_id)
     assert cleaned["amount"].isna().sum() == 0
     assert cleaned["category"].isna().sum() == 0
+    assert "date" not in cleaned.columns
     assert len(cleaned) == 2
