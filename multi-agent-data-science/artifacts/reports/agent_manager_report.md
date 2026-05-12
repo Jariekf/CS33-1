@@ -1205,3 +1205,44 @@ print(results_df.to_string(index=False))
 
 ---
 
+## agent_manager  `2026-05-12 05:31:15`
+
+All three required steps are complete. Here's a comprehensive summary:
+
+---
+
+## ✅ Workflow Complete — Steps 1–3
+
+### Step 1: Dataset Profile — Training Set (`bank-full_train.csv`)
+| Metric | Value |
+|--------|-------|
+| **Rows** | 36,168 |
+| **Columns** | 17 |
+| **Missing Values** | ✅ None (0%) |
+| **Columns to Drop** | None (no empty, constant, or ID-like columns) |
+| **Type Issues** | None found |
+
+**Outlier Summary:**
+| Column | Outlier Ratio | Key Observation |
+|--------|:------------:|-----------------|
+| `age` | 1.1% | Range 18–95 |
+| `balance` | **10.4%** | Highly skewed (max 102,127) |
+| `duration` | 7.3% | Call duration up to 4,918 sec |
+| `campaign` | 6.8% | Up to 63 contacts |
+| `pdays` | **18.2%** | -1 is valid sentinel (not contacted) |
+| `previous` | **18.2%** | 0 is valid minimum |
+
+### Step 2: Training Set Cleaning Plan
+- **Type Conversions**: Convert all 9 categorical columns (`job`, `marital`, `education`, `default`, `housing`, `loan`, `contact`, `month`, `poutcome`) and target `y` from `str` → `category`
+- **Outlier Handling**: Clip all 6 outlier columns at 1st–99th percentiles (preserving `pdays=-1` and `previous=0` as valid values)
+- **Drop Columns**: None
+
+### Step 3: Test Set Cleaning Plan
+- **Same transformations** as training set for consistency
+- **No target-based operations**
+- Same type conversions and outlier clipping thresholds
+
+The pipeline is now ready for the next agents to proceed with **EDA**, **feature engineering**, **model training**, **model selection**, and **business report generation**.
+
+---
+

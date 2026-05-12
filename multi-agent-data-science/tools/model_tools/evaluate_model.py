@@ -1,5 +1,7 @@
 import json
+import os
 import pickle
+import time
 from pathlib import Path
 from typing import Any
 
@@ -97,6 +99,9 @@ def evaluate_model(
         - 分类基础：accuracy、f1_macro、f1_weighted、confusion_matrix（始终计算）；
           若 evaluation_metrics 含 roc_auc/recall/precision 则额外计算对应指标。
         - 回归：rmse、mae、r2
+      resource_metrics：资源感知指标 dict（始终计算，与统计指标分开存放）。
+        - inference_latency_ms_per_sample：预热后单样本平均推理延迟（毫秒）。
+        - model_size_kb：模型 pkl 文件大小（KB）。
     """
     eval_metrics_set = set(evaluation_metrics or [])
     tool_inputs = {
@@ -136,7 +141,13 @@ def evaluate_model(
             feature_columns=feature_columns,
         )
 
+        # ── 推理延迟计时（预热 1 次后正式计时，取均值）────────────────────────
+        model.predict(X_test)  # warm-up
+        _t0 = time.perf_counter()
         y_pred = model.predict(X_test)
+        _elapsed_ms = (time.perf_counter() - _t0) * 1000
+        n_samples = len(X_test)
+        inference_latency_ms_per_sample = round(_elapsed_ms / n_samples, 4) if n_samples > 0 else None
 
         metrics: dict[str, Any] = {}
         if task_type == "classification":
@@ -175,11 +186,18 @@ def evaluate_model(
             metrics["mae"] = round(float(mean_absolute_error(y_test, y_pred)), 4)
             metrics["r2"] = round(float(r2_score(y_test, y_pred)), 4)
 
+        # ── 资源感知指标 ──────────────────────────────────────────────────────
+        model_size_kb = round(os.path.getsize(model_path) / 1024, 2) if Path(model_path).is_file() else None
+
         result = {
             "model_name": model_name,
             "model_path": model_path,
             "primary_metric": primary_metric or "",
             "metrics": metrics,
+            "resource_metrics": {
+                "inference_latency_ms_per_sample": inference_latency_ms_per_sample,
+                "model_size_kb": model_size_kb,
+            },
         }
         output = json.dumps(result, ensure_ascii=False, indent=2)
     except Exception as exc:

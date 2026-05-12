@@ -15,7 +15,7 @@ from langgraph.prebuilt import ToolNode
 
 from core.global_state import GlobalState
 from core.my_llm import llm_for
-from core.report_writer import save_agent_report
+from core.report_writer import save_agent_report, save_state_snapshot
 from tools.model_tools.evaluate_model import evaluate_model
 from tools.model_tools.train_model import train_model
 from tools.model_tools.tune_and_select_model import tune_and_select_model
@@ -89,7 +89,8 @@ def _model_node(state: GlobalState) -> GlobalState:
         "  分析完成后，调用 train_model：\n"
         "  featured_train_path = feature_dataset_ids[best_model_name]，\n"
         "  model_name = best_model_name，model_params = best_model_params，\n"
-        f"  output_dir = {output_dir!r}。\n\n"
+        f"  output_dir = {output_dir!r}，\n"
+        f"  scoring = '{primary_metric or ''}'（与 CV 一致，使 train_score 可与 cv_best_score 直接对比）。\n\n"
         "步骤 3 — 若 current_stage 为 model_trained，调用 evaluate_model：\n"
         "  传入 model_path、feature_columns_path、test_data_path、model_name、task_type、target_column，\n"
         "  以及最佳模型对应的预处理参数（scaler_path、scaled_columns、encoder_paths、encoding_method、encoded_columns）；\n"
@@ -151,6 +152,7 @@ def _handle_train(state: GlobalState, tool_message: ToolMessage) -> GlobalState:
         merged["feature_columns_path"] = payload.get("feature_columns_path", "")
         merged["model_params"] = payload.get("model_params", {})
         merged["train_score"] = payload.get("train_score")
+        merged["train_score_metric"] = payload.get("train_score_metric", "skipped")
         existing[name] = merged
     return {
         "best_model": best_model,
@@ -169,16 +171,21 @@ def _handle_evaluate(state: GlobalState, tool_message: ToolMessage) -> GlobalSta
         }
     existing = dict(state.get("model_results") or {})
     name = payload.get("model_name", "unknown")
+    test_metrics = payload.get("metrics", {})
     model_entry = dict(existing.get(name) or {})
-    # keep selection metrics for compare node; store final test metrics separately
     model_entry["model_path"] = payload.get("model_path", model_entry.get("model_path", ""))
-    model_entry["final_test_metrics"] = payload.get("metrics", {})
+    # overwrite the cv-score snapshot in "metrics" with definitive test results so that
+    # business_translator_agent always reads the most authoritative score per model.
+    # cv data is preserved separately in cv_best_score and selection_summary fields.
+    model_entry["metrics"] = test_metrics
+    model_entry["final_test_metrics"] = test_metrics
     existing[name] = model_entry
     best_model = dict(state.get("best_model") or {})
     if best_model.get("model_name") == name or not best_model.get("model_name"):
         best_model["model_name"] = name
         best_model["model_path"] = payload.get("model_path", "")
-        best_model["final_test_metrics"] = payload.get("metrics", {})
+        best_model["metrics"] = test_metrics
+        best_model["final_test_metrics"] = test_metrics
     return {
         "best_model": best_model,
         "model_results": existing,
@@ -200,13 +207,8 @@ def _handle_tune_and_select(state: GlobalState, tool_message: ToolMessage) -> Gl
     existing = dict(state.get("model_results") or {})
     for model_name, summary in per_model_summary.items():
         cv_best = float(summary.get("cv_best_score", -1))
-        metrics = (
-            {"f1_weighted": cv_best}
-            if selection_metric == "f1_weighted"
-            else {"r2": cv_best}
-        )
         merged = dict(existing.get(model_name) or {})
-        merged["metrics"] = metrics
+        merged["metrics"] = {selection_metric: cv_best}
         merged["selection_metric"] = selection_metric
         merged["cv_best_score"] = cv_best
         merged["model_params"] = summary.get("best_params", {})
@@ -231,10 +233,34 @@ def _route_after_model(state: GlobalState) -> str:
     last_msg = state["messages"][-1]
     if isinstance(last_msg, AIMessage) and last_msg.tool_calls:
         return "tools"
-    # last key in model_results is the model just evaluated
-    model = (state.get("best_model") or {}).get("model_name", "unknown")
-    save_agent_report("model_agent", last_msg, model=model, run_dir=state.get("run_dir") or "")
-    return END
+    return "finalize"
+
+
+def _model_finalize_node(state: GlobalState) -> GlobalState:
+    """Pipeline 收尾：存 model_report、补全 best_model.task_type、保存 state 快照。
+
+    原 compare_node 的非比较职责（task_type 注入、state 快照）迁移至此，
+    同时将 model agent Step 4 的叙述文本写入 model_report 供 BAT 直接读取。
+    """
+    last_msg = state["messages"][-1]
+    model_report_text = str(last_msg.content) if hasattr(last_msg, "content") else ""
+
+    best_model = dict(state.get("best_model") or {})
+    task_type = (state.get("task_type") or "regression").lower()
+    best_model["task_type"] = task_type
+
+    model_name = best_model.get("model_name", "unknown")
+    run_dir = state.get("run_dir") or ""
+
+    save_agent_report("model_agent", last_msg, model=model_name, run_dir=run_dir)
+
+    updated: GlobalState = {
+        "model_report": model_report_text,
+        "best_model": best_model,
+        "current_stage": "model_done",
+    }
+    save_state_snapshot({**state, **updated})
+    return updated
 
 
 def _show_graph_if_needed(agent_graph, show_graph: bool) -> None:
@@ -274,12 +300,14 @@ def build_model_agent(show_graph: bool = False):
     graph.add_node("model_agent", _model_node)
     graph.add_node("tools", ToolNode(tools))
     graph.add_node("tool_state_update", _tool_state_update_node)
+    graph.add_node("finalize", _model_finalize_node)
     graph.set_entry_point("model_agent")
     graph.add_conditional_edges(
-        "model_agent", _route_after_model, {"tools": "tools", END: END}
+        "model_agent", _route_after_model, {"tools": "tools", "finalize": "finalize"}
     )
     graph.add_edge("tools", "tool_state_update")
     graph.add_edge("tool_state_update", "model_agent")
+    graph.add_edge("finalize", END)
     compiled = graph.compile()
     _show_graph_if_needed(compiled, show_graph=show_graph)
     return compiled
