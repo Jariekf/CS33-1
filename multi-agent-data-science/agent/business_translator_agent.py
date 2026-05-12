@@ -21,7 +21,7 @@ from langgraph.graph import END, StateGraph
 from langgraph.prebuilt import ToolNode
 
 from core.global_state import GlobalState
-from core.my_llm import call_llm, llm_deepseek
+from core.my_llm import call_llm, llm_for
 from core.report_writer import save_agent_report
 from tools.business_tools.bat_tools import bat_tools
 from tools.business_tools.file_reader import read_file
@@ -31,7 +31,7 @@ logger = logging.getLogger(__name__)
 STYLE_SKELETONS_PATH = PROJECT_ROOT / "data" / "mckinsey_kb" / "style_skeletons.md"
 
 tools = bat_tools
-llm_with_tools = llm_deepseek.bind_tools(tools)
+llm_with_tools = llm_for("bat").bind_tools(tools)
 
 
 def _extract_top_features(state: GlobalState, limit: int = 10) -> list[str]:

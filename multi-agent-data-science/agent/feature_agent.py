@@ -14,7 +14,7 @@ from langgraph.graph import END, StateGraph
 from langgraph.prebuilt import ToolNode
 
 from core.global_state import GlobalState
-from core.my_llm import llm_deepseek
+from core.my_llm import llm_for
 from core.report_writer import save_agent_report
 from tools.dataclean_tools.load_dataset_to_store import load_dataset_to_store
 from tools.feature_tools.encode_categorical import encode_categorical
@@ -29,7 +29,7 @@ tools = [
     encode_categorical,
     save_featured_dataset,
 ]
-llm_with_tools = llm_deepseek.bind_tools(tools)
+llm_with_tools = llm_for("feature").bind_tools(tools)
 
 
 def _get_current_model(state: GlobalState) -> str | None:
