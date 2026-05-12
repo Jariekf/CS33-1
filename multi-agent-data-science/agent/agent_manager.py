@@ -49,8 +49,7 @@ def _manager_node(state: GlobalState) -> GlobalState:
 
     if has_meta:
         rap_step = (
-            "2. 调用 build_manager_rap_context(user_request, description, task_type, "
-            "target_column, dataset_profile) 生成 Manager RAP context；\n"
+            "2. 调用 build_manager_rap_context(user_request, description, task_type, target_column) 生成 Manager RAP context；\n"
             if not has_rap_context
             else "2. 当前 state 已有 Manager RAP context，不要重复调用 build_manager_rap_context；\n"
         )
@@ -68,8 +67,7 @@ def _manager_node(state: GlobalState) -> GlobalState:
         )
     else:
         rap_step = (
-            "3. 调用 build_manager_rap_context(user_request, description, task_type, "
-            "target_column, dataset_profile) 生成 Manager RAP context；\n"
+            "3. 调用 build_manager_rap_context(user_request, description, task_type, target_column) 生成 Manager RAP context；\n"
             if not has_rap_context
             else "3. 当前 state 已有 Manager RAP context，不要重复调用 build_manager_rap_context；\n"
         )

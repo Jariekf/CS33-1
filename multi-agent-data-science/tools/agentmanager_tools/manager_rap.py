@@ -4,9 +4,10 @@ from __future__ import annotations
 import json
 import os
 import re
-from typing import Any
+from typing import Annotated, Any
 
 from langchain_core.tools import tool
+from langgraph.prebuilt import InjectedState
 
 from core.my_llm import call_llm
 from tools.tool_trace import trace_tool_call
@@ -286,7 +287,7 @@ def build_manager_rap_context(
     description: str = "",
     task_type: str = "",
     target_column: str = "",
-    dataset_profile: dict[str, Any] | None = None,
+    dataset_profile: Annotated[dict[str, Any] | None, InjectedState("dataset_profile")] = None,
 ) -> str:
     """在 train/test 清洗计划之前构建 Manager RAP context。"""
     tool_inputs = {

@@ -59,14 +59,17 @@ def _profile_missing_values(df: pd.DataFrame) -> dict[str, Any]:
         if len(df) and float(count / len(df)) >= 0.3
     ]
 
-    return {
+    nonempty_columns = {col: v for col, v in columns.items() if v["missing_count"] > 0}
+    result: dict[str, Any] = {
         "total_missing_cells": int(missing_counts.sum()),
         "total_missing_ratio": round(float(missing_counts.sum() / total_cells), 6)
         if total_cells
         else 0.0,
         "high_missing_columns": high_missing_columns,
-        "columns": columns,
     }
+    if nonempty_columns:
+        result["columns"] = nonempty_columns
+    return result
 
 
 def _profile_outliers(df: pd.DataFrame) -> dict[str, Any]:
@@ -89,8 +92,6 @@ def _profile_outliers(df: pd.DataFrame) -> dict[str, Any]:
         columns[str(col)] = {
             "outlier_count": outlier_count,
             "outlier_ratio": round(float(outlier_count / len(df)), 6) if len(df) else 0.0,
-            "lower_bound": float(lower_bound),
-            "upper_bound": float(upper_bound),
             "min": float(series.min()),
             "max": float(series.max()),
         }
@@ -171,7 +172,7 @@ def _build_sample_rows(df: pd.DataFrame, n_rows: int) -> list[dict[str, Any]]:
 
 
 @tool
-def profile_dataset(file_path: str, n_rows: int = 5) -> str:
+def profile_dataset(file_path: str, n_rows: int = 2) -> str:
     """生成数据集质量画像，包含缺失值、异常值、类型问题和删除候选列。"""
     tool_inputs = {"file_path": file_path, "n_rows": n_rows}
     try:
