@@ -129,6 +129,77 @@ def test_infer_task_tool_message_updates_global_state():
     assert state_update["current_stage"] == "task_inferred"
 
 
+def test_manager_rap_tool_message_updates_global_state(tmp_path):
+    rap_result = {
+        "user_requirement_summary": "Build a classifier for bank term deposit subscription.",
+        "rap_retrieval_slots": {
+            "downstream_task": "term deposit subscription prediction",
+            "application_domain": "banking direct marketing",
+            "area": "imbalanced tabular classification",
+        },
+        "manager_rap_context": "- Preserve campaign outcome and contact-duration signals.",
+        "manager_rap_meta": {
+            "rap_enabled": True,
+            "fallback_used": False,
+            "errors": [],
+        },
+    }
+
+    state_update = _tool_state_update_node(
+        {
+            "run_dir": str(tmp_path),
+            "messages": [
+                ToolMessage(
+                    content=json.dumps(rap_result, ensure_ascii=False),
+                    name="build_manager_rap_context",
+                    tool_call_id="test-call",
+                )
+            ],
+        }
+    )
+
+    assert state_update["user_requirement_summary"] == rap_result["user_requirement_summary"]
+    assert state_update["rap_retrieval_slots"] == rap_result["rap_retrieval_slots"]
+    assert state_update["manager_rap_context"] == rap_result["manager_rap_context"]
+    assert state_update["manager_rap_meta"] == rap_result["manager_rap_meta"]
+    assert state_update["current_stage"] == "manager_rap_done"
+
+
+def test_manager_rap_tool_appends_report_when_run_dir(tmp_path):
+    rap_result = {
+        "user_requirement_summary": "Summary line for preview.",
+        "rap_retrieval_slots": {},
+        "manager_rap_context": "Context line for preview.",
+        "manager_rap_meta": {"rap_enabled": True, "errors": []},
+    }
+    _tool_state_update_node(
+        {
+            "run_dir": str(tmp_path),
+            "messages": [
+                ToolMessage(
+                    content=json.dumps(rap_result, ensure_ascii=False),
+                    name="build_manager_rap_context",
+                    tool_call_id="test-call",
+                )
+            ],
+        }
+    )
+    report_path = tmp_path / "reports" / "agent_manager_report.md"
+    assert report_path.is_file()
+    text = report_path.read_text(encoding="utf-8")
+    assert "Manager RAP · 中层检测" in text
+    assert "user_requirement_summary" in text
+    assert "manager_rap_context" in text
+    assert "Summary line for preview." in text
+    assert "Context line for preview." in text
+
+
+def test_append_manager_rap_midlayer_skips_when_no_rap_fields():
+    from core.report_writer import append_manager_rap_midlayer_to_report
+
+    assert append_manager_rap_midlayer_to_report({}) is None
+
+
 def test_create_cleaning_plan_train_updates_state():
     cleaning_plan = {
         "target": "train",

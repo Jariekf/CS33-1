@@ -14,11 +14,12 @@ from core.my_llm import llm_for
 
 from tools.agentmanager_tools.create_cleaning_plan import create_cleaning_plan
 from tools.agentmanager_tools.infer_task import infer_task
+from tools.agentmanager_tools.manager_rap import build_manager_rap_context
 from tools.agentmanager_tools.profile_dataset import profile_dataset
-from core.report_writer import save_agent_report
+from core.report_writer import append_manager_rap_midlayer_to_report, save_agent_report
 
 
-tools = [profile_dataset, infer_task, create_cleaning_plan]
+tools = [profile_dataset, infer_task, build_manager_rap_context, create_cleaning_plan]
 llm_with_tools = llm_for("agent_manager").bind_tools(tools)
 
 
@@ -36,28 +37,53 @@ def _manager_node(state: GlobalState) -> GlobalState:
     user_request = state.get("user_request", "")
     testing_data_path = state.get("testing_data_path") or ""
     has_meta = _has_complete_task_meta(state)
+    has_rap_context = bool((state.get("manager_rap_context") or "").strip())
+    rap_context = state.get("manager_rap_context") or ""
+    rap_summary = state.get("user_requirement_summary") or ""
+
+    rap_instruction = (
+        "\nManager RAP advisory context（用于清洗计划参考，不得覆盖数据画像中的事实）：\n"
+        f"需求摘要：{rap_summary or '尚未生成'}\n"
+        f"RAP建议：{rap_context or '尚未生成'}\n"
+    )
 
     if has_meta:
+        rap_step = (
+            "2. 调用 build_manager_rap_context(user_request, description, task_type, "
+            "target_column, dataset_profile) 生成 Manager RAP context；\n"
+            if not has_rap_context
+            else "2. 当前 state 已有 Manager RAP context，不要重复调用 build_manager_rap_context；\n"
+        )
         workflow = (
             "工作流要求（严格按顺序执行）：\n"
             f"1. 调用 profile_dataset(file_path='{training_data_path}') 获取训练集数据画像；\n"
-            "2. 调用 create_cleaning_plan(target='train', ...) 制定训练集清洗计划；\n"
-            "3. 调用 create_cleaning_plan(target='test', ...) 制定测试集清洗计划"
+            f"{rap_step}"
+            "3. 调用 create_cleaning_plan(target='train', ...) 制定训练集清洗计划；\n"
+            "4. 调用 create_cleaning_plan(target='test', ...) 制定测试集清洗计划"
             "   （测试集通常与训练集步骤相同，但不做基于标签分布的操作）。\n"
             "说明：当前 state 已包含有效的 task_type 与 target_column（来自 split_agent 或用户指定），"
             "不要调用 infer_task。\n"
-            "完成以上三步后停止。"
+            "制定清洗计划时把 Manager RAP context 作为背景知识参考，但以实际数据画像为准。\n"
+            "完成以上步骤后停止。"
         )
     else:
+        rap_step = (
+            "3. 调用 build_manager_rap_context(user_request, description, task_type, "
+            "target_column, dataset_profile) 生成 Manager RAP context；\n"
+            if not has_rap_context
+            else "3. 当前 state 已有 Manager RAP context，不要重复调用 build_manager_rap_context；\n"
+        )
         workflow = (
             "工作流要求（严格按顺序执行）：\n"
             f"1. 调用 profile_dataset(file_path='{training_data_path}') 获取训练集数据画像；\n"
             "2. 调用 infer_task，结合画像结果、数据集描述与用户问题判断"
             " task_type（classification/regression）与 target_column（列名须与实际 CSV 列一致）；\n"
-            "3. 调用 create_cleaning_plan(target='train', ...) 制定训练集清洗计划；\n"
-            "4. 调用 create_cleaning_plan(target='test', ...) 制定测试集清洗计划"
+            f"{rap_step}"
+            "4. 调用 create_cleaning_plan(target='train', ...) 制定训练集清洗计划；\n"
+            "5. 调用 create_cleaning_plan(target='test', ...) 制定测试集清洗计划"
             "   （测试集步骤与 train 对齐，不写基于标签分布的特殊操作）。\n"
-            "完成以上四步后停止。"
+            "制定清洗计划时把 Manager RAP context 作为背景知识参考，但以实际数据画像为准。\n"
+            "完成以上步骤后停止。"
         )
 
     messages = [
@@ -68,6 +94,7 @@ def _manager_node(state: GlobalState) -> GlobalState:
                 f"测试集路径：{testing_data_path or '未提供'}。\n"
                 f"数据集描述：{description or '未提供'}。\n"
                 f"用户的问题：{user_request or '未提供'}。\n"
+                + rap_instruction
                 + workflow
             )
         ),
@@ -85,6 +112,11 @@ def _tool_state_update_node(state: GlobalState) -> GlobalState:
         return _update_profile_state(state, last_msg)
     if last_msg.name == "infer_task":
         return _update_task_state(last_msg)
+    if last_msg.name == "build_manager_rap_context":
+        upd = _update_manager_rap_state(last_msg)
+        if upd.get("current_stage") == "manager_rap_done":
+            append_manager_rap_midlayer_to_report({**state, **upd})
+        return upd
     if last_msg.name == "create_cleaning_plan":
         return _update_cleaning_plan_state(last_msg)
     return {}
@@ -148,6 +180,30 @@ def _update_task_state(tool_message: ToolMessage) -> GlobalState:
     }
 
 
+def _update_manager_rap_state(tool_message: ToolMessage) -> GlobalState:
+    try:
+        rap_result = json.loads(str(tool_message.content))
+    except json.JSONDecodeError as exc:
+        return {
+            "current_stage": "manager_rap_failed",
+            "errors": [
+                {
+                    "stage": "manager_rap",
+                    "type": exc.__class__.__name__,
+                    "message": str(exc),
+                }
+            ],
+        }
+
+    return {
+        "user_requirement_summary": rap_result.get("user_requirement_summary", ""),
+        "rap_retrieval_slots": rap_result.get("rap_retrieval_slots", {}),
+        "manager_rap_context": rap_result.get("manager_rap_context", ""),
+        "manager_rap_meta": rap_result.get("manager_rap_meta", {}),
+        "current_stage": "manager_rap_done",
+    }
+
+
 def _update_cleaning_plan_state(tool_message: ToolMessage) -> GlobalState:
     try:
         plan = json.loads(str(tool_message.content))
@@ -176,7 +232,7 @@ def _route_after_manager(state: GlobalState) -> str:
     last_msg = state["messages"][-1]
     if isinstance(last_msg, AIMessage) and last_msg.tool_calls:
         return "tools"
-    save_agent_report("agent_manager", last_msg)
+    save_agent_report("agent_manager", last_msg, run_dir=state.get("run_dir") or "")
     return END
 
 
@@ -248,8 +304,3 @@ if __name__ == "__main__":
     for event in events:
         if "messages" in event:
             _pretty_print_message(event["messages"][-1])
-
-
-
-
-
