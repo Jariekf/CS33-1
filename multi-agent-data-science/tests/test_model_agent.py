@@ -19,7 +19,6 @@ from agent.model_agent import (
     _tool_state_update_node,
     build_model_agent,
 )
-from core.compare_node import compare_models_node
 from core.env_utils import DEEPSEEK_API_KEY
 from tools.model_tools.evaluate_model import evaluate_model
 from tools.model_tools.train_model import train_model
@@ -247,41 +246,6 @@ def test_evaluate_model_classification(tmp_path):
     assert "f1_weighted" in eval_result["metrics"]
 
 
-# ── compare_models_node ──────────────────────────────────────────────────────
-
-def test_compare_regression_picks_best_r2():
-    state = {
-        "task_type": "regression",
-        "model_results": {
-            "Ridge": {"model_path": "/a.pkl", "metrics": {"r2": 0.80, "rmse": 500.0}},
-            "XGBoostRegressor": {"model_path": "/b.pkl", "metrics": {"r2": 0.92, "rmse": 300.0}},
-            "LinearRegression": {"model_path": "/c.pkl", "metrics": {"r2": 0.75, "rmse": 600.0}},
-        },
-    }
-    update = compare_models_node(state)
-    assert update["best_model"]["model_name"] == "XGBoostRegressor"
-    assert update["current_stage"] == "compare_done"
-
-
-def test_compare_classification_picks_best_f1():
-    state = {
-        "task_type": "classification",
-        "model_results": {
-            "LogisticRegression": {"model_path": "/a.pkl", "metrics": {"f1_weighted": 0.78}},
-            "RandomForest": {"model_path": "/b.pkl", "metrics": {"f1_weighted": 0.91}},
-            "XGBoost": {"model_path": "/c.pkl", "metrics": {"f1_weighted": 0.85}},
-        },
-    }
-    update = compare_models_node(state)
-    assert update["best_model"]["model_name"] == "RandomForest"
-    assert update["current_stage"] == "compare_done"
-
-
-def test_compare_empty_results_fails():
-    update = compare_models_node({"task_type": "regression", "model_results": {}})
-    assert update["current_stage"] == "compare_failed"
-
-
 # ── LLM invoke 测试（需要 API Key）────────────────────────────────────────────
 
 @pytest.mark.skipif(not DEEPSEEK_API_KEY, reason="需要配置 DEEPSEEK_API_KEY")
@@ -328,4 +292,10 @@ def test_full_pipeline_model_routing():
     assert _route_after_model({
         "candidate_models": ["XGBoost", "Ridge"],
         "model_results": {"XGBoost": {}, "Ridge": {}},
-    }) == "compare"
+        "best_model": {"model_name": "XGBoost"},
+    }) == "business_translator"
+
+    assert _route_after_model({
+        "candidate_models": ["XGBoost", "Ridge"],
+        "model_results": {"XGBoost": {}, "Ridge": {}},
+    }) == END

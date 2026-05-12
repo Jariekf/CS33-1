@@ -21,8 +21,8 @@ from agent.eda_agent import build_eda_agent
 from agent.feature_agent import build_feature_agent, _get_current_model
 from agent.model_agent import build_model_agent, _get_current_model as _get_current_model_for_eval
 from agent.split_agent import build_split_agent
-from core.compare_node import compare_models_node
 from core.global_state import GlobalState
+from core.report_writer import log_node, save_state_snapshot
 
 
 def _init_run_node(state: GlobalState) -> GlobalState:
@@ -60,16 +60,15 @@ def _route_after_feature(state: GlobalState) -> str:
 
 
 def _route_after_model(state: GlobalState) -> str:
-    """Model Agent 结束后：还有未评估的模型则循环，否则进入 Compare。"""
+    """Model Agent 结束后：还有未评估的模型则循环，否则根据 best_model 决定下一步。"""
     if _get_current_model_for_eval(state) is not None:
         return "model_agent"
-    return "compare"
-
-
-def _route_after_compare(state: GlobalState) -> str:
-    """Compare 结束后：仅有最优模型时才生成业务报告。"""
-    if state.get("best_model"):
+    best_model = state.get("best_model") or {}
+    if best_model.get("model_name"):
+        log_node("finalize", success=True, detail=f"best={best_model.get('model_name')}")
+        save_state_snapshot(state)
         return "business_translator"
+    log_node("finalize", success=False, detail="best_model not set after model_agent")
     return END
 
 
@@ -135,7 +134,6 @@ def build_full_pipeline(show_graph: bool = False):
     graph.add_node("eda_agent", eda_graph)
     graph.add_node("feature_agent", feature_graph)
     graph.add_node("model_agent", model_graph)
-    graph.add_node("compare", compare_models_node)
     graph.add_node("business_translator", business_translator_graph)
     graph.set_entry_point("init_run")
     graph.add_conditional_edges(
@@ -159,12 +157,7 @@ def build_full_pipeline(show_graph: bool = False):
     graph.add_conditional_edges(
         "model_agent",
         _route_after_model,
-        {"model_agent": "model_agent", "compare": "compare"},
-    )
-    graph.add_conditional_edges(
-        "compare",
-        _route_after_compare,
-        {"business_translator": "business_translator", END: END},
+        {"model_agent": "model_agent", "business_translator": "business_translator", END: END},
     )
     graph.add_edge("business_translator", END)
     compiled = graph.compile()

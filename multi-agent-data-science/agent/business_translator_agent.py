@@ -204,7 +204,12 @@ def _inject_remaining_charts(report: str, charts: list[dict[str, str]]) -> str:
     """Append unreferenced charts as an appendix section at the end of the report."""
     if not charts:
         return report
-    unreferenced = [c for c in charts if c["name"] not in report]
+    report_lower = report.lower()
+    unreferenced = [
+        c for c in charts
+        if c["name"].lower() not in report_lower
+        and c["rel_path"].lower() not in report_lower
+    ]
     if not unreferenced:
         return report
     appendix_lines = [
@@ -417,10 +422,20 @@ def _handle_retrieve_mckinsey(state: GlobalState, tool_message: ToolMessage) -> 
                 }
             ],
         }
-    return {
+
+    updates: dict[str, Any] = {
         "bat_rag_buckets": buckets,
         "current_stage": "bat_rag_retrieved",
     }
+
+    if payload.get("fallback") == "arxiv":
+        arxiv_papers = payload.get("arxiv_papers") or []
+        merged = _merge_arxiv(list(state.get("bat_arxiv_papers") or []), arxiv_papers)
+        updates["bat_arxiv_papers"] = merged
+        updates["current_stage"] = "bat_rag_fallback_arxiv"
+        logger.info("RAG fell back to arXiv; %d papers merged into state.", len(merged))
+
+    return updates
 
 
 def _handle_search_arxiv(state: GlobalState, tool_message: ToolMessage) -> GlobalState:
