@@ -42,6 +42,7 @@ def _get_current_model(state: GlobalState) -> str | None:
 def _feature_node(state: GlobalState) -> GlobalState:
     messages = state["messages"]
     training_data_path = state.get("training_data_path")
+    testing_data_path = state.get("testing_data_path")
     current_model = _get_current_model(state)
     feature_engineering_plan = state.get("feature_engineering_plan") or {}
     task_type = (state.get("task_type") or "unknown").lower()
@@ -52,27 +53,45 @@ def _feature_node(state: GlobalState) -> GlobalState:
     model_plan = feature_engineering_plan.get(current_model, {}) if current_model else {}
     plan_text = json.dumps(model_plan, ensure_ascii=False, indent=2) if model_plan else "无特定计划，按需处理。"
     run_dir = state.get("run_dir") or ""
+    output_dir = run_dir + "/features" if run_dir else ""
+
+    has_test = bool(testing_data_path)
+    test_load_step = (
+        f"   然后调用 load_dataset_to_store 将测试集（{testing_data_path}）加载到内存，获取 test_id；\n"
+        if has_test else ""
+    )
+    test_id_arg = "test_dataset_id=test_id（从步骤 1b 获取）" if has_test else "test_dataset_id 不传（无测试集）"
+    test_save_step = (
+        f"5. 调用 save_featured_dataset(dataset_id=test_id, model_name=当前模型名, "
+        f"output_dir=\"{output_dir}\", split=\"test\") 保存预处理后的测试集。\n"
+        if has_test else ""
+    )
 
     system_content = (
-        f"你是特征工程 Agent，当前任务是为模型 [{current_model}] 处理训练集特征。\n"
+        f"你是特征工程 Agent，当前任务是为模型 [{current_model}] 同步处理训练集和测试集特征。\n"
         f"训练集路径：{training_data_path or '未提供'}。\n"
+        f"测试集路径：{testing_data_path or '未提供（跳过测试集步骤）'}。\n"
         f"任务类型：{task_type}。目标列：{target_column or '未提供'}。\n"
         f"全部候选模型：{candidate_models}，已完成：{list(feature_dataset_ids.keys())}。\n"
         f"本次运行工作目录：{run_dir or '未设置'}。\n"
         f"\n当前模型 [{current_model}] 的特征工程计划：\n{plan_text}\n"
         "工作流程（按顺序执行）：\n"
-        "1. 调用 load_dataset_to_store 将训练集加载到内存，获取 dataset_id；\n"
-        "2. 调用 encode_target_column 处理目标列编码（工具内部自动判断当前模型是否需要编码），"
-        f"run_dir 传入：{run_dir}；\n"
-        "   - XGBoost、XGBoostRegressor 需要 0/1 整数标签，工具会自动编码并保存 encoder；\n"
-        "   - RandomForest、LogisticRegression、SVM、KNN 等不需要，工具会返回 status=skipped；\n"
-        "3. 根据上方计划，按需调用 scale_features 和 encode_categorical，"
-        f"两者的 run_dir 均传入：{run_dir}；\n"
-        "   - 目标列不参与步骤 3 的特征缩放和类别编码；\n"
+        f"1. 调用 load_dataset_to_store 将训练集（{training_data_path}）加载到内存，获取 train_id；\n"
+        f"{test_load_step}"
+        "2. 调用 encode_target_column，传入：\n"
+        f"   dataset_id=train_id, target_column={target_column}, model_name={current_model},\n"
+        f"   task_type={task_type}, run_dir=\"{run_dir}\", {test_id_arg}；\n"
+        "   - XGBoost、XGBoostRegressor 需要 0/1 整数标签，工具自动编码并同步处理测试集；\n"
+        "   - 其他模型返回 status=skipped，测试集目标列不变；\n"
+        "3. 根据上方计划，按需调用 scale_features 和 encode_categorical，均传入：\n"
+        f"   dataset_id=train_id, run_dir=\"{run_dir}\", {test_id_arg}；\n"
+        "   - 目标列不参与特征缩放和类别编码；\n"
         "   - 树模型（XGBoost、RandomForest）通常不需要 scale_features；\n"
         "   - 线性模型（LogisticRegression、LinearRegression、Ridge）通常需要 scale_features；\n"
-        f"4. 调用 save_featured_dataset 保存结果，model_name 填写当前模型名称，"
-        f"output_dir 传入：{run_dir + '/features' if run_dir else ''}。\n"
+        "   - scale_features 和 encode_categorical 均在训练集上 fit，同步 transform 测试集；\n"
+        f"4. 调用 save_featured_dataset(dataset_id=train_id, model_name=当前模型名, "
+        f"output_dir=\"{output_dir}\", split=\"train\") 保存预处理后的训练集；\n"
+        f"{test_save_step}"
         "完成后停止，不要处理其他模型。"
     )
 
@@ -180,12 +199,24 @@ def _handle_save_featured(state: GlobalState, tool_message: ToolMessage) -> Glob
             "errors": (state.get("errors") or [])
             + [{"stage": "feature_save", **payload["error"]}],
         }
-    existing = dict(state.get("feature_dataset_ids") or {})
-    existing[payload["model_name"]] = payload["output_path"]
-    return {
-        "feature_dataset_ids": existing,
-        "current_stage": "feature_saved",
-    }
+    model_name = payload["model_name"]
+    output_path = payload["output_path"]
+    split = payload.get("split", "train")
+
+    if split == "test":
+        existing = dict(state.get("testing_feature_dataset_ids") or {})
+        existing[model_name] = output_path
+        return {
+            "testing_feature_dataset_ids": existing,
+            "current_stage": "test_feature_saved",
+        }
+    else:
+        existing = dict(state.get("feature_dataset_ids") or {})
+        existing[model_name] = output_path
+        return {
+            "feature_dataset_ids": existing,
+            "current_stage": "feature_saved",
+        }
 
 
 def _route_after_feature(state: GlobalState) -> str:
