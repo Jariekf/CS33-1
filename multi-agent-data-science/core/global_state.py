@@ -68,6 +68,7 @@ class GlobalState(TypedDict, total=False):
 
     # feature engineering
     feature_dataset_ids: dict[str, str]
+    testing_feature_dataset_ids: dict[str, str]
     feature_preprocessors: dict[str, Any]
 
     # feature selection

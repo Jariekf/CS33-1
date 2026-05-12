@@ -111,7 +111,7 @@ def test_train_model_regression(tmp_path):
     assert "error" not in result
     assert Path(result["model_path"]).exists()
     assert Path(result["feature_columns_path"]).exists()
-    assert result["train_score"] > 0
+    assert result["rows_trained"] > 0
 
 
 def test_train_model_classification(tmp_path):

@@ -35,9 +35,8 @@ def _model_node(state: GlobalState) -> GlobalState:
     messages = state["messages"]
     task_type = (state.get("task_type") or "unknown").lower()
     target_column = state.get("target_column") or ""
-    testing_data_path = state.get("testing_data_path") or ""
     feature_dataset_ids = state.get("feature_dataset_ids") or {}
-    feature_preprocessors = state.get("feature_preprocessors") or {}
+    testing_feature_dataset_ids = state.get("testing_feature_dataset_ids") or {}
     candidate_models = state.get("candidate_models") or []
     model_results = state.get("model_results") or {}
     best_model = state.get("best_model") or {}
@@ -49,12 +48,6 @@ def _model_node(state: GlobalState) -> GlobalState:
     metrics_rationale = state.get("metrics_rationale") or ""
 
     chosen_model = best_model.get("model_name") or ""
-    chosen_preprocessor = feature_preprocessors.get(chosen_model, {})
-    preprocessor_text = (
-        json.dumps(chosen_preprocessor, ensure_ascii=False, indent=2)
-        if chosen_preprocessor
-        else "无（该模型不需要预处理）"
-    )
 
     run_dir = state.get("run_dir") or ""
     output_dir = f"{run_dir}/models" if run_dir else ""
@@ -67,9 +60,9 @@ def _model_node(state: GlobalState) -> GlobalState:
         f"候选模型：{candidate_models}。\n"
         f"当前阶段：{current_stage or '未开始'}。已有 model_results 键：{list(model_results.keys())}。\n"
         f"本次运行工作目录：{run_dir or '未设置'}。\n"
-        f"各候选模型特征训练集路径：{json.dumps(feature_dataset_ids, ensure_ascii=False)}。\n"
-        f"测试集路径：{testing_data_path or '未提供'}。\n"
-        f"已选最佳模型：{chosen_model or '尚未选择'}，其预处理参数（最终评估时使用）：\n{preprocessor_text}\n\n"
+        f"各候选模型预处理后训练集路径：{json.dumps(feature_dataset_ids, ensure_ascii=False)}。\n"
+        f"各候选模型预处理后测试集路径：{json.dumps(testing_feature_dataset_ids, ensure_ascii=False)}。\n"
+        f"已选最佳模型：{chosen_model or '尚未选择'}。\n\n"
         "【EDA Agent 已确定的评估指标（直接使用，无需重新判断）】\n"
         f"primary_metric（CV 调优指标）：{primary_metric or '未设置，请使用任务默认值'}。\n"
         f"evaluation_metrics（综合评估指标列表）：{evaluation_metrics or '未设置，请使用任务默认指标'}。\n"
@@ -89,13 +82,12 @@ def _model_node(state: GlobalState) -> GlobalState:
         "  分析完成后，调用 train_model：\n"
         "  featured_train_path = feature_dataset_ids[best_model_name]，\n"
         "  model_name = best_model_name，model_params = best_model_params，\n"
-        f"  output_dir = {output_dir!r}，\n"
-        f"  scoring = '{primary_metric or ''}'（与 CV 一致，使 train_score 可与 cv_best_score 直接对比）。\n\n"
+        f"  output_dir = {output_dir!r}。\n\n"
         "步骤 3 — 若 current_stage 为 model_trained，调用 evaluate_model：\n"
-        "  传入 model_path、feature_columns_path、test_data_path、model_name、task_type、target_column，\n"
-        "  以及最佳模型对应的预处理参数（scaler_path、scaled_columns、encoder_paths、encoding_method、encoded_columns）；\n"
-        "  若含 target_encoder_path 必须一并传入。\n"
-        f"  同时传入 evaluation_metrics={evaluation_metrics} 和 primary_metric='{primary_metric}'。\n\n"
+        "  featured_test_data_path = testing_feature_dataset_ids[best_model_name]，\n"
+        "  model_path、feature_columns_path 来自 train_model 返回值，\n"
+        "  model_name、task_type、target_column 从上方任务信息传入，\n"
+        f"  evaluation_metrics={evaluation_metrics}，primary_metric='{primary_metric}'。\n\n"
         "步骤 4 — 当 current_stage 为 model_evaluated 时，不再调用工具，\n"
         "  输出简短总结：最终模型名称、cv_best_score vs final_test_metrics 中各指标对比、\n"
         "  以及对泛化能力的简要判断（CV 分与 test 分差距是否合理）。"
@@ -151,8 +143,6 @@ def _handle_train(state: GlobalState, tool_message: ToolMessage) -> GlobalState:
         merged["model_path"] = payload.get("model_path", "")
         merged["feature_columns_path"] = payload.get("feature_columns_path", "")
         merged["model_params"] = payload.get("model_params", {})
-        merged["train_score"] = payload.get("train_score")
-        merged["train_score_metric"] = payload.get("train_score_metric", "skipped")
         existing[name] = merged
     return {
         "best_model": best_model,
@@ -172,6 +162,7 @@ def _handle_evaluate(state: GlobalState, tool_message: ToolMessage) -> GlobalSta
     existing = dict(state.get("model_results") or {})
     name = payload.get("model_name", "unknown")
     test_metrics = payload.get("metrics", {})
+    confusion_matrix = payload.get("confusion_matrix")
     model_entry = dict(existing.get(name) or {})
     model_entry["model_path"] = payload.get("model_path", model_entry.get("model_path", ""))
     # overwrite the cv-score snapshot in "metrics" with definitive test results so that
@@ -179,6 +170,8 @@ def _handle_evaluate(state: GlobalState, tool_message: ToolMessage) -> GlobalSta
     # cv data is preserved separately in cv_best_score and selection_summary fields.
     model_entry["metrics"] = test_metrics
     model_entry["final_test_metrics"] = test_metrics
+    if confusion_matrix is not None:
+        model_entry["confusion_matrix"] = confusion_matrix
     existing[name] = model_entry
     best_model = dict(state.get("best_model") or {})
     if best_model.get("model_name") == name or not best_model.get("model_name"):
@@ -186,6 +179,8 @@ def _handle_evaluate(state: GlobalState, tool_message: ToolMessage) -> GlobalSta
         best_model["model_path"] = payload.get("model_path", "")
         best_model["metrics"] = test_metrics
         best_model["final_test_metrics"] = test_metrics
+        if confusion_matrix is not None:
+            best_model["confusion_matrix"] = confusion_matrix
     return {
         "best_model": best_model,
         "model_results": existing,
