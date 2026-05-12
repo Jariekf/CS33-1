@@ -25,6 +25,12 @@ class GlobalState(TypedDict, total=False):
     # profile
     dataset_profile: dict[str, Any]
 
+    # manager RAP context
+    user_requirement_summary: str
+    rap_retrieval_slots: dict[str, Any]
+    manager_rap_context: str
+    manager_rap_meta: dict[str, Any]
+
     # cleaning
     dataset_id: str
     cleaning_plan: dict[str, Any]
