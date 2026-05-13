@@ -13,9 +13,12 @@ from langchain_core.messages import AIMessage, HumanMessage, SystemMessage, Tool
 from langgraph.graph import END, StateGraph
 from langgraph.prebuilt import ToolNode
 
+import time
+
 from core.global_state import GlobalState
 from core.my_llm import llm_for
 from core.report_writer import save_agent_report, save_state_snapshot
+from core.timer_utils import make_timer_start
 from tools.model_tools.evaluate_model import evaluate_model
 from tools.model_tools.train_model import train_model
 from tools.model_tools.tune_and_select_model import tune_and_select_model
@@ -233,11 +236,7 @@ def _route_after_model(state: GlobalState) -> str:
 
 
 def _model_finalize_node(state: GlobalState) -> GlobalState:
-    """Pipeline 收尾：存 model_report、补全 best_model.task_type、保存 state 快照。
-
-    原 compare_node 的非比较职责（task_type 注入、state 快照）迁移至此，
-    同时将 model agent Step 4 的叙述文本写入 model_report 供 BAT 直接读取。
-    """
+    """Pipeline 收尾：存 model_report、补全 best_model.task_type、保存 state 快照。"""
     last_msg = state["messages"][-1]
     model_report_text = str(last_msg.content) if hasattr(last_msg, "content") else ""
 
@@ -250,10 +249,19 @@ def _model_finalize_node(state: GlobalState) -> GlobalState:
 
     save_agent_report("model_agent", last_msg, model=model_name, run_dir=run_dir)
 
+    timing = dict(state.get("timing") or {})
+    entry = dict(timing.get("model_agent") or {})
+    now = time.time()
+    entry["end"] = now
+    elapsed = now - entry.get("start", now)
+    print(f"[timer] {'model_agent':<28} {elapsed:6.1f}s")
+    timing["model_agent"] = entry
+
     updated: GlobalState = {
         "model_report": model_report_text,
         "best_model": best_model,
         "current_stage": "model_done",
+        "timing": timing,
     }
     save_state_snapshot({**state, **updated})
     return updated
@@ -293,11 +301,13 @@ def _pretty_print_message(message) -> None:
 
 def build_model_agent(show_graph: bool = False):
     graph = StateGraph(GlobalState)
+    graph.add_node("timer_start", make_timer_start("model_agent"))
     graph.add_node("model_agent", _model_node)
     graph.add_node("tools", ToolNode(tools))
     graph.add_node("tool_state_update", _tool_state_update_node)
     graph.add_node("finalize", _model_finalize_node)
-    graph.set_entry_point("model_agent")
+    graph.set_entry_point("timer_start")
+    graph.add_edge("timer_start", "model_agent")
     graph.add_conditional_edges(
         "model_agent", _route_after_model, {"tools": "tools", "finalize": "finalize"}
     )
