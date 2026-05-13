@@ -58,21 +58,27 @@ def _data_clean_node(state: GlobalState) -> GlobalState:
     description = state.get("description", "")
     user_request = state.get("user_request", "")
 
+    dataset_name = (state.get("dataset_name") or "").strip()
+
     if target == "train":
         cleaning_plan = state.get("train_cleaning_plan") or state.get("cleaning_plan")
-        prefix = "train_cleaned"
         source_path = (
             (state.get("raw_training_data_path") or "").strip()
             or (state.get("training_data_path") or "").strip()
             or (state.get("data_path") or "").strip()
         )
+        if not dataset_name and source_path:
+            dataset_name = Path(source_path).stem
+        prefix = f"cleaned_train_{dataset_name or 'dataset'}"
     else:
         cleaning_plan = state.get("test_cleaning_plan") or state.get("cleaning_plan")
-        prefix = "test_cleaned"
         source_path = (
             (state.get("raw_testing_data_path") or "").strip()
             or (state.get("testing_data_path") or "").strip()
         )
+        if not dataset_name and source_path:
+            dataset_name = Path(source_path).stem
+        prefix = f"cleaned_test_{dataset_name or 'dataset'}"
 
     plan_text = (
         json.dumps(cleaning_plan, ensure_ascii=False, indent=2, default=str)
@@ -81,9 +87,9 @@ def _data_clean_node(state: GlobalState) -> GlobalState:
     )
 
     if run_dir:
-        default_save_path = f"{run_dir}/{prefix}.csv"
+        default_save_path = f"{run_dir}/clean/{prefix}.csv"
     else:
-        default_save_path = f"artifacts/{prefix}.csv"
+        default_save_path = f"artifacts/clean/{prefix}.csv"
 
     system_parts = [
         f"你是数据清洗执行 Agent（ReAct），当前处理：{target} 数据集。",

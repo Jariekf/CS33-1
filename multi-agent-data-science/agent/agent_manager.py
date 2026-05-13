@@ -149,7 +149,8 @@ def _update_profile_state(state: GlobalState, tool_message: ToolMessage) -> Glob
 
     dataset_info = profile.get("dataset", {})
     dataset_path = dataset_info.get("file_path")
-    dataset_name = Path(dataset_path).name if dataset_path else state.get("dataset_name")
+    existing_name = (state.get("dataset_name") or "").strip()
+    dataset_name = existing_name or (Path(dataset_path).stem if dataset_path else "dataset")
     return {
         "dataset_profile": profile,
         "dataset_name": dataset_name,

@@ -101,6 +101,8 @@ def run_pipeline(
     print(_DIVIDER)
 
     final_state: dict = {}
+    _split_logged = False
+    _last_stage: str = ""
 
     initial: dict = {
         "messages": [HumanMessage(content=user_request)],
@@ -125,10 +127,12 @@ def run_pipeline(
         if "messages" in event:
             _pretty_print_message(event["messages"][-1])
 
-        if stage := event.get("current_stage"):
+        if (stage := event.get("current_stage")) and stage != _last_stage:
+            _last_stage = stage
             print(f"\n[stage] {stage}")
 
-        if event.get("training_data_path"):
+        if not _split_logged and event.get("training_data_path"):
+            _split_logged = True
             print(f"[split] train → {event['training_data_path']}")
             print(f"[split] test  → {event['testing_data_path']}")
 
