@@ -108,3 +108,11 @@ class GlobalState(TypedDict, total=False):
 
     # runtime timing  {agent_key: {"start": float, "end": float}, "pipeline_start": float}
     timing: dict[str, Any]
+
+    # supervisor
+    # hints: {"split": "...", "clean_train": "...", "clean_test": "...", "feature:{model}": "..."}
+    supervisor_hints: dict[str, str]
+    # external retry counts per stage (max 2; feature per-model key = "feature:{model}")
+    supervisor_retry: dict[str, int]
+    # internal self-check retry counts inside data_clean_agent: {"train": 0, "test": 0}
+    clean_internal_retry: dict[str, int]

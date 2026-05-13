@@ -21,6 +21,7 @@ from agent.eda_agent import build_eda_agent
 from agent.feature_agent import build_feature_agent, _get_current_model
 from agent.model_agent import build_model_agent, _get_current_model as _get_current_model_for_eval
 from agent.split_agent import build_split_agent
+from agent.supervisor import make_supervisor
 from core.global_state import GlobalState
 from core.report_writer import log_node, save_state_snapshot
 
@@ -122,67 +123,117 @@ def _set_clean_test(state: GlobalState) -> GlobalState:
     return out
 
 
-def _has_cleaned_output(state: GlobalState, target: str) -> tuple[bool, str]:
-    if target == "train":
-        path_key = "train_cleaned_data_path"
-        passed_key = "train_cleaning_passed"
-    else:
-        path_key = "test_cleaned_data_path"
-        passed_key = "test_cleaning_passed"
-
-    cleaned_path = (state.get(path_key) or "").strip()
-    passed = bool(state.get(passed_key))
-    return passed and bool(cleaned_path), cleaned_path
+def _reset_clean_train_internal_retry(state: GlobalState) -> GlobalState:
+    """Reset data_clean_agent internal retry counter when external supervisor retries train."""
+    internal_retry = dict(state.get("clean_internal_retry") or {})
+    internal_retry["train"] = 0
+    return {"clean_internal_retry": internal_retry}
 
 
-def _guard_train_cleaning(state: GlobalState) -> GlobalState:
-    ok, cleaned_path = _has_cleaned_output(state, "train")
-    if ok:
-        log_node("clean_train_guard", success=True, detail=f"path={cleaned_path}")
+def _reset_clean_test_internal_retry(state: GlobalState) -> GlobalState:
+    """Reset data_clean_agent internal retry counter when external supervisor retries test."""
+    internal_retry = dict(state.get("clean_internal_retry") or {})
+    internal_retry["test"] = 0
+    return {"clean_internal_retry": internal_retry}
+
+
+def _prepare_feature_retry(state: GlobalState) -> GlobalState:
+    """Remove the last saved model from feature_dataset_ids so feature_agent re-processes it."""
+    from agent.supervisor import _last_saved_feature_model
+    model = _last_saved_feature_model(state)
+    if model is None:
         return {}
-
-    msg = (
-        "train cleaning output missing or invalid: "
-        f"train_cleaning_passed={state.get('train_cleaning_passed')}  "
-        f"train_cleaned_data_path={cleaned_path or '(empty)'}"
-    )
-    log_node("clean_train_guard", success=False, detail=msg)
+    feature_ids = dict(state.get("feature_dataset_ids") or {})
+    test_ids = dict(state.get("testing_feature_dataset_ids") or {})
+    del feature_ids[model]
+    if model in test_ids:
+        del test_ids[model]
     return {
-        "current_stage": "train_cleaning_guard_failed",
-        "cleaning_passed": False,
-        "errors": (state.get("errors") or [])
-        + [{"stage": "clean_train_guard", "type": "CleaningOutputMissing", "message": msg}],
+        "feature_dataset_ids": feature_ids,
+        "testing_feature_dataset_ids": test_ids,
     }
 
 
-def _guard_test_cleaning(state: GlobalState) -> GlobalState:
-    ok, cleaned_path = _has_cleaned_output(state, "test")
-    if ok:
-        log_node("clean_test_guard", success=True, detail=f"path={cleaned_path}")
+def _skip_current_feature_model(state: GlobalState) -> GlobalState:
+    """Mark current feature model as skipped so the pipeline can continue."""
+    from agent.feature_agent import _get_current_model as _feat_model
+    model = _feat_model(state)
+    if model is None:
         return {}
-
-    msg = (
-        "test cleaning output missing or invalid: "
-        f"test_cleaning_passed={state.get('test_cleaning_passed')}  "
-        f"test_cleaned_data_path={cleaned_path or '(empty)'}"
-    )
-    log_node("clean_test_guard", success=False, detail=msg)
+    feature_ids = dict(state.get("feature_dataset_ids") or {})
+    feature_ids[model] = "skipped"
+    hints = dict(state.get("supervisor_hints") or {})
+    hints[f"feature:{model}"] = ""
+    retries = dict(state.get("supervisor_retry") or {})
+    retries[f"feature:{model}"] = 0
+    log_node("supervisor_feature", success=False, detail=f"model={model} skipped after max retries")
     return {
-        "current_stage": "test_cleaning_guard_failed",
-        "cleaning_passed": False,
-        "errors": (state.get("errors") or [])
-        + [{"stage": "clean_test_guard", "type": "CleaningOutputMissing", "message": msg}],
+        "feature_dataset_ids": feature_ids,
+        "supervisor_hints": hints,
+        "supervisor_retry": retries,
     }
 
 
-def _route_after_train_cleaning_guard(state: GlobalState) -> str:
-    ok, _ = _has_cleaned_output(state, "train")
-    return "set_clean_test" if ok else END
+_MAX_SUPERVISOR_RETRY = 2
 
 
-def _route_after_test_cleaning_guard(state: GlobalState) -> str:
-    ok, _ = _has_cleaned_output(state, "test")
-    return "eda_agent" if ok else END
+def _route_supervisor_split(state: GlobalState) -> str:
+    hint = (state.get("supervisor_hints") or {}).get("split", "")
+    retry = (state.get("supervisor_retry") or {}).get("split", 0)
+    if not hint:
+        return "agent_manager"
+    if retry <= _MAX_SUPERVISOR_RETRY:
+        return "split_agent"
+    return END
+
+
+def _route_supervisor_clean_train(state: GlobalState) -> str:
+    hint = (state.get("supervisor_hints") or {}).get("clean_train", "")
+    retry = (state.get("supervisor_retry") or {}).get("clean_train", 0)
+    if not hint:
+        return "set_clean_test"
+    if retry <= _MAX_SUPERVISOR_RETRY:
+        return "reset_clean_train_retry"
+    return END
+
+
+def _route_supervisor_clean_test(state: GlobalState) -> str:
+    hint = (state.get("supervisor_hints") or {}).get("clean_test", "")
+    retry = (state.get("supervisor_retry") or {}).get("clean_test", 0)
+    if not hint:
+        return "eda_agent"
+    if retry <= _MAX_SUPERVISOR_RETRY:
+        return "reset_clean_test_retry"
+    return END
+
+
+def _route_supervisor_eda(state: GlobalState) -> str:
+    hint = (state.get("supervisor_hints") or {}).get("eda", "")
+    retry = (state.get("supervisor_retry") or {}).get("eda", 0)
+    if not hint:
+        return "feature_agent"
+    if retry <= _MAX_SUPERVISOR_RETRY:
+        return "eda_agent"
+    return END
+
+
+def _route_supervisor_feature(state: GlobalState) -> str:
+    from agent.supervisor import _last_saved_feature_model
+    last_model = _last_saved_feature_model(state)
+
+    if last_model:
+        h_key = f"feature:{last_model}"
+        hint = (state.get("supervisor_hints") or {}).get(h_key, "")
+        retry = (state.get("supervisor_retry") or {}).get(h_key, 0)
+        if hint:
+            if retry <= _MAX_SUPERVISOR_RETRY:
+                return "prepare_feature_retry"
+            return "skip_feature_model"
+
+    # No hint on last model → check if more remain
+    if _get_current_model(state) is not None:
+        return "feature_agent"
+    return "model_agent"
 
 
 def build_full_pipeline(show_graph: bool = False):
@@ -198,46 +249,98 @@ def build_full_pipeline(show_graph: bool = False):
     graph = StateGraph(GlobalState)
     graph.add_node("init_run", _init_run_node)
     graph.add_node("split_agent", split_graph)
+    graph.add_node("supervisor_split", make_supervisor("split"))
     graph.add_node("agent_manager", manager_graph)
     graph.add_node("set_clean_train", _set_clean_train)
     graph.add_node("data_clean_train", clean_train_graph)
-    graph.add_node("guard_clean_train", _guard_train_cleaning)
+    graph.add_node("supervisor_clean_train", make_supervisor("clean_train"))
+    graph.add_node("reset_clean_train_retry", _reset_clean_train_internal_retry)
     graph.add_node("set_clean_test", _set_clean_test)
     graph.add_node("data_clean_test", clean_test_graph)
-    graph.add_node("guard_clean_test", _guard_test_cleaning)
+    graph.add_node("supervisor_clean_test", make_supervisor("clean_test"))
+    graph.add_node("reset_clean_test_retry", _reset_clean_test_internal_retry)
     graph.add_node("eda_agent", eda_graph)
+    graph.add_node("supervisor_eda", make_supervisor("eda"))
     graph.add_node("feature_agent", feature_graph)
+    graph.add_node("supervisor_feature", make_supervisor("feature"))
+    graph.add_node("prepare_feature_retry", _prepare_feature_retry)
+    graph.add_node("skip_feature_model", _skip_current_feature_model)
     graph.add_node("model_agent", model_graph)
     graph.add_node("business_translator", business_translator_graph)
+
     graph.set_entry_point("init_run")
     graph.add_conditional_edges(
         "init_run",
         _route_after_init,
         {"split_agent": "split_agent", "agent_manager": "agent_manager"},
     )
-    graph.add_edge("split_agent", "agent_manager")
+    # split → supervisor_split → (pass: agent_manager / retry: split_agent / exhaust: END)
+    graph.add_edge("split_agent", "supervisor_split")
+    graph.add_conditional_edges(
+        "supervisor_split",
+        _route_supervisor_split,
+        {"agent_manager": "agent_manager", "split_agent": "split_agent", END: END},
+    )
+
     graph.add_edge("agent_manager", "set_clean_train")
     graph.add_edge("set_clean_train", "data_clean_train")
-    graph.add_edge("data_clean_train", "guard_clean_train")
+    # data_clean_train → supervisor_clean_train → (pass: set_clean_test / retry: reset+data_clean_train / exhaust: END)
+    graph.add_edge("data_clean_train", "supervisor_clean_train")
     graph.add_conditional_edges(
-        "guard_clean_train",
-        _route_after_train_cleaning_guard,
-        {"set_clean_test": "set_clean_test", END: END},
+        "supervisor_clean_train",
+        _route_supervisor_clean_train,
+        {
+            "set_clean_test": "set_clean_test",
+            "reset_clean_train_retry": "reset_clean_train_retry",
+            END: END,
+        },
     )
-    graph.add_edge("set_clean_test", "data_clean_test")
-    graph.add_edge("data_clean_test", "guard_clean_test")
-    graph.add_conditional_edges(
-        "guard_clean_test",
-        _route_after_test_cleaning_guard,
-        {"eda_agent": "eda_agent", END: END},
-    )
-    graph.add_edge("eda_agent", "feature_agent")
+    graph.add_edge("reset_clean_train_retry", "data_clean_train")
 
+    graph.add_edge("set_clean_test", "data_clean_test")
+    # data_clean_test → supervisor_clean_test → (pass: eda_agent / retry: reset+data_clean_test / exhaust: END)
+    graph.add_edge("data_clean_test", "supervisor_clean_test")
     graph.add_conditional_edges(
-        "feature_agent",
-        _route_after_feature,
+        "supervisor_clean_test",
+        _route_supervisor_clean_test,
+        {
+            "eda_agent": "eda_agent",
+            "reset_clean_test_retry": "reset_clean_test_retry",
+            END: END,
+        },
+    )
+    graph.add_edge("reset_clean_test_retry", "data_clean_test")
+
+    # eda_agent → supervisor_eda → (pass: feature_agent / retry: eda_agent / exhaust: END)
+    graph.add_edge("eda_agent", "supervisor_eda")
+    graph.add_conditional_edges(
+        "supervisor_eda",
+        _route_supervisor_eda,
+        {"feature_agent": "feature_agent", "eda_agent": "eda_agent", END: END},
+    )
+
+    # feature_agent → supervisor_feature → (pass+more: feature_agent / pass+done: model_agent /
+    #                                        retry: feature_agent / exhaust: skip_feature_model)
+    graph.add_edge("feature_agent", "supervisor_feature")
+    graph.add_conditional_edges(
+        "supervisor_feature",
+        _route_supervisor_feature,
+        {
+            "feature_agent": "feature_agent",
+            "model_agent": "model_agent",
+            "prepare_feature_retry": "prepare_feature_retry",
+            "skip_feature_model": "skip_feature_model",
+        },
+    )
+    # prepare_feature_retry removes the failed model entry, then feature_agent re-processes it
+    graph.add_edge("prepare_feature_retry", "feature_agent")
+    # After skipping, check again if more models remain
+    graph.add_conditional_edges(
+        "skip_feature_model",
+        lambda s: "feature_agent" if _get_current_model(s) is not None else "model_agent",
         {"feature_agent": "feature_agent", "model_agent": "model_agent"},
     )
+
     graph.add_conditional_edges(
         "model_agent",
         _route_after_model,
