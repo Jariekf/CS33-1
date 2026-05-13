@@ -44,7 +44,8 @@ def test_build_agent_manager_graph():
     assert "tool_state_update" in graph.nodes
 
     edges = {(edge.source, edge.target) for edge in graph.edges}
-    assert ("__start__", "agent_manager") in edges
+    assert ("__start__", "timer_start") in edges
+    assert ("timer_start", "agent_manager") in edges
     assert ("tools", "tool_state_update") in edges
     assert ("tool_state_update", "agent_manager") in edges
 

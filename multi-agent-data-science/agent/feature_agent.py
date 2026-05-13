@@ -13,6 +13,8 @@ from langchain_core.messages import AIMessage, HumanMessage, SystemMessage, Tool
 from langgraph.graph import END, StateGraph
 from langgraph.prebuilt import ToolNode
 
+import time
+
 from core.global_state import GlobalState
 from core.my_llm import llm_for
 from core.report_writer import save_agent_report
@@ -221,15 +223,40 @@ def _handle_save_featured(state: GlobalState, tool_message: ToolMessage) -> Glob
         }
 
 
+def _timer_start_feature(state: GlobalState) -> GlobalState:
+    model = _get_current_model(state) or "unknown"
+    key = f"feature_{model}"
+    timing = dict(state.get("timing") or {})
+    timing[key] = {"start": time.time()}
+    timing["_pending_feature_key"] = key  # timer_end reads this directly
+    return {"timing": timing}
+
+
+def _timer_end_feature(state: GlobalState) -> GlobalState:
+    timing = dict(state.get("timing") or {})
+    key = timing.pop("_pending_feature_key", None)
+    if key is None:
+        # fallback: should not normally happen
+        feature_ids = state.get("feature_dataset_ids") or {}
+        model = next(reversed(feature_ids), "unknown")
+        key = f"feature_{model}"
+    entry = dict(timing.get(key) or {})
+    now = time.time()
+    entry["end"] = now
+    elapsed = now - entry.get("start", now)
+    print(f"[timer] {key:<28} {elapsed:6.1f}s")
+    timing[key] = entry
+    return {"timing": timing}
+
+
 def _route_after_feature(state: GlobalState) -> str:
     last_msg = state["messages"][-1]
     if isinstance(last_msg, AIMessage) and last_msg.tool_calls:
         return "tools"
-    # last key in feature_dataset_ids is the model just processed
     feature_ids = state.get("feature_dataset_ids") or {}
     model = next(reversed(feature_ids), "unknown")
     save_agent_report("feature_agent", last_msg, model=model, run_dir=state.get("run_dir") or "")
-    return END
+    return "timer_end"
 
 
 def _show_graph_if_needed(agent_graph, show_graph: bool) -> None:
@@ -266,15 +293,19 @@ def _pretty_print_message(message) -> None:
 
 def build_feature_agent(show_graph: bool = False):
     graph = StateGraph(GlobalState)
+    graph.add_node("timer_start", _timer_start_feature)
     graph.add_node("feature_agent", _feature_node)
     graph.add_node("tools", ToolNode(tools))
     graph.add_node("tool_state_update", _tool_state_update_node)
-    graph.set_entry_point("feature_agent")
+    graph.add_node("timer_end", _timer_end_feature)
+    graph.set_entry_point("timer_start")
+    graph.add_edge("timer_start", "feature_agent")
     graph.add_conditional_edges(
-        "feature_agent", _route_after_feature, {"tools": "tools", END: END}
+        "feature_agent", _route_after_feature, {"tools": "tools", "timer_end": "timer_end"}
     )
     graph.add_edge("tools", "tool_state_update")
     graph.add_edge("tool_state_update", "feature_agent")
+    graph.add_edge("timer_end", END)
     compiled = graph.compile()
     _show_graph_if_needed(compiled, show_graph=show_graph)
     return compiled

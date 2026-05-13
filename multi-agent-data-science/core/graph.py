@@ -26,6 +26,7 @@ from core.report_writer import log_node, save_state_snapshot
 
 
 def _init_run_node(state: GlobalState) -> GlobalState:
+    import time
     ts = datetime.now().strftime("%Y-%m-%d-%H-%M")
     run_dir = PROJECT_ROOT / "artifacts" / "workspace" / ts
     run_dir.mkdir(parents=True, exist_ok=True)
@@ -34,7 +35,7 @@ def _init_run_node(state: GlobalState) -> GlobalState:
         and (state.get("testing_data_path") or "").strip()
     )
     print(f"[init_run] 本次运行目录：{run_dir}  is_split={is_split}")
-    return {"run_dir": str(run_dir), "is_split": is_split}
+    return {"run_dir": str(run_dir), "is_split": is_split, "timing": {"pipeline_start": time.time()}}
 
 
 
@@ -186,7 +187,13 @@ if __name__ == "__main__":
         # 含 EDA/Feature/Model 多轮工具调用 + BAT 子图，默认 120 易触发 GraphRecursionError
         config={"recursion_limit": 280},
     )
+    import time
+    from main import _print_timing_summary
+
+    pipeline_end = time.time()
+    final_state: dict = {}
     for event in events:
+        final_state = event
         if "messages" in event:
             _pretty_print_message(event["messages"][-1])
         if event.get("current_stage"):
@@ -194,3 +201,6 @@ if __name__ == "__main__":
         if event.get("training_data_path"):
             print(f"[split] train: {event['training_data_path']}")
             print(f"[split] test:  {event['testing_data_path']}")
+        pipeline_end = time.time()
+
+    _print_timing_summary(final_state.get("timing") or {}, pipeline_end)

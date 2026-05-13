@@ -23,6 +23,7 @@ from langgraph.prebuilt import ToolNode
 from core.global_state import GlobalState
 from core.my_llm import call_llm, llm_for
 from core.report_writer import save_agent_report
+from core.timer_utils import make_timer_end, make_timer_start
 from tools.business_tools.bat_tools import bat_tools
 from tools.business_tools.file_reader import read_file
 
@@ -585,7 +586,7 @@ def _route_after_business_translator(state: GlobalState) -> str:
         return "tools"
     if state.get("business_report"):
         _save_business_artifacts(state)
-        return END
+        return "timer_end"
     return "bat_finalize"
 
 
@@ -662,20 +663,24 @@ def _pretty_print_message(message: Any) -> None:
 
 def build_business_translator_agent(show_graph: bool = False):
     graph = StateGraph(GlobalState)
+    graph.add_node("timer_start", make_timer_start("business_translator"))
     graph.add_node("business_translator", _business_translator_node)
     graph.add_node("tools", ToolNode(tools))
     graph.add_node("tool_state_update", _tool_state_update_node)
     graph.add_node("bat_finalize", _bat_finalize_node)
+    graph.add_node("timer_end", make_timer_end("business_translator"))
 
-    graph.set_entry_point("business_translator")
+    graph.set_entry_point("timer_start")
+    graph.add_edge("timer_start", "business_translator")
     graph.add_conditional_edges(
         "business_translator",
         _route_after_business_translator,
-        {"tools": "tools", "bat_finalize": "bat_finalize", END: END},
+        {"tools": "tools", "bat_finalize": "bat_finalize", "timer_end": "timer_end"},
     )
     graph.add_edge("tools", "tool_state_update")
     graph.add_edge("tool_state_update", "business_translator")
-    graph.add_edge("bat_finalize", END)
+    graph.add_edge("bat_finalize", "timer_end")
+    graph.add_edge("timer_end", END)
 
     compiled = graph.compile()
     _show_graph_if_needed(compiled, show_graph=show_graph)
