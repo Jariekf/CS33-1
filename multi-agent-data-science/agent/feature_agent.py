@@ -228,14 +228,18 @@ def _timer_start_feature(state: GlobalState) -> GlobalState:
     key = f"feature_{model}"
     timing = dict(state.get("timing") or {})
     timing[key] = {"start": time.time()}
+    timing["_pending_feature_key"] = key  # timer_end reads this directly
     return {"timing": timing}
 
 
 def _timer_end_feature(state: GlobalState) -> GlobalState:
-    feature_ids = state.get("feature_dataset_ids") or {}
-    model = next(reversed(feature_ids), "unknown")
-    key = f"feature_{model}"
     timing = dict(state.get("timing") or {})
+    key = timing.pop("_pending_feature_key", None)
+    if key is None:
+        # fallback: should not normally happen
+        feature_ids = state.get("feature_dataset_ids") or {}
+        model = next(reversed(feature_ids), "unknown")
+        key = f"feature_{model}"
     entry = dict(timing.get(key) or {})
     now = time.time()
     entry["end"] = now
