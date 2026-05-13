@@ -96,7 +96,7 @@ def _feature_node(state: GlobalState) -> GlobalState:
         f"{test_save_step}"
         "完成后停止，不要处理其他模型。\n"
         "最终文字回复只汇报当前模型的特征工程处理步骤与结果（编码方式、缩放情况、保存路径），"
-        "不要描述模型训练评估或其他候选模型的处理细节。"
+        "不要描述模型训练评估或其他候选模型的处理细节，并且不要说与数据清洗和EDA相关内容，只需要汇报特征工程处理步骤与结果。"
     )
 
     messages = [SystemMessage(content=system_content), *messages]

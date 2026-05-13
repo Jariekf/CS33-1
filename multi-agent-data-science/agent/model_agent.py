@@ -72,10 +72,31 @@ def _model_node(state: GlobalState) -> GlobalState:
         f"metrics 选择理由：{metrics_rationale or '未提供'}。\n\n"
         "【执行步骤，按顺序完成，不跳步，不重复】\n\n"
         "步骤 1 — 若 current_stage 不是 model_selected / model_trained / model_evaluated，\n"
-        "调用 tune_and_select_model，参数说明：\n"
-        f"  · scoring = '{primary_metric or '留空使用默认'}'\n"
-        "  · cv_strategy：检查特征中是否有时序特征，有则用 timeseries，否则用 auto\n"
-        "  · cv_folds=5、max_iter_per_model=12\n"
+        "调用 tune_and_select_model，需自主制定以下 HPO 策略：\n"
+        f"  · scoring【强制】= '{primary_metric or ''}' —— 这是 EDA Agent 已经决定的 primary_metric，"
+        "直接传入，不得替换为其他指标，不得留空。\n"
+        "  · cv_strategy：特征含时序列 → timeseries；否则 → auto\n"
+        "  · cv_folds：训练集行数 < 1000 → 3；1000~20000 → 5；> 20000 → 10\n"
+        "  · search_strategy 选择原则：\n"
+        "    - 参数空间总组合数 ≤ 30（如 Ridge/Lasso/LogisticRegression）→ grid\n"
+        "    - 希望最大化搜索质量、iter 预算 ≤ 20 → bayesian（GP 代理模型，最样本高效）\n"
+        "    - 参数空间大（组合数 > 100）且 iter 预算充裕 → halving（逐轮淘汰）\n"
+        "    - 其余均衡场景 → random\n"
+        "    - 多个候选模型混合类型时，以参数空间最大的模型为准决定策略\n"
+        "  · max_iter_per_model：参数维度 ≤ 2 → 12；维度 3~4 → 20；维度 ≥ 5 → 30\n"
+        "    （search_strategy=grid 时忽略此参数）\n"
+        "  · extra_param_overrides（可选）：按模型名注入/覆盖特定超参，其余参数保持默认搜索空间。\n"
+        "    只在有明确数据证据时才传，不确定则留 None。常见场景：\n"
+        "    - 不平衡分类（EDA 报告显示类别比例 > 5:1）→\n"
+        '      {"LogisticRegression": {"class_weight": ["balanced", null]},\n'
+        '       "RandomForest": {"class_weight": ["balanced", null]},\n'
+        '       "SVM": {"class_weight": ["balanced", null]}}\n'
+        "      （仅支持 class_weight 的模型：LogisticRegression/RandomForest/SVM/LightGBM）\n"
+        "    - 训练集 > 50000 行，扩充树模型 n_estimators 上限 →\n"
+        '      {"RandomForest": {"n_estimators": [200, 300, 500]},\n'
+        '       "XGBoost": {"n_estimators": [200, 300, 500]}}\n'
+        "    - 特征维度 > 100，RandomForest 加大 max_features 范围 →\n"
+        '      {"RandomForest": {"max_features": ["sqrt", "log2", 0.3, 0.5]}}\n'
         "  · feature_dataset_ids、candidate_models、task_type、target_column 从上方任务信息传入\n\n"
         "步骤 2 — 收到 tune_and_select_model 结果后，先输出一段分析（不调用工具）：\n"
         "  · 对比各模型 cv_best_score 和 cv_score_std，判断最佳模型优势是否显著\n"

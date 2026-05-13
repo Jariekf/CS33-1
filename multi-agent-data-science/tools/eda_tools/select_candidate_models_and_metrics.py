@@ -8,8 +8,8 @@ from tools.tool_trace import trace_tool_call
 # ── Metrics 白名单 ────────────────────────────────────────────────────────────
 # primary_metric / evaluation_metrics 均使用人类可读名（rmse/mae 而非 neg_* 前缀）
 # tune_and_select_model 内部会做 rmse→neg_root_mean_squared_error 的映射
-CLASSIFICATION_METRICS = {"accuracy", "f1_macro", "f1_weighted", "roc_auc", "precision", "recall"}
-REGRESSION_METRICS = {"r2", "rmse", "mae"}
+CLASSIFICATION_METRICS = {"accuracy", "f1_macro", "f1_weighted", "roc_auc", "precision", "recall", "log_loss"}
+REGRESSION_METRICS = {"r2", "rmse", "mae", "mape", "rmsle", "max_error"}
 
 CLASSIFICATION_POOL = [
     "LogisticRegression",    # 线性基线，可解释性强
@@ -75,20 +75,39 @@ def select_candidate_models_and_metrics(
       model_selection_plan (str)：选择这三个模型的理由，结合数据特征、任务类型和目标列说明。
 
       primary_metric (str)：CV 参数调优使用的单一优化指标（决定"最优参数"的判断标准）。
-        分类可选：accuracy、f1_macro、f1_weighted、roc_auc、precision、recall
-        回归可选：r2、rmse、mae
-        选择建议：
-          - 类别均衡时：f1_weighted（分类）、r2（回归）
-          - 类别严重不平衡时：roc_auc 或 recall（关注少数类）
-          - 回归存在明显异常值时：mae（比 r2 对离群点更鲁棒）
-          - 业务目标是排序/概率校准时：roc_auc
+        分类可选：accuracy、f1_macro、f1_weighted、roc_auc、precision、recall、log_loss
+        回归可选：r2、rmse、mae、mape、rmsle、max_error
+        选择建议（分类）：
+          - 类别均衡、整体准确率为主 → f1_weighted
+          - 存在少数类、需监控类别不平衡风险 → f1_macro
+            （macro 对每个类等权，少数类拉低分数时会立即在 CV 中反映出来）
+          - 类别严重不平衡、关注少数类召回率 → roc_auc 或 recall
+          - 多分类（类别数 > 2）→ f1_macro 或 f1_weighted；
+            roc_auc 会自动升级为 roc_auc_ovr_weighted，
+            但若候选模型中含 SVM（默认不支持 predict_proba），建议改选 f1_macro
+          - 业务目标是概率校准（CTR、点击率、风险评分等）→ log_loss
+            注：log_loss 需要所有候选模型支持 predict_proba；
+            SVM 默认不支持，应从候选模型中去除或改选其他 primary_metric
+        选择建议（回归）：
+          - 默认 → r2（全局拟合优度，直观）
+          - 存在明显异常值 → mae（比 rmse 对离群点更鲁棒）
+          - 目标值分布偏态显著（skewness > 1，如房价、销量、流量）→ rmsle
+            注：rmsle 要求 y_true ≥ 0，且对欠预测的惩罚大于过预测
+          - 业务关心"偏离了百分之几"、目标值无零点 → mape
+            注：mape 要求 y_true ≠ 0，含零时工具自动降级为 None
+          - 极少选 max_error 作为 primary_metric；适合精度要求苛刻、
+            不允许最坏情况出错的场景（如零件公差预测）
 
       evaluation_metrics (list[str])：最终 test set 综合评估时报告的指标列表（2~4 个）。
-        分类可选：accuracy、f1_macro、f1_weighted、roc_auc、precision、recall
-        回归可选：r2、rmse、mae
+        分类可选：accuracy、f1_macro、f1_weighted、roc_auc、precision、recall、log_loss
+        回归可选：r2、rmse、mae、mape、rmsle、max_error
         建议：primary_metric 必须包含在此列表中；可额外加入 1~2 个互补指标。
-        示例（不平衡分类）：["roc_auc", "f1_weighted", "recall"]
-        示例（回归）：["r2", "rmse", "mae"]
+        分类强烈建议：同时包含 f1_macro 和 f1_weighted，前者反映少数类风险，后者反映整体分布性能。
+        示例（均衡分类）：["f1_weighted", "f1_macro", "accuracy"]
+        示例（不平衡分类）：["roc_auc", "f1_macro", "f1_weighted"]
+        示例（概率校准场景）：["log_loss", "f1_weighted", "roc_auc"]
+        示例（回归，目标值偏态）：["rmsle", "mae", "r2"]
+        示例（回归，关注最坏情况）：["rmse", "mae", "max_error"]
 
       metrics_rationale (str)：选择上述指标的理由，结合任务类型、数据特征和业务目标说明。
     """
