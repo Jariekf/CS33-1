@@ -145,8 +145,7 @@ def train_model(
             raise ValueError(f"目标列 '{target_column}' 不在训练集中。")
 
         feature_cols = [c for c in df.columns if c != target_column]
-        X = df[feature_cols].select_dtypes(include="number")
-        feature_cols = X.columns.tolist()
+        X = df[feature_cols]
         y = df[target_column]
 
         model = _get_model(model_name, model_params=model_params)

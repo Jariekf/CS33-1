@@ -50,6 +50,7 @@ def evaluate_model(
       model_path：模型文件路径。
       primary_metric：主要指标名称。
       evaluation_metrics：原样透传的重点指标列表。
+      evaluation_metrics：原样透传的重点指标列表。
       metrics：标量评估指标 dict（不含混淆矩阵）。
       confusion_matrix：混淆矩阵嵌套列表（仅分类任务，否则为 null）。
       resource_metrics：资源感知指标 dict。
@@ -62,6 +63,7 @@ def evaluate_model(
         "model_name": model_name,
         "task_type": task_type,
         "primary_metric": primary_metric,
+        "evaluation_metrics": sorted(set(evaluation_metrics or [])),
         "evaluation_metrics": sorted(set(evaluation_metrics or [])),
     }
     try:
@@ -90,8 +92,10 @@ def evaluate_model(
 
         metrics: dict[str, Any] = {}
         confusion_matrix_result = None
+        n_classes_eval: int | None = None
 
         if task_type == "classification":
+            import numpy as np
             from sklearn.metrics import (
                 accuracy_score,
                 confusion_matrix,
@@ -100,22 +104,35 @@ def evaluate_model(
                 recall_score,
             )
             metrics["accuracy"] = round(float(accuracy_score(y_test, y_pred)), 4)
+            # f1_macro: equal weight per class → sensitive to minority class performance
+            # f1_weighted: sample-count weighted → reflects overall accuracy on the actual distribution
             metrics["f1_macro"] = round(float(f1_score(y_test, y_pred, average="macro", zero_division=0)), 4)
             metrics["f1_weighted"] = round(float(f1_score(y_test, y_pred, average="weighted", zero_division=0)), 4)
             metrics["recall"] = round(float(recall_score(y_test, y_pred, average="weighted", zero_division=0)), 4)
             metrics["precision"] = round(float(precision_score(y_test, y_pred, average="weighted", zero_division=0)), 4)
-            # roc_auc requires predict_proba; set None + reason if model doesn't support it
-            # or if y_test contains only one class (e.g. skewed test split)
+
+            # ── Compute y_proba once; reused by roc_auc / log_loss / top-k ──────
+            n_classes_eval = int(y_test.nunique())
+            y_proba: Any = None
+            _proba_err: str = ""
             if hasattr(model, "predict_proba"):
                 try:
+                    y_proba = model.predict_proba(X_test)
+                except Exception as exc:
+                    _proba_err = f"predict_proba failed: {exc}"
+            else:
+                _proba_err = "model does not support predict_proba"
+
+            # ── roc_auc ───────────────────────────────────────────────────────
+            if y_proba is not None:
+                try:
                     from sklearn.metrics import roc_auc_score
-                    y_prob = model.predict_proba(X_test)
-                    n_classes = y_prob.shape[1] if y_prob.ndim > 1 else 1
-                    if n_classes == 2:
-                        metrics["roc_auc"] = round(float(roc_auc_score(y_test, y_prob[:, 1])), 4)
+                    n_cls = y_proba.shape[1] if y_proba.ndim > 1 else 1
+                    if n_cls == 2:
+                        metrics["roc_auc"] = round(float(roc_auc_score(y_test, y_proba[:, 1])), 4)
                     else:
                         metrics["roc_auc"] = round(float(roc_auc_score(
-                            y_test, y_prob, multi_class="ovr", average="weighted"
+                            y_test, y_proba, multi_class="ovr", average="weighted"
                         )), 4)
                 except ValueError as exc:
                     metrics["roc_auc"] = None
@@ -125,13 +142,68 @@ def evaluate_model(
                     metrics["roc_auc_skipped_reason"] = f"unexpected error: {exc}"
             else:
                 metrics["roc_auc"] = None
-                metrics["roc_auc_skipped_reason"] = "model does not support predict_proba"
+                metrics["roc_auc_skipped_reason"] = _proba_err
+
+            # ── log_loss: continuous & probability-calibration-sensitive ──────
+            if y_proba is not None:
+                try:
+                    from sklearn.metrics import log_loss
+                    metrics["log_loss"] = round(float(log_loss(y_test, y_proba)), 4)
+                except Exception as exc:
+                    metrics["log_loss"] = None
+                    metrics["log_loss_skipped_reason"] = str(exc)
+            else:
+                metrics["log_loss"] = None
+                metrics["log_loss_skipped_reason"] = _proba_err
+
+            # ── top-k accuracy: auto-computed when n_classes > 10 ─────────────
+            if n_classes_eval > 10:
+                k = min(5, n_classes_eval - 1)
+                if y_proba is not None:
+                    try:
+                        from sklearn.metrics import top_k_accuracy_score
+                        metrics[f"top_{k}_accuracy"] = round(
+                            float(top_k_accuracy_score(y_test, y_proba, k=k)), 4
+                        )
+                    except Exception as exc:
+                        metrics[f"top_{k}_accuracy"] = None
+                        metrics[f"top_{k}_accuracy_skipped_reason"] = str(exc)
+                else:
+                    metrics[f"top_{k}_accuracy"] = None
+                    metrics[f"top_{k}_accuracy_skipped_reason"] = _proba_err
+
             confusion_matrix_result = confusion_matrix(y_test, y_pred).tolist()
         else:
-            from sklearn.metrics import mean_absolute_error, mean_squared_error, r2_score
+            import numpy as np
+            from sklearn.metrics import (
+                max_error as sklearn_max_error,
+                mean_absolute_error,
+                mean_squared_error,
+                r2_score,
+            )
             metrics["rmse"] = round(float(math.sqrt(mean_squared_error(y_test, y_pred))), 4)
             metrics["mae"] = round(float(mean_absolute_error(y_test, y_pred)), 4)
             metrics["r2"] = round(float(r2_score(y_test, y_pred)), 4)
+            metrics["max_error"] = round(float(sklearn_max_error(y_test, y_pred)), 4)
+            # mape: undefined when y_true contains zeros → degrade gracefully
+            try:
+                from sklearn.metrics import mean_absolute_percentage_error
+                mape_val = float(mean_absolute_percentage_error(y_test, y_pred))
+                metrics["mape"] = round(mape_val, 4) if np.isfinite(mape_val) else None
+                if not np.isfinite(mape_val):
+                    metrics["mape_skipped_reason"] = "y_true contains zero(s); MAPE is undefined"
+            except Exception as exc:
+                metrics["mape"] = None
+                metrics["mape_skipped_reason"] = str(exc)
+            # rmsle: clip predictions to ≥ 0 to avoid log domain errors
+            try:
+                from sklearn.metrics import mean_squared_log_error
+                metrics["rmsle"] = round(
+                    float(np.sqrt(mean_squared_log_error(y_test, np.clip(y_pred, 0, None)))), 4
+                )
+            except Exception as exc:
+                metrics["rmsle"] = None
+                metrics["rmsle_skipped_reason"] = str(exc)
 
         # ── 资源感知指标 ──────────────────────────────────────────────────────
         model_size_kb = round(os.path.getsize(model_path) / 1024, 2) if Path(model_path).is_file() else None
@@ -142,6 +214,7 @@ def evaluate_model(
             "model_path": model_path,
             "primary_metric": primary_metric or "",
             "evaluation_metrics": sorted(set(evaluation_metrics or [])),
+            "n_classes": n_classes_eval if task_type == "classification" else None,
             "metrics": metrics,
             "confusion_matrix": confusion_matrix_result,
             "resource_metrics": {

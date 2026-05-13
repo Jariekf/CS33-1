@@ -96,7 +96,7 @@ def _feature_node(state: GlobalState) -> GlobalState:
         f"{test_save_step}"
         "完成后停止，不要处理其他模型。\n"
         "最终文字回复只汇报当前模型的特征工程处理步骤与结果（编码方式、缩放情况、保存路径），"
-        "不要描述模型训练评估或其他候选模型的处理细节。"
+        "不要描述模型训练评估或其他候选模型的处理细节，并且不要说与数据清洗和EDA相关内容，只需要汇报特征工程处理步骤与结果。"
     )
 
     messages = [SystemMessage(content=system_content), *messages]
@@ -228,14 +228,18 @@ def _timer_start_feature(state: GlobalState) -> GlobalState:
     key = f"feature_{model}"
     timing = dict(state.get("timing") or {})
     timing[key] = {"start": time.time()}
+    timing["_pending_feature_key"] = key  # timer_end reads this directly
     return {"timing": timing}
 
 
 def _timer_end_feature(state: GlobalState) -> GlobalState:
-    feature_ids = state.get("feature_dataset_ids") or {}
-    model = next(reversed(feature_ids), "unknown")
-    key = f"feature_{model}"
     timing = dict(state.get("timing") or {})
+    key = timing.pop("_pending_feature_key", None)
+    if key is None:
+        # fallback: should not normally happen
+        feature_ids = state.get("feature_dataset_ids") or {}
+        model = next(reversed(feature_ids), "unknown")
+        key = f"feature_{model}"
     entry = dict(timing.get(key) or {})
     now = time.time()
     entry["end"] = now
