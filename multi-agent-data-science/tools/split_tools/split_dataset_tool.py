@@ -34,8 +34,8 @@ def split_dataset(
         out_dir = source.parent / "workspace"
         out_dir.mkdir(parents=True, exist_ok=True)
 
-    train_out = out_dir / f"{source.stem}_train.csv"
-    test_out = out_dir / f"{source.stem}_test.csv"
+    train_out = out_dir / f"train_{source.stem}.csv"
+    test_out = out_dir / f"test_{source.stem}.csv"
 
     task_type_norm = (task_type or "unknown").strip().lower()
     if task_type_norm not in {"classification", "regression"}:

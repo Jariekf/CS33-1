@@ -30,8 +30,8 @@ def _default_output_paths(source: Path) -> tuple[Path, Path]:
     out_dir = source.parent / "workspace"
     out_dir.mkdir(parents=True, exist_ok=True)
     stem = source.stem
-    train_path = out_dir / f"{stem}_train.csv"
-    test_path = out_dir / f"{stem}_test.csv"
+    train_path = out_dir / f"train_{stem}.csv"
+    test_path = out_dir / f"test_{stem}.csv"
     return train_path, test_path
 
 
@@ -132,8 +132,8 @@ def split_dataset_node(state: GlobalState, *, test_size: float = 0.2, random_sta
     if run_dir:
         out_dir = Path(run_dir)
         out_dir.mkdir(parents=True, exist_ok=True)
-        train_out = out_dir / f"{source.stem}_train.csv"
-        test_out = out_dir / f"{source.stem}_test.csv"
+        train_out = out_dir / f"train_{source.stem}.csv"
+        test_out = out_dir / f"test_{source.stem}.csv"
     else:
         train_out, test_out = _default_output_paths(source)
 

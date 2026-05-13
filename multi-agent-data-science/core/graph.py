@@ -34,8 +34,16 @@ def _init_run_node(state: GlobalState) -> GlobalState:
         (state.get("training_data_path") or "").strip()
         and (state.get("testing_data_path") or "").strip()
     )
-    print(f"[init_run] 本次运行目录：{run_dir}  is_split={is_split}")
-    return {"run_dir": str(run_dir), "is_split": is_split, "timing": {"pipeline_start": time.time()}}
+    data_path = (state.get("data_path") or "").strip()
+    training_data_path = (state.get("training_data_path") or "").strip()
+    if data_path:
+        dataset_name = Path(data_path).stem
+    elif training_data_path:
+        dataset_name = Path(training_data_path).stem
+    else:
+        dataset_name = "dataset"
+    print(f"[init_run] 本次运行目录：{run_dir}  is_split={is_split}  dataset_name={dataset_name}")
+    return {"run_dir": str(run_dir), "is_split": is_split, "dataset_name": dataset_name, "timing": {"pipeline_start": time.time()}}
 
 
 
@@ -124,8 +132,7 @@ def _has_cleaned_output(state: GlobalState, target: str) -> tuple[bool, str]:
 
     cleaned_path = (state.get(path_key) or "").strip()
     passed = bool(state.get(passed_key))
-    exists = bool(cleaned_path) and Path(cleaned_path).exists()
-    return passed and exists, cleaned_path
+    return passed and bool(cleaned_path), cleaned_path
 
 
 def _guard_train_cleaning(state: GlobalState) -> GlobalState:
@@ -268,13 +275,17 @@ if __name__ == "__main__":
 
     pipeline_end = time.time()
     final_state: dict = {}
+    _split_logged = False
+    _last_stage: str = ""
     for event in events:
         final_state = event
         if "messages" in event:
             _pretty_print_message(event["messages"][-1])
-        if event.get("current_stage"):
-            print(f"\n[stage] {event['current_stage']}")
-        if event.get("training_data_path"):
+        if (stage := event.get("current_stage")) and stage != _last_stage:
+            _last_stage = stage
+            print(f"\n[stage] {stage}")
+        if not _split_logged and event.get("training_data_path"):
+            _split_logged = True
             print(f"[split] train: {event['training_data_path']}")
             print(f"[split] test:  {event['testing_data_path']}")
         pipeline_end = time.time()
