@@ -29,12 +29,12 @@ def test_llm():
             model=model,
             temperature=0.1,
         )
-        response = llm.invoke("你好，请做一个简短的自我介绍。")
-        print("\n=== 测试成功 ===")
-        print("LLM 回复:", response.content)
+        response = llm.invoke("Hello, please give a brief self-introduction.")
+        print("\n=== Test succeeded ===")
+        print("LLM reply:", response.content)
     except Exception as e:
-        print("\n=== 测试失败 ===")
-        print(f"错误信息: {e}")
+        print("\n=== Test failed ===")
+        print(f"Error: {e}")
 
 
 if __name__ == "__main__":

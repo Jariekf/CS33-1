@@ -1,6 +1,6 @@
 """
-Arxiv 检索工具
-封装 arxiv Python 库，为 Manager (RAP) 和 Business Translator (RAG) 提供文献检索能力。
+arXiv search tool.
+Wraps the arxiv Python library for literature search used by Manager (RAP) and Business Translator (RAG).
 """
 from __future__ import annotations
 
@@ -9,14 +9,14 @@ from config import ARXIV_MAX_RESULTS
 
 def search_arxiv(query: str, max_results: int | None = None) -> list[dict]:
     """
-    检索 arxiv 论文。
+    Search arXiv papers.
 
     Args:
-        query: 检索关键词
-        max_results: 最大返回数量，默认使用 config 中的配置
+        query: Search keywords
+        max_results: Maximum number of results; defaults to config
 
     Returns:
-        论文列表，每项包含 title, summary, url 等字段。
+        List of papers, each with title, summary, url, etc.
     """
     import os
     if os.getenv("STUB_MODE", "false").lower() == "true":

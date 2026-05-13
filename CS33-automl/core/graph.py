@@ -1,6 +1,6 @@
 """
-LangGraph 工作流图构建
-定义节点 (Nodes)、边 (Edges) 与条件路由 (Conditional Edges)。
+LangGraph workflow graph construction.
+Defines nodes, edges, and conditional edges.
 """
 from langgraph.graph import StateGraph, END
 
@@ -19,10 +19,10 @@ sys_logger = get_agent_logger("sys")
 
 def _make_supervisor_routing(next_phase: str | None):
     """
-    工厂函数：为每个阶段的 Supervisor 创建对应的条件路由映射。
-    - "retry"  → 返回当前阶段的 Worker 节点
-    - "pass"   → 推进到下一个阶段 / 结束流水线
-    - "error"  → 终止图
+    Factory: build the conditional-edge map for each phase's Supervisor.
+    - "retry" → return to the current phase's worker node
+    - "pass"  → advance to the next phase / end the pipeline
+    - "error" → terminate the graph
     """
     def _router(state: GraphState) -> str:
         result = supervisor_router(state)
@@ -32,12 +32,12 @@ def _make_supervisor_routing(next_phase: str | None):
 
 
 def build_graph() -> StateGraph:
-    """构建并返回编译后的 LangGraph 工作流图。"""
+    """Build and return the compiled LangGraph workflow."""
     sys_logger.info("Building LangGraph workflow...")
 
     workflow = StateGraph(GraphState)
 
-    # ==================== 注册节点 ====================
+    # ==================== Register nodes ====================
     workflow.add_node("manager", manager_node)
 
     workflow.add_node("data_cleaning", data_cleaning_node)
@@ -52,9 +52,9 @@ def build_graph() -> StateGraph:
 
     workflow.add_node("business_translator", business_translator_node)
 
-    # ==================== 定义边 ====================
+    # ==================== Define edges ====================
 
-    # 入口：Manager → Data Cleaning
+    # Entry: Manager → Data Cleaning
     workflow.set_entry_point("manager")
     workflow.add_edge("manager", "data_cleaning")
 

@@ -1,4 +1,4 @@
-人工智能（Artificial Intelligence, AI）是计算机科学的一个分支，旨在了解智能的实质，并生产出一种新的能以人类智能相似的方式做出反应的智能机器。
-大型语言模型（Large Language Models, LLM）是深度学习的重要进展，通过对海量的数据进行训练，具有了通识理解与强大的文本生成能力。
-检索增强生成（Retrieval-Augmented Generation, RAG）是一种结合检索模型与生成模型的技术，通过从外部知识库检索出与查询相关的内容，显著提升生成的准确性和实时性。
-向量数据库（Vector Database）如 Chroma 或 FAISS，专门用于大规模存储、管理和高效检索多维向量数据。
+Artificial Intelligence (AI) is a branch of computer science that studies the nature of intelligence and builds machines that can react in ways similar to human intelligence.
+Large Language Models (LLMs) are a major advance in deep learning: trained on massive data, they gain broad understanding and strong text generation.
+Retrieval-Augmented Generation (RAG) combines retrieval with generation by pulling relevant content from an external knowledge base, improving accuracy and freshness of answers.
+Vector databases such as Chroma or FAISS store and efficiently retrieve high-dimensional vectors at scale.

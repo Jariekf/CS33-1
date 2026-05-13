@@ -1,7 +1,7 @@
 """
-公共 LLM 调用模块
-提供统一的 LLM 初始化、调用与代码提取功能，供所有 Agent 节点复用。
-设计参照 AutoKaggle 的 llm.py + agent_base._generate_code_file 的代码提取逻辑。
+Shared LLM invocation module.
+Provides unified LLM initialization, calls, and code extraction for all agent nodes.
+Design follows AutoKaggle's llm.py plus agent_base._generate_code_file extraction logic.
 """
 from __future__ import annotations
 
@@ -189,7 +189,7 @@ def get_llm(agent_name: str | None = None):
 
 
 # ======================================================================
-# 便捷调用函数
+# Convenience wrappers
 # ======================================================================
 
 def call_llm(
@@ -198,7 +198,7 @@ def call_llm(
     agent_name: str | None = None,
 ) -> str | None:
     """
-    发起一次 LLM 调用。
+    Invoke the LLM once.
     """
     if os.getenv("STUB_MODE", "false").lower() == "true":
         logger.info("STUB_MODE is enabled; skipping LLM call and returning None to trigger fallback.")
@@ -274,20 +274,20 @@ def call_llm(
 
 
 # ======================================================================
-# 代码提取 (参照 AutoKaggle developer.py 的 regex 提取逻辑)
+# Code extraction (regex logic similar to AutoKaggle developer.py)
 # ======================================================================
 
 def extract_code(reply: str) -> str | None:
     """
-    从 LLM 回复中提取 ```python ... ``` 代码块。
-    参照 AutoKaggle developer._generate_code_file 中的:
+    Extract ```python ... ``` blocks from an LLM reply.
+    Same idea as AutoKaggle developer._generate_code_file:
         pattern = r"```python(.*?)```"
         matches = re.findall(pattern, raw_reply, re.DOTALL)
 
-    若回复包含多个代码块，将它们拼接为一个完整脚本。
+    If multiple blocks exist, concatenate them into one script.
 
     Returns:
-        提取到的代码字符串。若未找到代码块则返回 None。
+        Extracted code string, or None if no block is found.
     """
     pattern = r"```python(.*?)```"
     matches = re.findall(pattern, reply, re.DOTALL)
@@ -296,6 +296,6 @@ def extract_code(reply: str) -> str | None:
         logger.warning("No ```python ... ``` code block found in LLM reply.")
         return None
 
-    # 多段代码拼接 (与 AutoKaggle 一致)
+    # Concatenate multiple blocks (same as AutoKaggle)
     code = "\n".join(match.strip() for match in matches)
     return code

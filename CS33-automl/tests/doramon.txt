@@ -1,57 +1,57 @@
-《哆啦A梦》百科参考文档（RAG 测试专用版）
-第一部分：核心设定与背景
+Doraemon encyclopedia reference (RAG test edition)
+Part I: Core setting and background
 
-1. 机器人型号与构造
-哆啦A梦（Doraemon）是一名产自 22 世纪（2112 年 9 月 3 日）的猫型育儿机器人，型号为 MS-903。他的身体由于一场意外失去了双耳：在 2122 年，一只机械鼠咬掉了他的耳朵，这导致他患上了严重的“恐鼠症”。失去耳朵后，他因为过度悲伤泪流不止，泪水的震动导致外层的黄色漆剥落，露出了蓝色的底漆。
+1. Robot model and construction
+Doraemon is a cat-shaped childcare robot from the 22nd century (born September 3, 2112), model MS-903. He lost both ears in an accident: in 2122 a robot mouse bit them off, which gave him severe musophobia. After losing his ears he cried so much that the tears shook off the yellow paint, revealing blue primer underneath.
 
-2. 能源与性能参数
+2. Energy and performance
 
-身高： 129.3 cm
+Height: 129.3 cm
 
-体重： 129.3 kg
+Weight: 129.3 kg
 
-马力： 129.3 hp
+Horsepower: 129.3 hp
 
-胸围： 129.3 cm
+Chest circumference: 129.3 cm
 
-最高时速（遇到老鼠时）： 129.3 km/h
+Top speed (when seeing a mouse): 129.3 km/h
 
-能源系统： 内部搭载核融合反应炉（早期设定为原子炉），只要吃掉任何物质都能转化为能量，但他最喜欢的食物是铜锣烧。
+Power: internal nuclear fusion reactor (early setting: atomic reactor). He can convert any eaten matter into energy; his favorite food is dorayaki.
 
-第二部分：关键角色档案
+Part II: Key characters
 
-野比大雄 (Nobita Nobi)： 故事的主角，就读于东京都练马区月见台小学。性格懦弱且懒惰，但在射击和翻花绳方面拥有天才级的天赋。根据未来路径，他原本会因为生意失败导致负债累累，改变历史后，他的未来妻子由胖虎的妹妹小珠变为了源静香。
+Nobita Nobi: protagonist, attends Tsukimidai Elementary in Nerima, Tokyo. Timid and lazy, but gifted at shooting and string figures. In one future he would fail in business and go deep into debt; after history changes, his future wife shifts from Jaiko to Shizuka Minamoto.
 
-源静香 (Shizuka Minamoto)： 爱好洗澡（平均每天 3 次）和拉小提琴（虽然琴声具有杀伤力）。她最喜欢的食物是烤红薯，但因为觉得不雅观而经常对外保密。
+Shizuka Minamoto: loves bathing (~3 times per day) and violin (notoriously painful to hear). Favorite food is baked sweet potato, which she often keeps secret because she finds it inelegant.
 
-刚田武 (Gian/Takeshi Goda)： 绰号“胖虎”，孩子王。他的梦想是成为歌手，但其歌声被公认为一种“音波武器”。他的核心逻辑是：“你的东西就是我的东西，我的东西还是我的东西。”
+Takeshi Goda (Gian): nicknamed "Big G," the neighborhood boss. Dreams of being a singer; his singing is treated as a sonic weapon. His motto: "What's yours is mine, and what's mine is still mine."
 
-骨川小夫 (Suneo Honekawa)： 富二代，擅长遥控模型和炫耀。他的性格特征是唯利是图且有些自卑（尤其是对自己的身高）。
+Suneo Honekawa: rich kid, good at RC models and showing off. Self-interested and somewhat insecure about his height.
 
-第三部分：秘密道具及其原理
+Part III: Secret gadgets and principles
 
-哆啦A梦拥有超过 2000 种道具，存放于腹部的“四次元口袋”中。
+Doraemon has over 2000 gadgets stored in his "fourth-dimensional pocket."
 
-1. 空间跳跃类：任意门 (Anywhere Door)
+1. Space jump: Anywhere Door
 
-功能： 只要心中想着目的地并打开门，即可跨越空间。
+Function: think of a destination, open the door, and cross space.
 
-限制： 搜索距离上限为 10 光年，且必须是地图上有记载的地方。
+Limit: search radius up to 10 light-years; destination must appear on a map.
 
-2. 时间干预类：时光机 (Time Machine)
+2. Time: Time Machine
 
-入口： 位于大雄房间的书桌抽屉内。
+Entry: inside Nobita's desk drawer.
 
-构造： 长度 2.2m，宽度 1.6m，高度 1.28m，重量 538kg。它通过时空隧道（Time Turbulence）在不同年代间穿梭。
+Size: length 2.2 m, width 1.6 m, height 1.28 m, weight 538 kg. Travels eras via the "time turbulence" tunnel.
 
-3. 逻辑干预类：如果电话亭 (What-if Telephone Booth)
+3. Logic: What-if Telephone Booth
 
-原理： 这是一个平行世界创造装置。用户对话筒说出某种假设（例如：“如果没有钱的世界”），装置会通过实验电波将现实切换至符合该描述的平行世界。
+Principle: a parallel-world creator. Speak a hypothesis into the phone (e.g. "a world without money"); experimental waves switch reality to a matching parallel world.
 
-恢复： 再次拨打电话并说“请把世界恢复原状”即可撤销更改。
+Restore: call again and say "please restore the world" to undo.
 
-4. 基础飞行类：竹蜻蜓 (Hopter)
+4. Flight: Bamboo Copter
 
-运作： 内部装有小型电池，利用反重力原理而非简单的螺旋桨动力进行飞行。
+How it works: small battery inside; uses anti-gravity rather than simple prop thrust.
 
-续航： 电池充满后可连续飞行 8 小时，最高时速 80km/h。
+Endurance: up to 8 hours on a full charge, top speed 80 km/h.

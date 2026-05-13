@@ -1,14 +1,14 @@
 """
-全局配置文件
-定义 LLM 模型、API Key、重试策略等核心参数。
+Global configuration file.
+Defines core parameters such as LLM models, API keys, and retry policy.
 """
 import os
 from dotenv import load_dotenv
 
-load_dotenv()  # 从项目根目录的 .env 文件加载环境变量
+load_dotenv()  # Load environment variables from the project-root .env file
 
 # ============================================================
-# LLM 配置
+# LLM configuration
 # ============================================================
 LLM_CONFIG = {
     "model": os.getenv("OPENAI_MODEL", "gpt-4o"),
@@ -18,39 +18,41 @@ LLM_CONFIG = {
 }
 
 # ============================================================
-# 重试策略
+# Retry policy
 # ============================================================
-# Worker 节点内部语法自救的最大重试次数
+# Maximum retries for a worker node's internal syntax self-recovery
 MAX_INNER_RETRY = 3
-# Supervisor 审查不通过后，全局重试的最大次数
+# Maximum global retries after the supervisor rejects a result
 MAX_OUTER_RETRY = 3
-# Supervisor 通过的最低分数阈值 (1-5 分制)
+# Minimum score threshold for the supervisor to pass (1-5 scale)
 SUPERVISOR_PASS_THRESHOLD = 3
 
 # ============================================================
-# 工作空间与日志路径
+# Workspace and log paths
 # ============================================================
 WORKSPACE_DIR = os.path.join(os.path.dirname(__file__), "workspace")
 LOG_DIR = os.path.join(os.path.dirname(__file__), "logs")
-# EDA 阶段落盘的 Markdown 报告（与 tools.eda_charts / agents.eda_analysis 一致）
+# Markdown report written during the EDA stage (kept in sync with tools.eda_charts / agents.eda_analysis)
 EDA_REPORT_PATH = os.path.join(WORKSPACE_DIR, "eda_report.md")
 
 # ============================================================
-# Arxiv 检索配置
+# Arxiv search configuration
 # ============================================================
 ARXIV_MAX_RESULTS = 5
 
 # ============================================================
-# Manager RAP 多源轻量检索（可选依赖见 requirements.txt）
-# Web：一般无需 API Key（duckduckgo-search）；Kaggle：~/.kaggle/kaggle.json；
-# PWC：无 API；需自备本地快照 JSON（见下方 PWC_DATA_DIR）。未放入文件前目录可空或仅 .gitkeep，不影响运行。
+# Manager RAP lightweight multi-source retrieval (see requirements.txt for optional deps)
+# Web: usually requires no API key (duckduckgo-search); Kaggle: ~/.kaggle/kaggle.json;
+# PWC: no API; requires a local snapshot JSON (see PWC_DATA_DIR below). The directory may
+# be empty or contain only .gitkeep before files are added — this does not break the run.
 # ============================================================
 RAP_ENABLED = os.getenv("RAP_ENABLED", "false").lower() in ("1", "true", "yes")
-# 默认关闭 optional 源；需要时在 .env 中设 RAP_WEB=true 等开启
+# Optional sources are disabled by default; enable them via .env, e.g. RAP_WEB=true
 RAP_WEB_ENABLED = os.getenv("RAP_WEB", "false").lower() in ("1", "true", "yes")
 RAP_PWC_ENABLED = os.getenv("RAP_PWC", "false").lower() in ("1", "true", "yes")
 RAP_KAGGLE_ENABLED = os.getenv("RAP_KAGGLE", "false").lower() in ("1", "true", "yes")
 WEB_MAX_RESULTS = int(os.getenv("RAP_WEB_MAX_RESULTS", "5"))
 RAP_FUSE_MAX_CHARS = int(os.getenv("RAP_FUSE_MAX_CHARS", "3500"))
-# 需存在 datasets.json 与 evaluation-tables.json（PapersWithCode 导出结构）；缺任一则检索逻辑静默跳过。
+# Requires datasets.json and evaluation-tables.json (PapersWithCode export schema);
+# if either is missing, the retrieval logic silently skips this source.
 PWC_DATA_DIR = os.path.join(os.path.dirname(__file__), "data", "paperswithcode")

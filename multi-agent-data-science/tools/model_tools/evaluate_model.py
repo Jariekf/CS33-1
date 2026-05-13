@@ -50,6 +50,7 @@ def evaluate_model(
       model_path：模型文件路径。
       primary_metric：主要指标名称。
       evaluation_metrics：原样透传的重点指标列表。
+      evaluation_metrics：原样透传的重点指标列表。
       metrics：标量评估指标 dict（不含混淆矩阵）。
       confusion_matrix：混淆矩阵嵌套列表（仅分类任务，否则为 null）。
       resource_metrics：资源感知指标 dict。
@@ -62,6 +63,7 @@ def evaluate_model(
         "model_name": model_name,
         "task_type": task_type,
         "primary_metric": primary_metric,
+        "evaluation_metrics": sorted(set(evaluation_metrics or [])),
         "evaluation_metrics": sorted(set(evaluation_metrics or [])),
     }
     try:
