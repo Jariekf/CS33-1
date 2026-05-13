@@ -40,7 +40,9 @@ def _split_agent_node(state: GlobalState) -> GlobalState:
         "1. 调用 infer_task，根据数据集描述和用户问题判断任务类型（classification/regression）和目标列；\n"
         "2. 调用 split_dataset，传入上一步推断的 task_type 和 target_column，"
         f"data_path='{data_path}', run_dir='{run_dir}'，将数据集切分为训练集和测试集。\n"
-        "完成以上两步后停止，不要再调用任何工具。"
+        "完成以上两步后停止，不要再调用任何工具。\n"
+        "最终文字回复只说明任务类型推断结果和数据集切分情况（训练集/测试集路径与行数），"
+        "不要提及后续数据清洗、EDA 或建模步骤。"
     )
 
     messages = [SystemMessage(content=system_content), *state["messages"]]

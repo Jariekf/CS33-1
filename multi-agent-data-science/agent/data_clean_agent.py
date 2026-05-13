@@ -97,6 +97,8 @@ def _data_clean_node(state: GlobalState) -> GlobalState:
         f"完成后必须调用 save_dataset_from_store 写出 CSV，output_path 使用：{default_save_path}。",
         f"\n--- cleaning_plan ({target}) ---\n",
         plan_text,
+        "\n完成全部清洗步骤并保存后，最终文字回复只汇报本次数据清洗的执行结果（各步骤处理了哪些列、行数变化等），"
+        "不要提及 EDA、特征工程或建模等后续环节。",
     ]
 
     messages = [SystemMessage(content="".join(system_parts)), *messages]

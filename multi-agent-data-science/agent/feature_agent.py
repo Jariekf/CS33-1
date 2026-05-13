@@ -92,7 +92,9 @@ def _feature_node(state: GlobalState) -> GlobalState:
         f"4. 调用 save_featured_dataset(dataset_id=train_id, model_name=当前模型名, "
         f"output_dir=\"{output_dir}\", split=\"train\") 保存预处理后的训练集；\n"
         f"{test_save_step}"
-        "完成后停止，不要处理其他模型。"
+        "完成后停止，不要处理其他模型。\n"
+        "最终文字回复只汇报当前模型的特征工程处理步骤与结果（编码方式、缩放情况、保存路径），"
+        "不要描述模型训练评估或其他候选模型的处理细节。"
     )
 
     messages = [SystemMessage(content=system_content), *messages]
