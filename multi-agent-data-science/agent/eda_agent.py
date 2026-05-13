@@ -87,7 +87,9 @@ def _eda_node(state: GlobalState) -> GlobalState:
         "     - 业务目标是排序/概率校准 → roc_auc\n"
         "   · evaluation_metrics（2~4 个列表）：最终 test set 综合报告的指标，"
         "     primary_metric 必须包含在内，可加 1~2 个互补指标\n"
-        "   · metrics_rationale：结合数据画像和业务目标，说明选择上述指标的原因。"
+        "   · metrics_rationale：结合数据画像和业务目标，说明选择上述指标的原因。\n"
+        "完成工具调用后，最终文字回复只汇报本次 EDA 的分析结论、特征工程建议和候选模型选择理由，"
+        "不要涉及模型训练调参过程或业务策略解读。"
     )
 
     messages = [SystemMessage(content=system_content), *messages]

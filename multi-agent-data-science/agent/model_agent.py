@@ -90,7 +90,8 @@ def _model_node(state: GlobalState) -> GlobalState:
         f"  evaluation_metrics={evaluation_metrics}，primary_metric='{primary_metric}'。\n\n"
         "步骤 4 — 当 current_stage 为 model_evaluated 时，不再调用工具，\n"
         "  输出简短总结：最终模型名称、cv_best_score vs final_test_metrics 中各指标对比、\n"
-        "  以及对泛化能力的简要判断（CV 分与 test 分差距是否合理）。"
+        "  以及对泛化能力的简要判断（CV 分与 test 分差距是否合理）。\n"
+        "  最终文字回复严格限于上述模型结果分析，不要延伸至业务建议或下一步操作说明。"
     )
 
     messages = [SystemMessage(content=system_content), *messages]
