@@ -1,6 +1,6 @@
 """
-Python 沙盒执行工具
-在子进程中安全执行 Agent 生成的 Python 代码，并捕获 Stdout / Stderr 双流。
+Python sandbox execution tool.
+Runs agent-generated Python code in a subprocess and captures stdout and stderr.
 """
 from __future__ import annotations
 
@@ -12,25 +12,25 @@ import os
 
 def execute_code(code: str, timeout: int = 300) -> tuple[str, str]:
     """
-    将代码写入临时文件并在子进程中执行。
+    Write code to a temporary file and run it in a subprocess.
 
     Args:
-        code: 要执行的 Python 代码字符串
-        timeout: 最大执行时间（秒）
+        code: Python source to execute
+        timeout: Maximum runtime in seconds
 
     Returns:
-        (stdout, stderr) 元组。
-        若 stderr 为空字符串，表示执行成功。
+        (stdout, stderr) tuple.
+        An empty stderr string means success.
     """
-    # 写入临时 .py 文件
+    # Write a temporary .py file
     tmp_fd, tmp_path = tempfile.mkstemp(suffix=".py", prefix="agent_exec_")
     try:
         with os.fdopen(tmp_fd, "w", encoding="utf-8") as f:
             f.write(code)
 
-        # Agent 常生成 pd.to_datetime 等；pandas 会把 UserWarning/FutureWarning 打到 stderr，
-        # 若原样返回会导致 data_cleaning 等节点把「仅警告」误判为执行失败。子进程里忽略常见
-        # 警告类；真正的 Traceback/Exception 仍会出现在 stderr。
+        # Agents often emit pd.to_datetime etc.; pandas may write UserWarning/FutureWarning to stderr.
+        # Returning stderr verbatim can make data_cleaning treat "warnings only" as failure.
+        # Ignore common warning classes in the child process; real Tracebacks/exceptions still go to stderr.
         result = subprocess.run(
             [
                 sys.executable,
@@ -45,7 +45,7 @@ def execute_code(code: str, timeout: int = 300) -> tuple[str, str]:
             capture_output=True,
             text=True,
             timeout=timeout,
-            cwd=os.path.dirname(os.path.dirname(__file__)),  # 项目根目录
+            cwd=os.path.dirname(os.path.dirname(__file__)),  # project root
         )
 
         stdout = result.stdout.strip()
@@ -73,6 +73,6 @@ def execute_code(code: str, timeout: int = 300) -> tuple[str, str]:
     except Exception as e:
         return "", f"[ExecutionError] {str(e)}"
     finally:
-        # 清理临时文件
+        # Remove temporary file
         if os.path.exists(tmp_path):
             os.remove(tmp_path)

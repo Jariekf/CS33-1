@@ -1,24 +1,24 @@
 """
-文件读取工具
-为 Agent 提供按需读取本地落盘文件的能力 (Read_File_Tool)。
-用于 Business Translator 等后置节点从硬盘读取 Supervisor 的详细报告。
+File reading tool.
+Lets agents read on-disk files on demand (Read_File_Tool).
+Used by downstream nodes such as Business Translator to load detailed Supervisor reports from disk.
 """
 from __future__ import annotations
 
 
 def read_file(file_path: str, encoding: str = "utf-8") -> str:
     """
-    读取本地文件内容并返回字符串。
+    Read a local file and return its contents as a string.
 
     Args:
-        file_path: 文件绝对或相对路径
-        encoding: 文件编码，默认 UTF-8
+        file_path: Absolute or relative path to the file
+        encoding: File encoding; default UTF-8
 
     Returns:
-        文件内容字符串
+        File contents as a string
 
     Raises:
-        FileNotFoundError: 文件不存在
+        FileNotFoundError: If the file does not exist
     """
     with open(file_path, "r", encoding=encoding) as f:
         return f.read()

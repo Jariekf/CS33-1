@@ -15,7 +15,7 @@ def main() -> None:
 
     print("\nRetrieving knowledge...")
     retrieve_result = retrieve_knowledge(
-        query="哆啦A梦的身高、体重和马力数值有什么共同点？",
+        query="What do Doraemon's height, weight, and horsepower have in common?",
         top_k=3,
     )
     pprint(retrieve_result)
