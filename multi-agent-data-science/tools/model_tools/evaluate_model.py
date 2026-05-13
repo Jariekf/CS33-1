@@ -37,30 +37,31 @@ def evaluate_model(
       model_name (str)：模型名称。
       task_type (str)："classification" 或 "regression"。
       target_column (str)：目标列名，从测试集中提取 y_test。
-      evaluation_metrics (list)：EDA Agent 指定的综合评估指标列表（如 ["roc_auc", "f1_weighted"]）。
-        分类始终计算 accuracy、f1_macro、f1_weighted；
-        额外触发 roc_auc、recall、precision（若在列表中）。
-        回归始终计算 rmse、mae、r2。
+      evaluation_metrics (list)：EDA Agent 指定的重点评估指标列表（如 ["roc_auc", "f1_weighted"]）。
+        写入结果 JSON，供 model agent 复盘和 supervisor agent 审查时划定关注范围。
+        工具内部始终计算全量指标（不以此列表为 if-gate）：
+          分类：accuracy、f1_macro、f1_weighted、recall、precision、roc_auc（均计算）。
+          回归：rmse、mae、r2（均计算）。
       primary_metric (str)：EDA Agent 指定的主要指标（CV 选型所用），写入结果便于下游追踪。
 
     返回 JSON，包含：
       model_name：模型名称。
       model_path：模型文件路径。
       primary_metric：主要指标名称。
+      evaluation_metrics：原样透传的重点指标列表。
       metrics：标量评估指标 dict（不含混淆矩阵）。
       confusion_matrix：混淆矩阵嵌套列表（仅分类任务，否则为 null）。
       resource_metrics：资源感知指标 dict。
         - inference_latency_ms_per_sample：预热后单样本平均推理延迟（毫秒）。
         - model_size_kb：模型 pkl 文件大小（KB）。
     """
-    eval_metrics_set = set(evaluation_metrics or [])
     tool_inputs = {
         "model_path": model_path,
         "featured_test_data_path": featured_test_data_path,
         "model_name": model_name,
         "task_type": task_type,
         "primary_metric": primary_metric,
-        "evaluation_metrics": sorted(eval_metrics_set),
+        "evaluation_metrics": sorted(set(evaluation_metrics or [])),
     }
     try:
         with open(model_path, "rb") as f:
@@ -90,30 +91,40 @@ def evaluate_model(
         confusion_matrix_result = None
 
         if task_type == "classification":
-            from sklearn.metrics import accuracy_score, confusion_matrix, f1_score
+            from sklearn.metrics import (
+                accuracy_score,
+                confusion_matrix,
+                f1_score,
+                precision_score,
+                recall_score,
+            )
             metrics["accuracy"] = round(float(accuracy_score(y_test, y_pred)), 4)
             metrics["f1_macro"] = round(float(f1_score(y_test, y_pred, average="macro", zero_division=0)), 4)
             metrics["f1_weighted"] = round(float(f1_score(y_test, y_pred, average="weighted", zero_division=0)), 4)
-            if "recall" in eval_metrics_set:
-                from sklearn.metrics import recall_score
-                metrics["recall"] = round(float(recall_score(y_test, y_pred, average="weighted", zero_division=0)), 4)
-            if "precision" in eval_metrics_set:
-                from sklearn.metrics import precision_score
-                metrics["precision"] = round(float(precision_score(y_test, y_pred, average="weighted", zero_division=0)), 4)
-            if "roc_auc" in eval_metrics_set:
+            metrics["recall"] = round(float(recall_score(y_test, y_pred, average="weighted", zero_division=0)), 4)
+            metrics["precision"] = round(float(precision_score(y_test, y_pred, average="weighted", zero_division=0)), 4)
+            # roc_auc requires predict_proba; set None + reason if model doesn't support it
+            # or if y_test contains only one class (e.g. skewed test split)
+            if hasattr(model, "predict_proba"):
                 try:
                     from sklearn.metrics import roc_auc_score
-                    if hasattr(model, "predict_proba"):
-                        y_prob = model.predict_proba(X_test)
-                        n_classes = y_prob.shape[1] if y_prob.ndim > 1 else 1
-                        if n_classes == 2:
-                            metrics["roc_auc"] = round(float(roc_auc_score(y_test, y_prob[:, 1])), 4)
-                        else:
-                            metrics["roc_auc"] = round(float(roc_auc_score(
-                                y_test, y_prob, multi_class="ovr", average="weighted"
-                            )), 4)
-                except Exception:
+                    y_prob = model.predict_proba(X_test)
+                    n_classes = y_prob.shape[1] if y_prob.ndim > 1 else 1
+                    if n_classes == 2:
+                        metrics["roc_auc"] = round(float(roc_auc_score(y_test, y_prob[:, 1])), 4)
+                    else:
+                        metrics["roc_auc"] = round(float(roc_auc_score(
+                            y_test, y_prob, multi_class="ovr", average="weighted"
+                        )), 4)
+                except ValueError as exc:
                     metrics["roc_auc"] = None
+                    metrics["roc_auc_skipped_reason"] = str(exc)
+                except Exception as exc:
+                    metrics["roc_auc"] = None
+                    metrics["roc_auc_skipped_reason"] = f"unexpected error: {exc}"
+            else:
+                metrics["roc_auc"] = None
+                metrics["roc_auc_skipped_reason"] = "model does not support predict_proba"
             confusion_matrix_result = confusion_matrix(y_test, y_pred).tolist()
         else:
             from sklearn.metrics import mean_absolute_error, mean_squared_error, r2_score
@@ -129,6 +140,7 @@ def evaluate_model(
             "model_name": model_name,
             "model_path": model_path,
             "primary_metric": primary_metric or "",
+            "evaluation_metrics": sorted(set(evaluation_metrics or [])),
             "metrics": metrics,
             "confusion_matrix": confusion_matrix_result,
             "resource_metrics": {
