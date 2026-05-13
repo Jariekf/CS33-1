@@ -44,7 +44,8 @@ def test_eda_agent_graph_structure():
     assert "tool_state_update" in graph.nodes
 
     edges = {(e.source, e.target) for e in graph.edges}
-    assert ("__start__", "eda_agent") in edges
+    assert ("__start__", "timer_start") in edges
+    assert ("timer_start", "eda_agent") in edges
     assert ("tools", "tool_state_update") in edges
     assert ("tool_state_update", "eda_agent") in edges
 

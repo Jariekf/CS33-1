@@ -105,3 +105,6 @@ class GlobalState(TypedDict, total=False):
 
     # run isolation
     run_dir: str
+
+    # runtime timing  {agent_key: {"start": float, "end": float}, "pipeline_start": float}
+    timing: dict[str, Any]

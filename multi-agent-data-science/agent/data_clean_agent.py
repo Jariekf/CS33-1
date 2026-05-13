@@ -13,6 +13,8 @@ from langchain_core.messages import AIMessage, HumanMessage, SystemMessage, Tool
 from langgraph.graph import END, StateGraph
 from langgraph.prebuilt import ToolNode
 
+import time
+
 from core.global_state import GlobalState
 from core.my_llm import llm_for
 from core.report_writer import save_agent_report
@@ -203,12 +205,33 @@ def _handle_clean_step(state: GlobalState, tool_message: ToolMessage) -> GlobalS
     }
 
 
+def _timer_start_clean(state: GlobalState) -> GlobalState:
+    target = state.get("cleaning_target", "train")
+    key = f"data_clean_{target}"
+    timing = dict(state.get("timing") or {})
+    timing[key] = {"start": time.time()}
+    return {"timing": timing}
+
+
+def _timer_end_clean(state: GlobalState) -> GlobalState:
+    target = state.get("cleaning_target", "train")
+    key = f"data_clean_{target}"
+    timing = dict(state.get("timing") or {})
+    entry = dict(timing.get(key) or {})
+    now = time.time()
+    entry["end"] = now
+    elapsed = now - entry.get("start", now)
+    print(f"[timer] {key:<28} {elapsed:6.1f}s")
+    timing[key] = entry
+    return {"timing": timing}
+
+
 def _route_after_agent(state: GlobalState) -> str:
     last_msg = state["messages"][-1]
     if isinstance(last_msg, AIMessage) and last_msg.tool_calls:
         return "tools"
     save_agent_report("data_clean_agent", last_msg, run_dir=state.get("run_dir") or "")
-    return END
+    return "timer_end"
 
 
 def _show_graph_if_needed(agent_graph, show_graph: bool) -> None:
@@ -246,15 +269,19 @@ def _pretty_print_message(message) -> None:
 
 def build_data_clean_agent(show_graph: bool = False):
     graph = StateGraph(GlobalState)
+    graph.add_node("timer_start", _timer_start_clean)
     graph.add_node("data_clean_agent", _data_clean_node)
     graph.add_node("tools", ToolNode(tools))
     graph.add_node("tool_state_update", _tool_state_update_node)
-    graph.set_entry_point("data_clean_agent")
+    graph.add_node("timer_end", _timer_end_clean)
+    graph.set_entry_point("timer_start")
+    graph.add_edge("timer_start", "data_clean_agent")
     graph.add_conditional_edges(
-        "data_clean_agent", _route_after_agent, {"tools": "tools", END: END}
+        "data_clean_agent", _route_after_agent, {"tools": "tools", "timer_end": "timer_end"}
     )
     graph.add_edge("tools", "tool_state_update")
     graph.add_edge("tool_state_update", "data_clean_agent")
+    graph.add_edge("timer_end", END)
     compiled = graph.compile()
     _show_graph_if_needed(compiled, show_graph=show_graph)
     return compiled

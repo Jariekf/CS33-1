@@ -13,6 +13,7 @@
 
 import argparse
 import sys
+import time
 from pathlib import Path
 
 PROJECT_ROOT = Path(__file__).resolve().parent
@@ -25,6 +26,30 @@ from agent.agent_manager import _pretty_print_message
 from core.graph import build_full_pipeline
 
 _DIVIDER = "=" * 60
+_COL = 28
+
+
+def _print_timing_summary(timing: dict, pipeline_end: float) -> None:
+    pipeline_start = timing.get("pipeline_start")
+    rows = [
+        (k, v)
+        for k, v in timing.items()
+        if k != "pipeline_start" and isinstance(v, dict) and "start" in v and "end" in v
+    ]
+    if not rows and pipeline_start is None:
+        return
+    sep = "─" * (_COL + 12)
+    print(f"\n{sep}")
+    print(f"  {'Agent':<{_COL}} {'Time':>6}")
+    print(sep)
+    for key, entry in rows:
+        elapsed = entry["end"] - entry["start"]
+        print(f"  {key:<{_COL}} {elapsed:6.1f}s")
+    if pipeline_start is not None:
+        total = pipeline_end - pipeline_start
+        print(sep)
+        print(f"  {'total (wall clock)':<{_COL}} {total:6.1f}s")
+    print(sep)
 
 
 def run_pipeline(
@@ -111,6 +136,8 @@ def run_pipeline(
             bm = event["best_model"]
             print(f"\n[best_model] {bm.get('model_name')}  metrics={bm.get('metrics')}")
 
+    pipeline_end = time.time()
+
     print(f"\n{_DIVIDER}")
     print("流水线运行完毕")
     if run_dir := final_state.get("run_dir"):
@@ -121,6 +148,8 @@ def run_pipeline(
     if bm := final_state.get("best_model"):
         print(f"最优模型：{bm.get('model_name')}")
         print(f"评估指标：{bm.get('metrics')}")
+
+    _print_timing_summary(final_state.get("timing") or {}, pipeline_end)
     print(_DIVIDER)
 
     return final_state

@@ -17,6 +17,7 @@ from langgraph.prebuilt import ToolNode
 from core.global_state import GlobalState
 from core.my_llm import llm_for
 from core.report_writer import save_agent_report
+from core.timer_utils import make_timer_end, make_timer_start
 from tools.agentmanager_tools.infer_task import infer_task
 from tools.split_tools.split_dataset_tool import split_dataset
 
@@ -103,20 +104,24 @@ def _route_after_split_agent(state: GlobalState) -> str:
     if isinstance(last_msg, AIMessage) and last_msg.tool_calls:
         return "tools"
     save_agent_report("split_agent", last_msg)
-    return END
+    return "timer_end"
 
 
 def build_split_agent(show_graph: bool = False):
     graph = StateGraph(GlobalState)
+    graph.add_node("timer_start", make_timer_start("split_agent"))
     graph.add_node("split_agent", _split_agent_node)
     graph.add_node("tools", ToolNode(tools))
     graph.add_node("tool_state_update", _tool_state_update_node)
-    graph.set_entry_point("split_agent")
+    graph.add_node("timer_end", make_timer_end("split_agent"))
+    graph.set_entry_point("timer_start")
+    graph.add_edge("timer_start", "split_agent")
     graph.add_conditional_edges(
-        "split_agent", _route_after_split_agent, {"tools": "tools", END: END}
+        "split_agent", _route_after_split_agent, {"tools": "tools", "timer_end": "timer_end"}
     )
     graph.add_edge("tools", "tool_state_update")
     graph.add_edge("tool_state_update", "split_agent")
+    graph.add_edge("timer_end", END)
     compiled_graph = graph.compile()
     if show_graph:
         _show_graph(compiled_graph)

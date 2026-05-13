@@ -16,6 +16,7 @@ from langgraph.prebuilt import ToolNode
 from core.global_state import GlobalState
 from core.my_llm import llm_for
 from core.report_writer import save_agent_report
+from core.timer_utils import make_timer_end, make_timer_start
 from tools.eda_tools.compute_correlation_matrix import compute_correlation_matrix
 from tools.eda_tools.generate_eda_charts import generate_eda_charts
 from tools.eda_tools.profile_training_data import profile_training_data
@@ -166,7 +167,7 @@ def _route_after_eda(state: GlobalState) -> str:
     if isinstance(last_msg, AIMessage) and last_msg.tool_calls:
         return "tools"
     save_agent_report("eda_agent", last_msg, run_dir=state.get("run_dir") or "")
-    return END
+    return "timer_end"
 
 
 def _show_graph_if_needed(agent_graph, show_graph: bool) -> None:
@@ -203,15 +204,19 @@ def _pretty_print_message(message) -> None:
 
 def build_eda_agent(show_graph: bool = False):
     graph = StateGraph(GlobalState)
+    graph.add_node("timer_start", make_timer_start("eda_agent"))
     graph.add_node("eda_agent", _eda_node)
     graph.add_node("tools", ToolNode(tools))
     graph.add_node("tool_state_update", _tool_state_update_node)
-    graph.set_entry_point("eda_agent")
+    graph.add_node("timer_end", make_timer_end("eda_agent"))
+    graph.set_entry_point("timer_start")
+    graph.add_edge("timer_start", "eda_agent")
     graph.add_conditional_edges(
-        "eda_agent", _route_after_eda, {"tools": "tools", END: END}
+        "eda_agent", _route_after_eda, {"tools": "tools", "timer_end": "timer_end"}
     )
     graph.add_edge("tools", "tool_state_update")
     graph.add_edge("tool_state_update", "eda_agent")
+    graph.add_edge("timer_end", END)
     compiled = graph.compile()
     _show_graph_if_needed(compiled, show_graph=show_graph)
     return compiled

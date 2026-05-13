@@ -39,7 +39,8 @@ def test_build_data_clean_agent_graph():
     assert "tool_state_update" in graph.nodes
 
     edges = {(edge.source, edge.target) for edge in graph.edges}
-    assert ("__start__", "data_clean_agent") in edges
+    assert ("__start__", "timer_start") in edges
+    assert ("timer_start", "data_clean_agent") in edges
     assert ("tools", "tool_state_update") in edges
     assert ("tool_state_update", "data_clean_agent") in edges
 

@@ -17,6 +17,7 @@ from tools.agentmanager_tools.infer_task import infer_task
 from tools.agentmanager_tools.manager_rap import build_manager_rap_context
 from tools.agentmanager_tools.profile_dataset import profile_dataset
 from core.report_writer import append_manager_rap_midlayer_to_report, save_agent_report
+from core.timer_utils import make_timer_end, make_timer_start
 
 
 tools = [profile_dataset, infer_task, build_manager_rap_context, create_cleaning_plan]
@@ -231,7 +232,7 @@ def _route_after_manager(state: GlobalState) -> str:
     if isinstance(last_msg, AIMessage) and last_msg.tool_calls:
         return "tools"
     save_agent_report("agent_manager", last_msg, run_dir=state.get("run_dir") or "")
-    return END
+    return "timer_end"
 
 
 def _show_graph_if_needed(agent_graph, show_graph: bool) -> None:
@@ -267,15 +268,19 @@ def _pretty_print_message(message) -> None:
 
 def build_agent_manager(show_graph: bool = False):
     graph = StateGraph(GlobalState)
+    graph.add_node("timer_start", make_timer_start("agent_manager"))
     graph.add_node("agent_manager", _manager_node)
     graph.add_node("tools", ToolNode(tools))
     graph.add_node("tool_state_update", _tool_state_update_node)
-    graph.set_entry_point("agent_manager")
+    graph.add_node("timer_end", make_timer_end("agent_manager"))
+    graph.set_entry_point("timer_start")
+    graph.add_edge("timer_start", "agent_manager")
     graph.add_conditional_edges(
-        "agent_manager", _route_after_manager, {"tools": "tools", END: END}
+        "agent_manager", _route_after_manager, {"tools": "tools", "timer_end": "timer_end"}
     )
     graph.add_edge("tools", "tool_state_update")
     graph.add_edge("tool_state_update", "agent_manager")
+    graph.add_edge("timer_end", END)
     compiled_graph = graph.compile()
     _show_graph_if_needed(compiled_graph, show_graph=show_graph)
     return compiled_graph
