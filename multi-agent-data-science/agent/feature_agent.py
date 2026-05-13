@@ -69,6 +69,12 @@ def _feature_node(state: GlobalState) -> GlobalState:
         if has_test else ""
     )
 
+    supervisor_hint = (state.get("supervisor_hints") or {}).get(f"feature:{current_model}", "").strip()
+    hint_line = (
+        f"[Supervisor 反馈] 上一轮检查未通过：{supervisor_hint}\n请仅针对此问题修复，不要重新执行已完成的步骤。\n"
+        if supervisor_hint else ""
+    )
+
     system_content = (
         f"你是特征工程 Agent，当前任务是为模型 [{current_model}] 同步处理训练集和测试集特征。\n"
         f"训练集路径：{training_data_path or '未提供'}。\n"
@@ -76,7 +82,8 @@ def _feature_node(state: GlobalState) -> GlobalState:
         f"任务类型：{task_type}。目标列：{target_column or '未提供'}。\n"
         f"全部候选模型：{candidate_models}，已完成：{list(feature_dataset_ids.keys())}。\n"
         f"本次运行工作目录：{run_dir or '未设置'}。\n"
-        f"\n当前模型 [{current_model}] 的特征工程计划：\n{plan_text}\n"
+        + hint_line
+        + f"\n当前模型 [{current_model}] 的特征工程计划：\n{plan_text}\n"
         "工作流程（按顺序执行）：\n"
         f"1. 调用 load_dataset_to_store 将训练集（{training_data_path}）加载到内存，获取 train_id；\n"
         f"{test_load_step}"

@@ -63,6 +63,13 @@ def _eda_node(state: GlobalState) -> GlobalState:
 
     run_dir = state.get("run_dir") or ""
 
+    supervisor_hint = (state.get("supervisor_hints") or {}).get("eda", "").strip()
+    hint_line = (
+        f"[Supervisor 反馈] 上一轮检查未通过：{supervisor_hint}\n"
+        "请确保依次完成所有 4 个工具调用后再输出最终回复。\n"
+        if supervisor_hint else ""
+    )
+
     system_content = (
         "你是 EDA（探索性数据分析）Agent，负责分析训练集、制定特征工程计划、选出三个候选模型，"
         "并决定本次任务的评估指标。\n"
@@ -71,7 +78,8 @@ def _eda_node(state: GlobalState) -> GlobalState:
         f"任务类型：{task_type}。\n"
         f"目标列：{target_column or '未提供'}。\n"
         f"本次运行工作目录：{run_dir or '未设置'}。\n"
-        "工作流程（按顺序执行）：\n"
+        + hint_line
+        + "工作流程（按顺序执行）：\n"
         "1. 调用 profile_training_data 获取训练集数据画像；\n"
         "2. 调用 compute_correlation_matrix 计算特征相关矩阵（传入目标列名）；\n"
         "3. 调用 generate_eda_charts 生成完整 EDA 图表："
