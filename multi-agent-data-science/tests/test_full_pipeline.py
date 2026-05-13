@@ -16,6 +16,8 @@ from core.env_utils import DEEPSEEK_API_KEY
 from core.graph import (
     _route_after_init,
     _route_after_model,
+    _route_after_test_cleaning_guard,
+    _route_after_train_cleaning_guard,
     build_full_pipeline,
 )
 
@@ -39,8 +41,10 @@ def test_pipeline_graph_contains_all_nodes():
         "agent_manager",
         "set_clean_train",
         "data_clean_train",
+        "guard_clean_train",
         "set_clean_test",
         "data_clean_test",
+        "guard_clean_test",
         "eda_agent",
         "feature_agent",
         "model_agent",
@@ -54,7 +58,8 @@ def test_pipeline_graph_contains_all_nodes():
     assert ("init_run", "split_agent") in edges
     assert ("split_agent", "agent_manager") in edges
     assert ("agent_manager", "set_clean_train") in edges
-    assert ("data_clean_test", "eda_agent") in edges
+    assert ("data_clean_train", "guard_clean_train") in edges
+    assert ("data_clean_test", "guard_clean_test") in edges
 
 
 def test_route_model_to_business_translator_when_best_model():
@@ -87,6 +92,26 @@ def test_route_init_skips_split_when_presplit_paths():
 def test_route_init_goes_split_agent_when_not_presplit():
     assert _route_after_init({"is_split": False}) == "split_agent"
     assert _route_after_init({}) == "split_agent"
+
+
+def test_route_train_cleaning_guard_to_next_or_end():
+    assert (
+        _route_after_train_cleaning_guard(
+            {"train_cleaning_passed": True, "train_cleaned_data_path": str(RAW_CSV)}
+        )
+        == "set_clean_test"
+    )
+    assert _route_after_train_cleaning_guard({}) == END
+
+
+def test_route_test_cleaning_guard_to_next_or_end():
+    assert (
+        _route_after_test_cleaning_guard(
+            {"test_cleaning_passed": True, "test_cleaned_data_path": str(RAW_CSV)}
+        )
+        == "eda_agent"
+    )
+    assert _route_after_test_cleaning_guard({}) == END
 
 
 # ── 图：start → init_run ─────────────────────────────────────────────────────
