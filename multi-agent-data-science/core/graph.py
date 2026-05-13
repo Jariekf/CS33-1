@@ -114,6 +114,70 @@ def _set_clean_test(state: GlobalState) -> GlobalState:
     return out
 
 
+def _has_cleaned_output(state: GlobalState, target: str) -> tuple[bool, str]:
+    if target == "train":
+        path_key = "train_cleaned_data_path"
+        passed_key = "train_cleaning_passed"
+    else:
+        path_key = "test_cleaned_data_path"
+        passed_key = "test_cleaning_passed"
+
+    cleaned_path = (state.get(path_key) or "").strip()
+    passed = bool(state.get(passed_key))
+    exists = bool(cleaned_path) and Path(cleaned_path).exists()
+    return passed and exists, cleaned_path
+
+
+def _guard_train_cleaning(state: GlobalState) -> GlobalState:
+    ok, cleaned_path = _has_cleaned_output(state, "train")
+    if ok:
+        log_node("clean_train_guard", success=True, detail=f"path={cleaned_path}")
+        return {}
+
+    msg = (
+        "train cleaning output missing or invalid: "
+        f"train_cleaning_passed={state.get('train_cleaning_passed')}  "
+        f"train_cleaned_data_path={cleaned_path or '(empty)'}"
+    )
+    log_node("clean_train_guard", success=False, detail=msg)
+    return {
+        "current_stage": "train_cleaning_guard_failed",
+        "cleaning_passed": False,
+        "errors": (state.get("errors") or [])
+        + [{"stage": "clean_train_guard", "type": "CleaningOutputMissing", "message": msg}],
+    }
+
+
+def _guard_test_cleaning(state: GlobalState) -> GlobalState:
+    ok, cleaned_path = _has_cleaned_output(state, "test")
+    if ok:
+        log_node("clean_test_guard", success=True, detail=f"path={cleaned_path}")
+        return {}
+
+    msg = (
+        "test cleaning output missing or invalid: "
+        f"test_cleaning_passed={state.get('test_cleaning_passed')}  "
+        f"test_cleaned_data_path={cleaned_path or '(empty)'}"
+    )
+    log_node("clean_test_guard", success=False, detail=msg)
+    return {
+        "current_stage": "test_cleaning_guard_failed",
+        "cleaning_passed": False,
+        "errors": (state.get("errors") or [])
+        + [{"stage": "clean_test_guard", "type": "CleaningOutputMissing", "message": msg}],
+    }
+
+
+def _route_after_train_cleaning_guard(state: GlobalState) -> str:
+    ok, _ = _has_cleaned_output(state, "train")
+    return "set_clean_test" if ok else END
+
+
+def _route_after_test_cleaning_guard(state: GlobalState) -> str:
+    ok, _ = _has_cleaned_output(state, "test")
+    return "eda_agent" if ok else END
+
+
 def build_full_pipeline(show_graph: bool = False):
     split_graph = build_split_agent(show_graph=False)
     manager_graph = build_agent_manager(show_graph=False)
@@ -130,8 +194,10 @@ def build_full_pipeline(show_graph: bool = False):
     graph.add_node("agent_manager", manager_graph)
     graph.add_node("set_clean_train", _set_clean_train)
     graph.add_node("data_clean_train", clean_train_graph)
+    graph.add_node("guard_clean_train", _guard_train_cleaning)
     graph.add_node("set_clean_test", _set_clean_test)
     graph.add_node("data_clean_test", clean_test_graph)
+    graph.add_node("guard_clean_test", _guard_test_cleaning)
     graph.add_node("eda_agent", eda_graph)
     graph.add_node("feature_agent", feature_graph)
     graph.add_node("model_agent", model_graph)
@@ -145,9 +211,19 @@ def build_full_pipeline(show_graph: bool = False):
     graph.add_edge("split_agent", "agent_manager")
     graph.add_edge("agent_manager", "set_clean_train")
     graph.add_edge("set_clean_train", "data_clean_train")
-    graph.add_edge("data_clean_train", "set_clean_test")
+    graph.add_edge("data_clean_train", "guard_clean_train")
+    graph.add_conditional_edges(
+        "guard_clean_train",
+        _route_after_train_cleaning_guard,
+        {"set_clean_test": "set_clean_test", END: END},
+    )
     graph.add_edge("set_clean_test", "data_clean_test")
-    graph.add_edge("data_clean_test", "eda_agent")
+    graph.add_edge("data_clean_test", "guard_clean_test")
+    graph.add_conditional_edges(
+        "guard_clean_test",
+        _route_after_test_cleaning_guard,
+        {"eda_agent": "eda_agent", END: END},
+    )
     graph.add_edge("eda_agent", "feature_agent")
 
     graph.add_conditional_edges(
