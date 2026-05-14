@@ -147,7 +147,7 @@ def run_pipeline(
     if run_dir := final_state.get("run_dir"):
         print(f"输出目录：{run_dir}")
         if final_state.get("business_report"):
-            br_path = Path(run_dir) / "reports" / "business_report.md"
+            br_path = Path(run_dir) / "reports" / "business_insight_report.md"
             print(f"业务洞察报告：{br_path}")
     if bm := final_state.get("best_model"):
         print(f"最优模型：{bm.get('model_name')}")
