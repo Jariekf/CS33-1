@@ -8,6 +8,30 @@ from core.dataset_store import get_dataset, update_dataset
 from tools.tool_trace import trace_tool_call
 
 
+def _pick_text(payload: dict[str, Any], *keys: str) -> str:
+    for key in keys:
+        raw = payload.get(key)
+        if isinstance(raw, str):
+            text = raw.strip()
+            if text:
+                return text
+    return ""
+
+
+def _normalize_conversion_aliases(conversion: dict[str, Any]) -> dict[str, Any]:
+    normalized = dict(conversion)
+    column = _pick_text(conversion, "column", "column_name")
+    target_type = _pick_text(conversion, "target_type", "new_type", "to").lower()
+    if target_type == "categorical":
+        target_type = "category"
+
+    if column:
+        normalized["column"] = column
+    if target_type:
+        normalized["target_type"] = target_type
+    return normalized
+
+
 def _clean_numeric_series(series: pd.Series) -> pd.Series:
     cleaned = (
         series.astype(str)
@@ -24,16 +48,28 @@ def _clean_numeric_series(series: pd.Series) -> pd.Series:
 
 
 @tool
-def clean_data_types(dataset_id: str, conversions: list[dict[str, Any]]) -> str:
-    """修正数据类型，支持 numeric 和 datetime。"""
-    tool_inputs = {"dataset_id": dataset_id, "conversions": conversions}
+def clean_data_types(dataset_id: str, conversions: list[dict[str, Any]] | None = None) -> str:
+    """修正数据类型，支持 numeric、datetime、object、category。"""
+    tool_inputs = {"dataset_id": dataset_id, "conversions": conversions or []}
     converted_columns = []
     skipped_columns = []
     try:
         df = get_dataset(dataset_id).copy()
-        for conversion in conversions:
-            column = conversion.get("column")
-            target_type = conversion.get("target_type")
+        for conversion in conversions or []:
+            if not isinstance(conversion, dict):
+                skipped_columns.append(
+                    {"column": None, "reason": "conversion_must_be_object", "conversion": conversion}
+                )
+                continue
+
+            normalized = _normalize_conversion_aliases(conversion)
+            column = normalized.get("column")
+            target_type = normalized.get("target_type")
+            if not isinstance(column, str) or not column:
+                skipped_columns.append(
+                    {"column": column, "reason": "missing_or_invalid_column", "conversion": conversion}
+                )
+                continue
             if column not in df.columns:
                 skipped_columns.append({"column": column, "reason": "column_not_found"})
                 continue
@@ -41,6 +77,10 @@ def clean_data_types(dataset_id: str, conversions: list[dict[str, Any]]) -> str:
                 df[column] = _clean_numeric_series(df[column])
             elif target_type == "datetime":
                 df[column] = pd.to_datetime(df[column], errors="coerce")
+            elif target_type == "object":
+                df[column] = df[column].astype("object")
+            elif target_type == "category":
+                df[column] = df[column].astype("category")
             else:
                 skipped_columns.append(
                     {"column": column, "reason": f"unsupported_target_type:{target_type}"}

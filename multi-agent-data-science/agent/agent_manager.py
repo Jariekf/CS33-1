@@ -47,6 +47,14 @@ def _manager_node(state: GlobalState) -> GlobalState:
         f"需求摘要：{rap_summary or '尚未生成'}\n"
         f"RAP建议：{rap_context or '尚未生成'}\n"
     )
+    cleaning_plan_contract = (
+        "\ncreate_cleaning_plan contract（必须显式传入这些字段）：\n"
+        "target, summary, column_name_actions, type_conversions, missing_value_actions, "
+        "outlier_actions, drop_columns, notes。\n"
+        "如果某个字段没有动作，传空列表 []，不要省略参数。\n"
+        "示例：create_cleaning_plan(target='train', summary='...', column_name_actions=[], "
+        "type_conversions=[], missing_value_actions=[], outlier_actions=[], drop_columns=[], notes=[])\n"
+    )
 
     if has_meta:
         rap_step = (
@@ -95,6 +103,7 @@ def _manager_node(state: GlobalState) -> GlobalState:
                 f"用户的问题：{user_request or '未提供'}。\n"
                 + rap_instruction
                 + workflow
+                + cleaning_plan_contract
             )
         ),
         *messages,
@@ -121,6 +130,13 @@ def _tool_state_update_node(state: GlobalState) -> GlobalState:
     return {}
 
 
+def _tool_content_preview(tool_message: ToolMessage, max_chars: int = 1000) -> str:
+    raw = str(tool_message.content)
+    if len(raw) <= max_chars:
+        return raw
+    return f"{raw[:max_chars]}... <truncated>"
+
+
 def _update_profile_state(state: GlobalState, tool_message: ToolMessage) -> GlobalState:
     try:
         profile = json.loads(str(tool_message.content))
@@ -132,6 +148,7 @@ def _update_profile_state(state: GlobalState, tool_message: ToolMessage) -> Glob
                     "stage": "profile",
                     "type": exc.__class__.__name__,
                     "message": str(exc),
+                    "raw_content_preview": _tool_content_preview(tool_message),
                 }
             ],
         }
@@ -169,6 +186,7 @@ def _update_task_state(tool_message: ToolMessage) -> GlobalState:
                     "stage": "task_inference",
                     "type": exc.__class__.__name__,
                     "message": str(exc),
+                    "raw_content_preview": _tool_content_preview(tool_message),
                 }
             ],
         }
@@ -191,6 +209,7 @@ def _update_manager_rap_state(tool_message: ToolMessage) -> GlobalState:
                     "stage": "manager_rap",
                     "type": exc.__class__.__name__,
                     "message": str(exc),
+                    "raw_content_preview": _tool_content_preview(tool_message),
                 }
             ],
         }
@@ -210,7 +229,14 @@ def _update_cleaning_plan_state(tool_message: ToolMessage) -> GlobalState:
     except json.JSONDecodeError as exc:
         return {
             "current_stage": "cleaning_plan_failed",
-            "errors": [{"stage": "cleaning_plan", "type": exc.__class__.__name__, "message": str(exc)}],
+            "errors": [
+                {
+                    "stage": "cleaning_plan",
+                    "type": exc.__class__.__name__,
+                    "message": str(exc),
+                    "raw_content_preview": _tool_content_preview(tool_message),
+                }
+            ],
         }
 
     target = plan.get("target", "train")

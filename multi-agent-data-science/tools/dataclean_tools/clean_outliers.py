@@ -9,7 +9,7 @@ from tools.tool_trace import trace_tool_call
 
 
 @tool
-def clean_outliers(dataset_id: str, actions: list[dict[str, Any]]) -> str:
+def clean_outliers(dataset_id: str, actions: list[dict[str, Any]] | None = None) -> str:
     """处理异常值。
 
     每个 action 必须包含以下字段：
@@ -24,12 +24,12 @@ def clean_outliers(dataset_id: str, actions: list[dict[str, Any]]) -> str:
 
     注意：strategy 必须精确填写 "clip_iqr"，填写其他任何值（如 "iqr"、"clip"、"IQR"）该列会被跳过。
     """
-    tool_inputs = {"dataset_id": dataset_id, "actions": actions}
+    tool_inputs = {"dataset_id": dataset_id, "actions": actions or []}
     processed_columns = []
     skipped_columns = []
     try:
         df = get_dataset(dataset_id).copy()
-        for action in actions:
+        for action in actions or []:
             column = action.get("column")
             strategy = action.get("strategy")
             if column not in df.columns:

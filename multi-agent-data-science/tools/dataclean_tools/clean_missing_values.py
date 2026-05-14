@@ -50,6 +50,162 @@ def _resolve_fill_value(series: pd.Series, method: str) -> tuple[bool, Any, str]
     return False, None, f"unsupported_fill_method:{method}"
 
 
+def _pick_text(action: dict[str, Any], *keys: str) -> str:
+    for key in keys:
+        raw = action.get(key)
+        if isinstance(raw, str):
+            text = raw.strip()
+            if text:
+                return text
+    return ""
+
+
+def _normalize_group_by(raw_group_by: Any) -> list[str]:
+    if isinstance(raw_group_by, str):
+        value = raw_group_by.strip()
+        return [value] if value else []
+
+    if isinstance(raw_group_by, list):
+        normalized: list[str] = []
+        for item in raw_group_by:
+            if isinstance(item, str):
+                value = item.strip()
+                if value:
+                    normalized.append(value)
+        return normalized
+
+    return []
+
+
+def _extract_condition_value(action: dict[str, Any]) -> Any:
+    if "condition_value" in action:
+        return action.get("condition_value")
+    if "when_value" in action:
+        return action.get("when_value")
+    if "if_value" in action:
+        return action.get("if_value")
+    return None
+
+
+def _build_condition_mask(df: pd.DataFrame, action: dict[str, Any]) -> tuple[bool, pd.Series | None, str]:
+    condition_column = _pick_text(action, "condition_column", "when_column", "if_column")
+    if not condition_column:
+        return False, None, "condition_column_missing"
+    if condition_column not in df.columns:
+        return False, None, f"condition_column_not_found:{condition_column}"
+
+    operator = _pick_text(action, "condition_operator", "operator", "op").lower() or "eq"
+    condition_value = _extract_condition_value(action)
+    series = df[condition_column]
+
+    if operator in {"eq", "=="}:
+        if condition_value is None:
+            return False, None, "condition_value_missing"
+        return True, series == condition_value, ""
+
+    if operator in {"ne", "!="}:
+        if condition_value is None:
+            return False, None, "condition_value_missing"
+        return True, series != condition_value, ""
+
+    if operator == "in":
+        if not isinstance(condition_value, list):
+            return False, None, "condition_value_must_be_list_for_in"
+        return True, series.isin(condition_value), ""
+
+    if operator == "not_in":
+        if not isinstance(condition_value, list):
+            return False, None, "condition_value_must_be_list_for_not_in"
+        return True, ~series.isin(condition_value), ""
+
+    if operator == "isna":
+        return True, series.isna(), ""
+
+    if operator == "notna":
+        return True, series.notna(), ""
+
+    return False, None, f"unsupported_condition_operator:{operator}"
+
+
+def _normalize_action_aliases(action: dict[str, Any]) -> dict[str, Any]:
+    normalized = dict(action)
+
+    column = _pick_text(action, "column", "column_name")
+    if column:
+        normalized["column"] = column
+
+    strategy = _pick_text(action, "strategy", "imputation_strategy", "action").lower()
+    method = _pick_text(action, "method").lower()
+    if not strategy and method:
+        strategy = "fill"
+
+    if strategy:
+        normalized["strategy"] = strategy
+
+    if not method and strategy == "fill":
+        method_alias = _pick_text(action, "imputation_strategy").lower()
+        if method_alias and method_alias != "fill":
+            method = method_alias
+    if method:
+        normalized["method"] = method
+
+    if "value" not in normalized and "fill_value" in action:
+        normalized["value"] = action.get("fill_value")
+
+    condition_column = _pick_text(action, "condition_column", "when_column", "if_column")
+    if condition_column:
+        normalized["condition_column"] = condition_column
+
+    condition_operator = _pick_text(action, "condition_operator", "operator", "op")
+    if condition_operator:
+        normalized["condition_operator"] = condition_operator
+
+    condition_value = _extract_condition_value(action)
+    if condition_value is not None and "condition_value" not in normalized:
+        normalized["condition_value"] = condition_value
+
+    flag_column = _pick_text(action, "flag_column", "indicator_column")
+    if flag_column:
+        normalized["flag_column"] = flag_column
+
+    if strategy == "fill_with_constant":
+        normalized["strategy"] = "fill"
+        normalized["method"] = "constant"
+    elif strategy == "fill_with_mode":
+        normalized["strategy"] = "fill"
+        normalized["method"] = "mode"
+    elif strategy == "fill_with_zero":
+        normalized["strategy"] = "fill"
+        normalized["method"] = "constant"
+        normalized.setdefault("value", 0)
+    elif strategy == "fill_with_constant_or_mode":
+        normalized["strategy"] = "fill"
+        if "value" in normalized:
+            normalized["method"] = "constant"
+        else:
+            normalized["method"] = "mode"
+    elif strategy == "impute_group_median":
+        normalized["strategy"] = "group_median"
+        normalized.setdefault("fallback_method", "median")
+    elif strategy == "fill_with_zero_if_no_garage":
+        normalized["strategy"] = "conditional_fill"
+        normalized.setdefault("condition_column", "GarageType")
+        normalized.setdefault("condition_value", "NoGarage")
+        normalized.setdefault("value", 0)
+    elif strategy == "fill_with_constant_or_median":
+        normalized["strategy"] = "conditional_fill_with_flag"
+        normalized.setdefault("condition_column", "GarageType")
+        normalized.setdefault("condition_value", "NoGarage")
+        normalized.setdefault("condition_fill_value", 0)
+        normalized.setdefault("fallback_method", "median")
+        if "flag_column" not in normalized:
+            raw_value = action.get("value")
+            if isinstance(raw_value, str) and raw_value.strip():
+                normalized["flag_column"] = raw_value.strip()
+
+    return normalized
+
+
 def _normalize_action(action: dict[str, Any]) -> tuple[bool, dict[str, Any], str]:
     strategy = str(action.get("strategy") or "").strip().lower()
 
@@ -67,13 +223,46 @@ def _normalize_action(action: dict[str, Any]) -> tuple[bool, dict[str, Any], str
     if strategy == "drop_rows":
         return True, {"operation": "drop_rows"}, ""
 
+    if strategy == "group_median":
+        return True, {"operation": "group_median"}, ""
+
+    if strategy == "conditional_fill":
+        return True, {"operation": "conditional_fill"}, ""
+
+    if strategy == "conditional_fill_with_flag":
+        return True, {"operation": "conditional_fill_with_flag"}, ""
+
     return False, {}, f"unsupported_strategy:{strategy or 'missing'}"
+
+
+def _mark_filled_column(df: pd.DataFrame, column: str, filled_columns: list[str], before_nulls: int) -> None:
+    after_nulls = int(df[column].isna().sum())
+    if before_nulls > after_nulls and column not in filled_columns:
+        filled_columns.append(column)
+
+
+def _resolve_method_value_for_column(
+    df: pd.DataFrame,
+    column: str,
+    method: str,
+    action: dict[str, Any],
+    *,
+    constant_key: str = "value",
+) -> tuple[bool, Any, str]:
+    if method == "constant":
+        if constant_key in action:
+            return True, action.get(constant_key), ""
+        if constant_key == "value":
+            return False, None, "fill_value_missing"
+        return False, None, f"{constant_key}_missing"
+
+    return _resolve_fill_value(df[column], method)
 
 
 @tool
 def clean_missing_values(
     dataset_id: str,
-    actions: list[dict[str, Any]],
+    actions: list[dict[str, Any]] | None = None,
     fallback_strategy: str = "fill_zero",
 ) -> str:
     """Handle missing values with compatibility + soft warnings.
@@ -81,8 +270,17 @@ def clean_missing_values(
     Supported action strategies:
     - fill (constant): requires `value`
     - fill (method): method in {median, mean, mode, most_frequent}
+    - group_median (requires `group_by`)
+    - conditional_fill (requires condition + `value`)
+    - conditional_fill_with_flag (condition + optional `flag_column`)
     - drop_rows
-    - median / mean / mode / most_frequent (strategy aliases)
+
+    Supported legacy aliases:
+    - fill_with_constant / fill_with_mode / fill_with_zero
+    - fill_with_constant_or_mode
+    - impute_group_median
+    - fill_with_zero_if_no_garage
+    - fill_with_constant_or_median
 
     Unknown/invalid actions will not interrupt execution. They are reported in:
     - warnings
@@ -93,7 +291,7 @@ def clean_missing_values(
     """
     tool_inputs = {
         "dataset_id": dataset_id,
-        "actions": actions,
+        "actions": actions or [],
         "fallback_strategy": fallback_strategy,
     }
     filled_columns: list[str] = []
@@ -118,7 +316,8 @@ def clean_missing_values(
                 unsupported_actions.append(warn)
                 continue
 
-            column = action.get("column")
+            normalized_action = _normalize_action_aliases(action)
+            column = normalized_action.get("column")
             if not isinstance(column, str) or not column.strip():
                 warn = {
                     "action_index": idx,
@@ -138,7 +337,7 @@ def clean_missing_values(
                 warnings.append({"action_index": idx, **skipped})
                 continue
 
-            ok, normalized, normalize_err = _normalize_action(action)
+            ok, normalized, normalize_err = _normalize_action(normalized_action)
             if not ok:
                 skipped = {"column": column, "reason": normalize_err}
                 skipped_columns.append(skipped)
@@ -147,24 +346,20 @@ def clean_missing_values(
                 unsupported_actions.append(warn)
                 continue
 
-            if normalized["operation"] == "drop_rows":
+            operation = normalized["operation"]
+            before_nulls = int(df[column].isna().sum())
+
+            if operation == "drop_rows":
                 before_rows = len(df)
                 df = df.dropna(subset=[column])
                 dropped_rows += before_rows - len(df)
                 continue
 
-            method = normalized["method"]
-            if method == "constant":
-                if "value" not in action:
-                    skipped = {"column": column, "reason": "fill_value_missing"}
-                    skipped_columns.append(skipped)
-                    warn = {"action_index": idx, **skipped, "action": action}
-                    warnings.append(warn)
-                    unsupported_actions.append(warn)
-                    continue
-                fill_value = action.get("value")
-            else:
-                can_fill, fill_value, fill_err = _resolve_fill_value(df[column], method)
+            if operation == "fill":
+                method = normalized["method"]
+                can_fill, fill_value, fill_err = _resolve_method_value_for_column(
+                    df, column, method, normalized_action, constant_key="value"
+                )
                 if not can_fill:
                     skipped = {"column": column, "reason": fill_err}
                     skipped_columns.append(skipped)
@@ -172,12 +367,155 @@ def clean_missing_values(
                     warnings.append(warn)
                     unsupported_actions.append(warn)
                     continue
+                df[column] = df[column].fillna(fill_value)
+                _mark_filled_column(df, column, filled_columns, before_nulls)
+                continue
 
-            before_nulls = int(df[column].isna().sum())
-            df[column] = df[column].fillna(fill_value)
-            after_nulls = int(df[column].isna().sum())
-            if before_nulls > after_nulls and column not in filled_columns:
-                filled_columns.append(column)
+            if operation == "group_median":
+                group_by = _normalize_group_by(normalized_action.get("group_by"))
+                if not group_by:
+                    skipped = {"column": column, "reason": "group_by_missing_or_invalid"}
+                    skipped_columns.append(skipped)
+                    warn = {"action_index": idx, **skipped, "action": action}
+                    warnings.append(warn)
+                    unsupported_actions.append(warn)
+                    continue
+
+                missing_group_cols = [col for col in group_by if col not in df.columns]
+                if missing_group_cols:
+                    skipped = {
+                        "column": column,
+                        "reason": f"group_by_column_not_found:{','.join(missing_group_cols)}",
+                    }
+                    skipped_columns.append(skipped)
+                    warn = {"action_index": idx, **skipped, "action": action}
+                    warnings.append(warn)
+                    unsupported_actions.append(warn)
+                    continue
+
+                if not _is_numeric_dtype(df[column]):
+                    skipped = {"column": column, "reason": "non_numeric_for_group_median"}
+                    skipped_columns.append(skipped)
+                    warn = {"action_index": idx, **skipped, "action": action}
+                    warnings.append(warn)
+                    unsupported_actions.append(warn)
+                    continue
+
+                grouped_median = df.groupby(group_by, dropna=False)[column].transform("median")
+                missing_mask = df[column].isna()
+                if missing_mask.any():
+                    df.loc[missing_mask, column] = grouped_median[missing_mask]
+
+                remaining = df[column].isna()
+                if remaining.any():
+                    fallback_method = _pick_text(normalized_action, "fallback_method").lower() or "median"
+                    fallback_method = _ALIAS_TO_METHOD.get(fallback_method, fallback_method)
+                    can_fill, fill_value, fill_err = _resolve_method_value_for_column(
+                        df, column, fallback_method, normalized_action, constant_key="fallback_value"
+                    )
+                    if can_fill:
+                        df.loc[remaining, column] = df.loc[remaining, column].fillna(fill_value)
+                    else:
+                        warnings.append(
+                            {
+                                "action_index": idx,
+                                "column": column,
+                                "reason": f"group_median_fallback_skipped:{fill_err}",
+                            }
+                        )
+
+                _mark_filled_column(df, column, filled_columns, before_nulls)
+                continue
+
+            if operation == "conditional_fill":
+                ok_mask, condition_mask, mask_err = _build_condition_mask(df, normalized_action)
+                if not ok_mask or condition_mask is None:
+                    skipped = {"column": column, "reason": mask_err}
+                    skipped_columns.append(skipped)
+                    warn = {"action_index": idx, **skipped, "action": action}
+                    warnings.append(warn)
+                    unsupported_actions.append(warn)
+                    continue
+
+                if "value" in normalized_action:
+                    fill_value = normalized_action.get("value")
+                elif "condition_fill_value" in normalized_action:
+                    fill_value = normalized_action.get("condition_fill_value")
+                else:
+                    skipped = {"column": column, "reason": "fill_value_missing"}
+                    skipped_columns.append(skipped)
+                    warn = {"action_index": idx, **skipped, "action": action}
+                    warnings.append(warn)
+                    unsupported_actions.append(warn)
+                    continue
+
+                target_mask = df[column].isna() & condition_mask
+                if target_mask.any():
+                    df.loc[target_mask, column] = fill_value
+
+                _mark_filled_column(df, column, filled_columns, before_nulls)
+                continue
+
+            if operation == "conditional_fill_with_flag":
+                missing_before = df[column].isna()
+                flag_column = _pick_text(normalized_action, "flag_column", "indicator_column")
+                if flag_column:
+                    if flag_column not in df.columns:
+                        df[flag_column] = 0
+                    flag_series = pd.to_numeric(df[flag_column], errors="coerce").fillna(0).astype(int)
+                    flag_series.loc[missing_before] = 1
+                    df[flag_column] = flag_series
+
+                condition_mask: pd.Series | None = None
+                ok_mask, condition_mask, mask_err = _build_condition_mask(df, normalized_action)
+                if ok_mask and condition_mask is not None:
+                    fill_value = normalized_action.get("condition_fill_value", normalized_action.get("value", 0))
+                    target_mask = missing_before & condition_mask
+                    if target_mask.any():
+                        df.loc[target_mask, column] = fill_value
+                else:
+                    warnings.append(
+                        {
+                            "action_index": idx,
+                            "column": column,
+                            "reason": f"conditional_fill_skipped:{mask_err}",
+                        }
+                    )
+
+                remaining = df[column].isna()
+                if remaining.any():
+                    fallback_method = _pick_text(normalized_action, "fallback_method").lower() or "median"
+                    fallback_method = _ALIAS_TO_METHOD.get(fallback_method, fallback_method)
+                    if fallback_method == "constant":
+                        can_fill, fill_value, fill_err = _resolve_method_value_for_column(
+                            df, column, fallback_method, normalized_action, constant_key="fallback_value"
+                        )
+                    else:
+                        reference_series = (
+                            df.loc[~condition_mask, column]
+                            if condition_mask is not None
+                            else df[column]
+                        )
+                        can_fill, fill_value, fill_err = _resolve_fill_value(reference_series, fallback_method)
+                    if can_fill:
+                        df.loc[remaining, column] = df.loc[remaining, column].fillna(fill_value)
+                    else:
+                        warnings.append(
+                            {
+                                "action_index": idx,
+                                "column": column,
+                                "reason": f"conditional_fallback_skipped:{fill_err}",
+                            }
+                        )
+
+                _mark_filled_column(df, column, filled_columns, before_nulls)
+                continue
+
+            skipped = {"column": column, "reason": f"unsupported_operation:{operation}"}
+            skipped_columns.append(skipped)
+            warn = {"action_index": idx, **skipped, "action": action}
+            warnings.append(warn)
+            unsupported_actions.append(warn)
 
         if fallback_strategy not in _SUPPORTED_FALLBACKS:
             warnings.append(
