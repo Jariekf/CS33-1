@@ -31,13 +31,20 @@ def _split_agent_node(state: GlobalState) -> GlobalState:
     user_request = state.get("user_request", "")
     run_dir = state.get("run_dir", "")
 
+    supervisor_hint = (state.get("supervisor_hints") or {}).get("split", "").strip()
+    hint_line = (
+        f"[Supervisor 反馈] 上一轮检查未通过：{supervisor_hint}\n请仅针对此问题修复，不要重新执行已完成的步骤。\n"
+        if supervisor_hint else ""
+    )
+
     system_content = (
         "你是一个数据集划分 Agent，负责推断建模任务并切分数据集。\n"
         f"数据集路径：{data_path or '未提供'}。\n"
         f"数据集描述：{description or '未提供'}。\n"
         f"用户问题：{user_request or '未提供'}。\n"
         f"本次运行目录：{run_dir or '未提供'}。\n"
-        "工作流（严格按顺序执行）：\n"
+        + hint_line
+        + "工作流（严格按顺序执行）：\n"
         "1. 调用 infer_task，根据数据集描述和用户问题判断任务类型（classification/regression）和目标列；\n"
         "2. 调用 split_dataset，传入上一步推断的 task_type 和 target_column，"
         f"data_path='{data_path}', run_dir='{run_dir}'，将数据集切分为训练集和测试集。\n"
