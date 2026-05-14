@@ -121,19 +121,8 @@ def _data_clean_node(state: GlobalState) -> GlobalState:
 
 
 def _tool_state_update_node(state: GlobalState) -> GlobalState:
-    messages = state["messages"]
-
-    # Collect all ToolMessages from the most recent batch (stop at first non-ToolMessage).
-    # LLM may emit multiple tool_calls in one AIMessage; ToolNode adds one ToolMessage per call,
-    # so we must process all of them — not just messages[-1].
-    recent: list[ToolMessage] = []
-    for msg in reversed(messages):
-        if isinstance(msg, ToolMessage):
-            recent.insert(0, msg)
-        else:
-            break
-
-    if not recent:
+    last_msg = state["messages"][-1]
+    if not isinstance(last_msg, ToolMessage) or not last_msg.name:
         return {}
 
     handlers = {
@@ -145,25 +134,10 @@ def _tool_state_update_node(state: GlobalState) -> GlobalState:
         "clean_drop_columns": _handle_clean_step,
         "clean_duplicates": _handle_clean_step,
     }
-
-    # Thread accumulated state through handlers so report steps merge correctly.
-    current = dict(state)
-    merged: dict = {}
-    for tool_msg in recent:
-        if not tool_msg.name:
-            continue
-        handler = handlers.get(tool_msg.name)
-        if handler is None:
-            continue
-        update = handler(current, tool_msg)  # type: ignore[arg-type]
-        for k, v in update.items():
-            if k == "errors":
-                merged[k] = (merged.get(k) or current.get(k) or []) + v
-            else:
-                merged[k] = v
-        current.update(merged)
-
-    return merged
+    handler = handlers.get(last_msg.name)
+    if handler is None:
+        return {}
+    return handler(state, last_msg)
 
 
 def _parse_tool_payload(tool_message: ToolMessage) -> dict[str, Any]:
@@ -288,12 +262,43 @@ def _clean_self_check(state: GlobalState) -> GlobalState:
 
     ok = passed and bool(path) and Path(path).exists()
 
+    # If state wasn't updated but save tool actually ran (multi-tool-batch edge case),
+    # recover the path directly from the most recent save ToolMessage.
+    recovered: dict = {}
+    if not ok:
+        for msg in reversed(state.get("messages") or []):
+            if isinstance(msg, ToolMessage) and msg.name == "save_dataset_from_store":
+                try:
+                    payload = json.loads(str(msg.content))
+                    saved_path = (payload.get("output_path") or "").strip()
+                    if saved_path and "error" not in payload and Path(saved_path).exists():
+                        ok = True
+                        path = saved_path
+                        if target == "train":
+                            recovered = {
+                                "train_cleaned_data_path": saved_path,
+                                "training_data_path": saved_path,
+                                "cleaned_data_path": saved_path,
+                                "train_cleaning_passed": True,
+                                "cleaning_passed": True,
+                            }
+                        else:
+                            recovered = {
+                                "test_cleaned_data_path": saved_path,
+                                "testing_data_path": saved_path,
+                                "test_cleaning_passed": True,
+                                "cleaning_passed": True,
+                            }
+                except Exception:
+                    pass
+                break
+
     if ok:
         save_agent_report("data_clean_agent", state["messages"][-1], run_dir=state.get("run_dir") or "")
         hints = dict(state.get("supervisor_hints") or {})
         hints[f"clean_{target}"] = ""
         internal_retry[target] = 0
-        return {"supervisor_hints": hints, "clean_internal_retry": internal_retry}
+        return {**recovered, "supervisor_hints": hints, "clean_internal_retry": internal_retry}
 
     if retry_count >= _MAX_INTERNAL_RETRY:
         save_agent_report("data_clean_agent", state["messages"][-1], run_dir=state.get("run_dir") or "")

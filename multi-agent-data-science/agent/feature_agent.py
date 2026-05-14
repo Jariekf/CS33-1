@@ -123,8 +123,29 @@ def _tool_state_update_node(state: GlobalState) -> GlobalState:
         "encode_categorical": _handle_feature_step,
         "save_featured_dataset": _handle_save_featured,
     }
+
+    result = {}
     handler = handlers.get(last_msg.name)
-    return handler(state, last_msg) if handler else {}
+    if handler:
+        result = handler(state, last_msg)
+
+    # LLM may batch multiple tool_calls in one AIMessage (e.g. encode + save_train + save_test).
+    # ToolNode adds one ToolMessage per call; only the last is processed above.
+    # Scan the rest of the batch specifically for save_featured_dataset so that
+    # feature_dataset_ids / testing_feature_dataset_ids are always written.
+    messages = state["messages"]
+    for msg in reversed(messages[:-1]):
+        if not isinstance(msg, ToolMessage):
+            break
+        if msg.name == "save_featured_dataset":
+            save_result = _handle_save_featured(state, msg)
+            for k, v in save_result.items():
+                if k not in result:
+                    result[k] = v
+                elif isinstance(v, dict) and isinstance(result.get(k), dict):
+                    result[k] = {**result[k], **v}
+
+    return result
 
 
 def _parse_payload(tool_message: ToolMessage) -> dict[str, Any]:
