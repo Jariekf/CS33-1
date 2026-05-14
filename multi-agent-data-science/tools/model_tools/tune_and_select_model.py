@@ -330,7 +330,10 @@ def tune_and_select_model(
       selection_metric（实际使用的 scorer，多分类时可能已升级）、
       n_classes（目标列唯一类别数，供下游判断任务是二分类还是多分类）、
       cv_strategy_used、search_strategy_used、best_cv_score、
-      per_model_summary（每个模型的 best_params / cv_best_score / cv_score_std / scoring / search_strategy）
+      per_model_summary（每个模型的结果，含 status 字段）：
+        - status="success"：best_params / cv_best_score / cv_score_std / scoring / search_strategy
+        - status="failed"：error（失败原因，含异常类型和消息）；该模型不参与 best 评选
+      skipped_models（失败模型列表，供 model_agent 分析失败原因）
     """
     resolved_scoring = _resolve_scoring(scoring, task_type)
     cv = _build_cv(cv_strategy, task_type, cv_folds)
@@ -378,110 +381,129 @@ def tune_and_select_model(
         best_score = float("-inf")
 
         for model_name in candidate_models:
-            featured_train_path = feature_dataset_ids.get(model_name, "")
-            if not featured_train_path:
-                raise ValueError(f"模型 {model_name} 缺少 feature_dataset_ids 路径。")
+            # ── Per-model fallback：单个模型失败不影响其他模型 ──────────────────
+            try:
+                featured_train_path = feature_dataset_ids.get(model_name, "")
+                if not featured_train_path:
+                    raise ValueError(f"feature_dataset_ids 中缺少 '{model_name}' 的路径。")
 
-            df = pd.read_csv(featured_train_path)
-            if target_column not in df.columns:
-                raise ValueError(f"目标列 '{target_column}' 不在 {model_name} 训练集中。")
+                df = pd.read_csv(featured_train_path)
+                if target_column not in df.columns:
+                    raise ValueError(f"目标列 '{target_column}' 不在训练集中。")
 
-            feature_cols = [c for c in df.columns if c != target_column]
-            X = df[feature_cols]
-            y = df[target_column]
+                feature_cols = [c for c in df.columns if c != target_column]
+                X = df[feature_cols]
+                y = df[target_column]
 
-            estimator = _get_model(model_name)
-            param_space = dict(_get_param_space(model_name))  # copy to avoid mutating the default
-            if extra_param_overrides and model_name in extra_param_overrides:
-                param_space.update(extra_param_overrides[model_name])
+                estimator = _get_model(model_name)
+                param_space = dict(_get_param_space(model_name))  # copy to avoid mutating the default
+                if extra_param_overrides and model_name in extra_param_overrides:
+                    param_space.update(extra_param_overrides[model_name])
 
-            if not param_space:
-                # No hyperparameters to tune: plain CV scoring
-                raw_scores = cross_val_score(estimator, X, y, cv=cv, scoring=effective_sklearn_scorer)
-                cv_score = round(float(raw_scores.mean()), 4)
-                cv_std = round(float(raw_scores.std()), 4)
-                summary[model_name] = {
-                    "best_params": {},
-                    "cv_best_score": cv_score,
-                    "cv_score_std": cv_std,
-                    "scoring": effective_scoring_name,
-                    "rows_trained": int(len(df)),
-                    "search_strategy": "cv_only",
-                }
-            else:
-                total_combinations = 1
-                for v in param_space.values():
-                    total_combinations *= len(v)
-
-                if hpo_strategy == "grid":
-                    search = GridSearchCV(
-                        estimator=estimator,
-                        param_grid=param_space,
-                        scoring=effective_sklearn_scorer,
-                        cv=cv,
-                        n_jobs=-1,
-                    )
-                    actual_strategy = "grid"
-                elif hpo_strategy == "halving":
-                    search = HalvingRandomSearchCV(
-                        estimator=estimator,
-                        param_distributions=param_space,
-                        n_candidates=min(max_iter_per_model * 3, total_combinations),
-                        scoring=effective_sklearn_scorer,
-                        cv=cv,
-                        factor=3,
-                        random_state=random_state,
-                        n_jobs=-1,
-                    )
-                    actual_strategy = "halving"
-                elif hpo_strategy == "bayesian":
-                    from skopt import BayesSearchCV
-                    from skopt.space import Categorical as SkoptCategorical
-                    # Convert discrete lists to skopt Categorical spaces.
-                    # GP surrogate learns to avoid poor regions even in categorical spaces.
-                    bayes_space = {k: SkoptCategorical(v) for k, v in param_space.items()}
-                    search = BayesSearchCV(
-                        estimator=estimator,
-                        search_spaces=bayes_space,
-                        n_iter=min(max_iter_per_model, total_combinations),
-                        scoring=effective_sklearn_scorer,
-                        cv=cv,
-                        random_state=random_state,
-                        n_jobs=1,  # BayesSearchCV is not thread-safe with n_jobs=-1
-                    )
-                    actual_strategy = "bayesian"
+                if not param_space:
+                    # No hyperparameters to tune: plain CV scoring
+                    raw_scores = cross_val_score(estimator, X, y, cv=cv, scoring=effective_sklearn_scorer)
+                    cv_score = round(float(raw_scores.mean()), 4)
+                    cv_std = round(float(raw_scores.std()), 4)
+                    summary[model_name] = {
+                        "status": "success",
+                        "best_params": {},
+                        "cv_best_score": cv_score,
+                        "cv_score_std": cv_std,
+                        "scoring": effective_scoring_name,
+                        "rows_trained": int(len(df)),
+                        "search_strategy": "cv_only",
+                    }
                 else:
-                    search = RandomizedSearchCV(
-                        estimator=estimator,
-                        param_distributions=param_space,
-                        n_iter=min(max_iter_per_model, total_combinations),
-                        scoring=effective_sklearn_scorer,
-                        cv=cv,
-                        random_state=random_state,
-                        n_jobs=-1,
-                    )
-                    actual_strategy = "random"
+                    total_combinations = 1
+                    for v in param_space.values():
+                        total_combinations *= len(v)
 
-                search.fit(X, y)
-                best_idx = search.best_index_
-                cv_std = round(float(search.cv_results_["std_test_score"][best_idx]), 4)
+                    if hpo_strategy == "grid":
+                        search = GridSearchCV(
+                            estimator=estimator,
+                            param_grid=param_space,
+                            scoring=effective_sklearn_scorer,
+                            cv=cv,
+                            n_jobs=-1,
+                        )
+                        actual_strategy = "grid"
+                    elif hpo_strategy == "halving":
+                        search = HalvingRandomSearchCV(
+                            estimator=estimator,
+                            param_distributions=param_space,
+                            n_candidates=min(max_iter_per_model * 3, total_combinations),
+                            scoring=effective_sklearn_scorer,
+                            cv=cv,
+                            factor=3,
+                            random_state=random_state,
+                            n_jobs=-1,
+                        )
+                        actual_strategy = "halving"
+                    elif hpo_strategy == "bayesian":
+                        from skopt import BayesSearchCV
+                        from skopt.space import Categorical as SkoptCategorical
+                        # Convert discrete lists to skopt Categorical spaces.
+                        # GP surrogate learns to avoid poor regions even in categorical spaces.
+                        bayes_space = {k: SkoptCategorical(v) for k, v in param_space.items()}
+                        search = BayesSearchCV(
+                            estimator=estimator,
+                            search_spaces=bayes_space,
+                            n_iter=min(max_iter_per_model, total_combinations),
+                            scoring=effective_sklearn_scorer,
+                            cv=cv,
+                            random_state=random_state,
+                            n_jobs=1,  # BayesSearchCV is not thread-safe with n_jobs=-1
+                        )
+                        actual_strategy = "bayesian"
+                    else:
+                        search = RandomizedSearchCV(
+                            estimator=estimator,
+                            param_distributions=param_space,
+                            n_iter=min(max_iter_per_model, total_combinations),
+                            scoring=effective_sklearn_scorer,
+                            cv=cv,
+                            random_state=random_state,
+                            n_jobs=-1,
+                        )
+                        actual_strategy = "random"
+
+                    search.fit(X, y)
+                    best_idx = search.best_index_
+                    cv_std = round(float(search.cv_results_["std_test_score"][best_idx]), 4)
+                    summary[model_name] = {
+                        "status": "success",
+                        "best_params": _to_builtin(search.best_params_),
+                        "cv_best_score": round(float(search.best_score_), 4),
+                        "cv_score_std": cv_std,
+                        "scoring": effective_scoring_name,
+                        "rows_trained": int(len(df)),
+                        "search_strategy": actual_strategy,
+                    }
+
+                score = float(summary[model_name]["cv_best_score"])
+                if score > best_score:
+                    best_score = score
+                    best_model_name = model_name
+
+            except Exception as model_exc:
+                # 记录失败原因，继续处理下一个候选模型
                 summary[model_name] = {
-                    "best_params": _to_builtin(search.best_params_),
-                    "cv_best_score": round(float(search.best_score_), 4),
-                    "cv_score_std": cv_std,
-                    "scoring": effective_scoring_name,
-                    "rows_trained": int(len(df)),
-                    "search_strategy": actual_strategy,
+                    "status": "failed",
+                    "error": f"{type(model_exc).__name__}: {model_exc}",
+                    "cv_best_score": None,
                 }
 
-            score = float(summary[model_name]["cv_best_score"])
-            if score > best_score:
-                best_score = score
-                best_model_name = model_name
+        # 若全部模型均失败，整体报错
+        successful = [m for m, v in summary.items() if v.get("status") == "success"]
+        if not successful:
+            failed_reasons = {m: v["error"] for m, v in summary.items()}
+            raise ValueError(f"所有候选模型均失败，无法选出最佳模型。失败原因：{failed_reasons}")
 
         if not best_model_name:
             raise ValueError("无法从候选模型中选出最佳模型。")
 
+        skipped_models = [m for m, v in summary.items() if v.get("status") == "failed"]
         result = {
             "best_model_name": best_model_name,
             "best_model_params": summary[best_model_name]["best_params"],
@@ -491,6 +513,7 @@ def tune_and_select_model(
             "search_strategy_used": hpo_strategy,
             "best_cv_score": round(best_score, 4),
             "per_model_summary": summary,
+            "skipped_models": skipped_models,
         }
         output = json.dumps(result, ensure_ascii=False, indent=2)
     except Exception as exc:
