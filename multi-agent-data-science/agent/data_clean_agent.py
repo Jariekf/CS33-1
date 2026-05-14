@@ -50,6 +50,23 @@ def _merge_cleaning_report(
     return report_key, existing
 
 
+def _ensure_save_step_recorded(
+    state: GlobalState, payload: dict[str, Any]
+) -> tuple[str, dict[str, Any], bool]:
+    target = state.get("cleaning_target", "train")
+    report_key = "train_cleaning_report" if target == "train" else "test_cleaning_report"
+    existing = dict(state.get(report_key) or {})
+    steps = list(existing.get("steps", []))
+    already_saved = any(
+        isinstance(step, dict) and step.get("tool") == "save_dataset_from_store" for step in steps
+    )
+    if already_saved:
+        return report_key, existing, False
+    steps.append({"tool": "save_dataset_from_store", "result": payload})
+    existing["steps"] = steps
+    return report_key, existing, True
+
+
 def _normalize_action_list(value: Any) -> list[dict[str, Any]]:
     if not isinstance(value, list):
         return []
@@ -71,7 +88,7 @@ def _normalize_type_conversions(value: Any) -> list[dict[str, Any]]:
     for action in _normalize_action_list(value):
         mapped = dict(action)
         column = _pick_text(action, "column", "column_name")
-        target_type = _pick_text(action, "target_type", "new_type", "to")
+        target_type = _pick_text(action, "target_type", "new_type", "to", "conversion_type")
         if column:
             mapped["column"] = column
         if target_type:
@@ -246,6 +263,8 @@ def _data_clean_node(state: GlobalState) -> GlobalState:
         "If drop_columns exists in plan, call clean_drop_columns(dataset_id=..., columns=[...]).",
         f"After cleaning, call save_dataset_from_store and write CSV to output_path={default_save_path}.",
         "Tool-call contract: always pass explicit list args, even when empty.",
+        "You are in data-clean stage only. Never call model/EDA/feature tools "
+        "(e.g., train_model, tune_and_select_model, evaluate_model, encode_categorical, scale_features).",
         "Use the normalized cleaning_plan below as the source of truth for tool arguments.",
         "Mapping: type_conversions -> clean_data_types(dataset_id=..., conversions=[...]); "
         "missing_value_actions -> clean_missing_values(dataset_id=..., actions=[...], fallback_strategy='fill_zero'); "
@@ -265,8 +284,12 @@ def _data_clean_node(state: GlobalState) -> GlobalState:
 
 
 def _tool_state_update_node(state: GlobalState) -> GlobalState:
-    last_msg = state["messages"][-1]
-    if not isinstance(last_msg, ToolMessage) or not last_msg.name:
+    messages = state.get("messages") or []
+    if not messages:
+        return {}
+
+    last_msg = messages[-1]
+    if not isinstance(last_msg, ToolMessage):
         return {}
 
     handlers = {
@@ -278,10 +301,28 @@ def _tool_state_update_node(state: GlobalState) -> GlobalState:
         "clean_drop_columns": _handle_clean_step,
         "clean_duplicates": _handle_clean_step,
     }
-    handler = handlers.get(last_msg.name)
-    if handler is None:
-        return {}
-    return handler(state, last_msg)
+    trailing_tool_messages: list[ToolMessage] = []
+    for msg in reversed(messages):
+        if not isinstance(msg, ToolMessage):
+            break
+        trailing_tool_messages.append(msg)
+    trailing_tool_messages.reverse()
+
+    running_state: GlobalState = dict(state)
+    merged_update: dict[str, Any] = {}
+    for msg in trailing_tool_messages:
+        if not msg.name:
+            continue
+        handler = handlers.get(msg.name)
+        if handler is None:
+            continue
+        delta = handler(running_state, msg)
+        if not delta:
+            continue
+        running_state = {**running_state, **delta}
+        merged_update = {**merged_update, **delta}
+
+    return merged_update
 
 
 def _parse_tool_payload(tool_message: ToolMessage) -> dict[str, Any]:
@@ -421,8 +462,12 @@ def _clean_self_check(state: GlobalState) -> GlobalState:
                     if saved_path and "error" not in payload and Path(saved_path).exists():
                         ok = True
                         path = saved_path
+                        report_key, report, changed = _ensure_save_step_recorded(state, payload)
+                        if changed:
+                            recovered[report_key] = report
                         if target == "train":
                             recovered = {
+                                **recovered,
                                 "train_cleaned_data_path": saved_path,
                                 "training_data_path": saved_path,
                                 "cleaned_data_path": saved_path,
@@ -431,6 +476,7 @@ def _clean_self_check(state: GlobalState) -> GlobalState:
                             }
                         else:
                             recovered = {
+                                **recovered,
                                 "test_cleaned_data_path": saved_path,
                                 "testing_data_path": saved_path,
                                 "test_cleaning_passed": True,

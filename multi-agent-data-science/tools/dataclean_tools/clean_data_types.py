@@ -21,7 +21,9 @@ def _pick_text(payload: dict[str, Any], *keys: str) -> str:
 def _normalize_conversion_aliases(conversion: dict[str, Any]) -> dict[str, Any]:
     normalized = dict(conversion)
     column = _pick_text(conversion, "column", "column_name")
-    target_type = _pick_text(conversion, "target_type", "new_type", "to").lower()
+    target_type = _pick_text(
+        conversion, "target_type", "new_type", "to", "conversion_type"
+    ).lower()
     if target_type == "categorical":
         target_type = "category"
 
