@@ -91,6 +91,8 @@ def _data_clean_node(state: GlobalState) -> GlobalState:
     else:
         default_save_path = f"artifacts/clean/{prefix}.csv"
 
+    supervisor_hint = (state.get("supervisor_hints") or {}).get(f"clean_{target}", "").strip()
+
     system_parts = [
         f"你是数据清洗执行 Agent（ReAct），当前处理：{target} 数据集。",
         f"源文件路径：{source_path or '未提供'}。",
@@ -98,6 +100,10 @@ def _data_clean_node(state: GlobalState) -> GlobalState:
         f"数据集描述：{description or '未提供'}。",
         f"用户诉求：{user_request or '未提供'}。",
         f"本次运行工作目录：{run_dir or '未设置'}。所有输出文件应保存至此目录下。",
+        *(
+            [f"[Supervisor 反馈] 上一轮检查未通过：{supervisor_hint}\n请仅针对此问题修复，不要重新执行已完成的步骤。\n"]
+            if supervisor_hint else []
+        ),
         "若尚未加载数据，应优先调用 load_dataset_to_store(file_path=...)；路径缺失时使用上面的源文件路径。",
         "后续按清洗计划依次调用 clean_data_types、clean_missing_values、clean_outliers、clean_drop_columns、clean_duplicates；"
         "所有清洗工具的 dataset_id 必须与 load 返回的 dataset_id 一致。",
@@ -236,7 +242,97 @@ def _route_after_agent(state: GlobalState) -> str:
     last_msg = state["messages"][-1]
     if isinstance(last_msg, AIMessage) and last_msg.tool_calls:
         return "tools"
-    save_agent_report("data_clean_agent", last_msg, run_dir=state.get("run_dir") or "")
+    return "self_check"
+
+
+_MAX_INTERNAL_RETRY = 2
+
+
+def _clean_self_check(state: GlobalState) -> GlobalState:
+    target = state.get("cleaning_target", "train")
+    internal_retry = dict(state.get("clean_internal_retry") or {})
+    retry_count = internal_retry.get(target, 0)
+
+    if target == "train":
+        path = (state.get("train_cleaned_data_path") or "").strip()
+        passed = bool(state.get("train_cleaning_passed"))
+    else:
+        path = (state.get("test_cleaned_data_path") or "").strip()
+        passed = bool(state.get("test_cleaning_passed"))
+
+    ok = passed and bool(path) and Path(path).exists()
+
+    # If state wasn't updated but save tool actually ran (multi-tool-batch edge case),
+    # recover the path directly from the most recent save ToolMessage.
+    recovered: dict = {}
+    if not ok:
+        for msg in reversed(state.get("messages") or []):
+            if isinstance(msg, ToolMessage) and msg.name == "save_dataset_from_store":
+                try:
+                    payload = json.loads(str(msg.content))
+                    saved_path = (payload.get("output_path") or "").strip()
+                    if saved_path and "error" not in payload and Path(saved_path).exists():
+                        ok = True
+                        path = saved_path
+                        if target == "train":
+                            recovered = {
+                                "train_cleaned_data_path": saved_path,
+                                "training_data_path": saved_path,
+                                "cleaned_data_path": saved_path,
+                                "train_cleaning_passed": True,
+                                "cleaning_passed": True,
+                            }
+                        else:
+                            recovered = {
+                                "test_cleaned_data_path": saved_path,
+                                "testing_data_path": saved_path,
+                                "test_cleaning_passed": True,
+                                "cleaning_passed": True,
+                            }
+                except Exception:
+                    pass
+                break
+
+    if ok:
+        save_agent_report("data_clean_agent", state["messages"][-1], run_dir=state.get("run_dir") or "")
+        hints = dict(state.get("supervisor_hints") or {})
+        hints[f"clean_{target}"] = ""
+        internal_retry[target] = 0
+        return {**recovered, "supervisor_hints": hints, "clean_internal_retry": internal_retry}
+
+    if retry_count >= _MAX_INTERNAL_RETRY:
+        save_agent_report("data_clean_agent", state["messages"][-1], run_dir=state.get("run_dir") or "")
+        # Signal exhausted so router goes to timer_end
+        internal_retry[target] = _MAX_INTERNAL_RETRY + 1
+        return {"clean_internal_retry": internal_retry}
+
+    issues: list[str] = []
+    if not passed:
+        issues.append(f"{target}_cleaning_passed 为 False 或未写入")
+    if not path:
+        issues.append(f"{target}_cleaned_data_path 未写入 state")
+    elif not Path(path).exists():
+        issues.append(f"清洗后文件不存在：{path}")
+
+    hint = (
+        "；".join(issues)
+        + "。请检查是否已调用 save_dataset_from_store，"
+        + f"只补做缺失的保存步骤，output_path 使用：{path or '请根据上方默认路径填写'}。"
+    )
+
+    hints = dict(state.get("supervisor_hints") or {})
+    hints[f"clean_{target}"] = hint
+    internal_retry[target] = retry_count + 1
+    print(f"[data_clean_agent] self_check fail (retry={retry_count + 1}/{_MAX_INTERNAL_RETRY})  {target}  {issues}")
+    return {"supervisor_hints": hints, "clean_internal_retry": internal_retry}
+
+
+def _route_after_self_check(state: GlobalState) -> str:
+    target = state.get("cleaning_target", "train")
+    hint = (state.get("supervisor_hints") or {}).get(f"clean_{target}", "")
+    retry = (state.get("clean_internal_retry") or {}).get(target, 0)
+    if hint and retry <= _MAX_INTERNAL_RETRY:
+        return "data_clean_agent"
     return "timer_end"
 
 
@@ -279,14 +375,20 @@ def build_data_clean_agent(show_graph: bool = False):
     graph.add_node("data_clean_agent", _data_clean_node)
     graph.add_node("tools", ToolNode(tools))
     graph.add_node("tool_state_update", _tool_state_update_node)
+    graph.add_node("self_check", _clean_self_check)
     graph.add_node("timer_end", _timer_end_clean)
     graph.set_entry_point("timer_start")
     graph.add_edge("timer_start", "data_clean_agent")
     graph.add_conditional_edges(
-        "data_clean_agent", _route_after_agent, {"tools": "tools", "timer_end": "timer_end"}
+        "data_clean_agent", _route_after_agent, {"tools": "tools", "self_check": "self_check"}
     )
     graph.add_edge("tools", "tool_state_update")
     graph.add_edge("tool_state_update", "data_clean_agent")
+    graph.add_conditional_edges(
+        "self_check",
+        _route_after_self_check,
+        {"data_clean_agent": "data_clean_agent", "timer_end": "timer_end"},
+    )
     graph.add_edge("timer_end", END)
     compiled = graph.compile()
     _show_graph_if_needed(compiled, show_graph=show_graph)

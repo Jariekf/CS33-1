@@ -93,6 +93,8 @@ def _normalize_pipeline_choice(raw: str | None) -> str:
     return s
 
 
+# Set PIPELINE_LLM_SUPERVISOR env var to pick a cheaper/faster backend for the supervisor
+# (e.g. "gemini_flash"). Falls back to PIPELINE_LLM if not set.
 _PIPELINE_REGISTRY: dict[str, ChatOpenAI] = {
     "deepseek": llm_deepseek,
     "openai": llm_openai,
