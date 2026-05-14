@@ -217,6 +217,7 @@ def test_clean_data_types_supports_manager_alias_and_category_object():
                 "MSSubClass": [20, 30, None],
                 "SaleType": ["WD", "New", None],
                 "YrSold": [2006, 2007, 2008],
+                "MoSold": [1, 2, 3],
             }
         )
     )
@@ -229,16 +230,18 @@ def test_clean_data_types_supports_manager_alias_and_category_object():
                     {"column_name": "MSSubClass", "new_type": "object"},
                     {"column_name": "SaleType", "new_type": "category"},
                     {"column": "YrSold", "to": "category"},
+                    {"column_name": "MoSold", "conversion_type": "object"},
                 ],
             }
         )
     )
 
     cleaned = get_dataset(dataset_id)
-    assert report["converted_columns"] == ["MSSubClass", "SaleType", "YrSold"]
+    assert report["converted_columns"] == ["MSSubClass", "SaleType", "YrSold", "MoSold"]
     assert str(cleaned["MSSubClass"].dtype) == "object"
     assert str(cleaned["SaleType"].dtype) == "category"
     assert str(cleaned["YrSold"].dtype) == "category"
+    assert str(cleaned["MoSold"].dtype) == "object"
 
 
 def test_clean_missing_values_supports_manager_alias_keys():

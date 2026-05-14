@@ -14,6 +14,7 @@ def test_normalize_cleaning_plan_maps_manager_style_fields():
         "type_conversions": [
             {"column_name": "MSSubClass", "new_type": "object"},
             {"column": "YrSold", "to": "category"},
+            {"column_name": "MoSold", "conversion_type": "object"},
         ],
         "missing_value_actions": [
             {"column_name": "LotFrontage", "imputation_strategy": "median"},
@@ -37,6 +38,7 @@ def test_normalize_cleaning_plan_maps_manager_style_fields():
         "target_type": "object",
     }
     assert normalized["type_conversions"][1]["target_type"] == "category"
+    assert normalized["type_conversions"][2]["target_type"] == "object"
 
     assert normalized["missing_value_actions"][0]["column"] == "LotFrontage"
     assert normalized["missing_value_actions"][0]["strategy"] == "median"
