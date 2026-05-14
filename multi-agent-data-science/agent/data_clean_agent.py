@@ -50,15 +50,130 @@ def _merge_cleaning_report(
     return report_key, existing
 
 
+def _current_report_key(state: GlobalState) -> str:
+    target = state.get("cleaning_target", "train")
+    return "train_cleaning_report" if target == "train" else "test_cleaning_report"
+
+
+def _normalize_path_text(path: str) -> str:
+    raw = (path or "").strip()
+    if not raw:
+        return ""
+    try:
+        return str(Path(raw).expanduser().resolve())
+    except Exception:
+        try:
+            return str(Path(raw).expanduser())
+        except Exception:
+            return raw
+
+
+def _expected_source_path(state: GlobalState) -> str:
+    target = state.get("cleaning_target", "train")
+    if target == "train":
+        source = (
+            (state.get("raw_training_data_path") or "").strip()
+            or (state.get("training_data_path") or "").strip()
+            or (state.get("data_path") or "").strip()
+        )
+    else:
+        source = (
+            (state.get("raw_testing_data_path") or "").strip()
+            or (state.get("testing_data_path") or "").strip()
+        )
+    return _normalize_path_text(source)
+
+
+def _opposite_split_prefix(target: str) -> str:
+    return "cleaned_test_" if target == "train" else "cleaned_train_"
+
+
+def _payload_dataset_id(payload: dict[str, Any]) -> str:
+    return str(payload.get("dataset_id") or "").strip()
+
+
+def _validate_load_payload(state: GlobalState, payload: dict[str, Any]) -> tuple[bool, str]:
+    expected_source = _expected_source_path(state)
+    got_source = _normalize_path_text(str(payload.get("source_path") or ""))
+    if expected_source and got_source and got_source != expected_source:
+        target = state.get("cleaning_target", "train")
+        return (
+            False,
+            f"Current target={target} expects source_path={expected_source}, "
+            f"but tool loaded source_path={got_source}.",
+        )
+    return True, ""
+
+
+def _validate_dataset_id_alignment(state: GlobalState, payload: dict[str, Any]) -> tuple[bool, str]:
+    expected_dataset_id = str(state.get("dataset_id") or "").strip()
+    got_dataset_id = _payload_dataset_id(payload)
+    if expected_dataset_id and got_dataset_id and got_dataset_id != expected_dataset_id:
+        return (
+            False,
+            f"Expected dataset_id={expected_dataset_id} in current stage, "
+            f"but got dataset_id={got_dataset_id}.",
+        )
+    return True, ""
+
+
+def _validate_save_payload(state: GlobalState, payload: dict[str, Any]) -> tuple[bool, str]:
+    ok, msg = _validate_dataset_id_alignment(state, payload)
+    if not ok:
+        return ok, msg
+
+    target = state.get("cleaning_target", "train")
+    output_path = str(payload.get("output_path") or "")
+    name = Path(output_path).name.lower() if output_path else ""
+    opposite_prefix = _opposite_split_prefix(target)
+    if name.startswith(opposite_prefix):
+        return (
+            False,
+            f"Current target={target} but output_path looks like opposite split: {output_path}",
+        )
+    return True, ""
+
+
+def _save_payload_matches_stage_for_recovery(state: GlobalState, payload: dict[str, Any]) -> bool:
+    valid, _ = _validate_save_payload(state, payload)
+    return valid
+
+
+def _build_rejected_tool_update(
+    state: GlobalState,
+    tool_name: str,
+    stage: str,
+    error_type: str,
+    message: str,
+    payload: dict[str, Any],
+) -> GlobalState:
+    rejected_payload = {
+        "error": {"type": error_type, "message": message},
+        "rejected_payload": payload,
+    }
+    report_key, report = _merge_cleaning_report(state, tool_name, rejected_payload)
+    return {
+        report_key: report,
+        "current_stage": stage,
+        "errors": (state.get("errors") or [])
+        + [{"stage": stage.replace("_failed", ""), "tool": tool_name, "type": error_type, "message": message}],
+    }
+
+
 def _ensure_save_step_recorded(
     state: GlobalState, payload: dict[str, Any]
 ) -> tuple[str, dict[str, Any], bool]:
-    target = state.get("cleaning_target", "train")
-    report_key = "train_cleaning_report" if target == "train" else "test_cleaning_report"
+    report_key = _current_report_key(state)
     existing = dict(state.get(report_key) or {})
     steps = list(existing.get("steps", []))
+    payload_dataset_id = _payload_dataset_id(payload)
+    payload_output_path = str(payload.get("output_path") or "").strip()
     already_saved = any(
-        isinstance(step, dict) and step.get("tool") == "save_dataset_from_store" for step in steps
+        isinstance(step, dict)
+        and step.get("tool") == "save_dataset_from_store"
+        and _payload_dataset_id(step.get("result") or {}) == payload_dataset_id
+        and str((step.get("result") or {}).get("output_path") or "").strip() == payload_output_path
+        for step in steps
     )
     if already_saved:
         return report_key, existing, False
@@ -260,6 +375,10 @@ def _data_clean_node(state: GlobalState) -> GlobalState:
         "Then execute cleaning tools according to the cleaning plan in this order as needed: "
         "clean_data_types, clean_missing_values, clean_outliers, clean_drop_columns, clean_duplicates.",
         "All tools must use the exact dataset_id returned by load_dataset_to_store.",
+        "Strict split guard: in target=train, only load/clean/save the training source path; "
+        "in target=test, only load/clean/save the testing source path.",
+        "Never load the opposite split in the current run, and never summarize the opposite split "
+        "in this stage's final response.",
         "If drop_columns exists in plan, call clean_drop_columns(dataset_id=..., columns=[...]).",
         f"After cleaning, call save_dataset_from_store and write CSV to output_path={default_save_path}.",
         "Tool-call contract: always pass explicit list args, even when empty.",
@@ -275,7 +394,7 @@ def _data_clean_node(state: GlobalState) -> GlobalState:
         plan_text,
         "\nAfter all cleaning steps and save are complete, your final text response should summarize "
         "what was executed (columns touched, row/column shape changes, etc.). Do not mention EDA, "
-        "feature engineering, or modeling.",
+        "feature engineering, or modeling. Only summarize the current target split.",
     ]
 
     messages = [SystemMessage(content="".join(system_parts)), *messages]
@@ -321,6 +440,9 @@ def _tool_state_update_node(state: GlobalState) -> GlobalState:
             continue
         running_state = {**running_state, **delta}
         merged_update = {**merged_update, **delta}
+        if str(delta.get("current_stage") or "").endswith("_failed"):
+            # Stop at first failed tool update in this batch to avoid cascading contamination.
+            break
 
     return merged_update
 
@@ -342,15 +464,39 @@ def _parse_tool_payload(tool_message: ToolMessage) -> dict[str, Any]:
 
 def _handle_load_dataset(state: GlobalState, tool_message: ToolMessage) -> GlobalState:
     payload = _parse_tool_payload(tool_message)
-    report_key, report = _merge_cleaning_report(state, tool_message.name, payload)
     if "error" in payload:
+        report_key, report = _merge_cleaning_report(state, tool_message.name, payload)
         return {
             report_key: report,
             "current_stage": "cleaning_load_failed",
             "errors": (state.get("errors") or []) + [{"stage": "cleaning_load", **payload["error"]}],
         }
+
+    valid, reason = _validate_load_payload(state, payload)
+    if not valid:
+        return _build_rejected_tool_update(
+            state=state,
+            tool_name=tool_message.name,
+            stage="cleaning_load_failed",
+            error_type="StageSourceMismatch",
+            message=reason,
+            payload=payload,
+        )
+
+    loaded_dataset_id = _payload_dataset_id(payload)
+    if not loaded_dataset_id:
+        return _build_rejected_tool_update(
+            state=state,
+            tool_name=tool_message.name,
+            stage="cleaning_load_failed",
+            error_type="MissingDatasetId",
+            message="load_dataset_to_store returned empty dataset_id.",
+            payload=payload,
+        )
+
+    report_key, report = _merge_cleaning_report(state, tool_message.name, payload)
     return {
-        "dataset_id": payload["dataset_id"],
+        "dataset_id": loaded_dataset_id,
         report_key: report,
         "current_stage": "dataset_loaded",
     }
@@ -358,15 +504,38 @@ def _handle_load_dataset(state: GlobalState, tool_message: ToolMessage) -> Globa
 
 def _handle_save_dataset(state: GlobalState, tool_message: ToolMessage) -> GlobalState:
     payload = _parse_tool_payload(tool_message)
-    report_key, report = _merge_cleaning_report(state, tool_message.name, payload)
     target = state.get("cleaning_target", "train")
     if "error" in payload:
+        report_key, report = _merge_cleaning_report(state, tool_message.name, payload)
         return {
             report_key: report,
             "current_stage": "cleaning_save_failed",
             "errors": (state.get("errors") or []) + [{"stage": "cleaning_save", **payload["error"]}],
         }
-    output_path = payload["output_path"]
+
+    valid, reason = _validate_save_payload(state, payload)
+    if not valid:
+        return _build_rejected_tool_update(
+            state=state,
+            tool_name=tool_message.name,
+            stage="cleaning_save_failed",
+            error_type="StageDatasetMismatch",
+            message=reason,
+            payload=payload,
+        )
+
+    output_path = str(payload.get("output_path") or "").strip()
+    if not output_path:
+        return _build_rejected_tool_update(
+            state=state,
+            tool_name=tool_message.name,
+            stage="cleaning_save_failed",
+            error_type="MissingOutputPath",
+            message="save_dataset_from_store returned empty output_path.",
+            payload=payload,
+        )
+
+    report_key, report = _merge_cleaning_report(state, tool_message.name, payload)
     if target == "train":
         return {
             "train_cleaned_data_path": output_path,
@@ -391,14 +560,27 @@ def _handle_save_dataset(state: GlobalState, tool_message: ToolMessage) -> Globa
 
 def _handle_clean_step(state: GlobalState, tool_message: ToolMessage) -> GlobalState:
     payload = _parse_tool_payload(tool_message)
-    report_key, report = _merge_cleaning_report(state, tool_message.name, payload)
     if "error" in payload:
+        report_key, report = _merge_cleaning_report(state, tool_message.name, payload)
         return {
             report_key: report,
             "current_stage": "cleaning_step_failed",
             "errors": (state.get("errors") or [])
             + [{"stage": "cleaning_step", "tool": tool_message.name, **payload["error"]}],
         }
+
+    valid, reason = _validate_dataset_id_alignment(state, payload)
+    if not valid:
+        return _build_rejected_tool_update(
+            state=state,
+            tool_name=tool_message.name,
+            stage="cleaning_step_failed",
+            error_type="StageDatasetMismatch",
+            message=reason,
+            payload=payload,
+        )
+
+    report_key, report = _merge_cleaning_report(state, tool_message.name, payload)
     return {
         report_key: report,
         "current_stage": "cleaning_step_done",
@@ -459,7 +641,12 @@ def _clean_self_check(state: GlobalState) -> GlobalState:
                 try:
                     payload = json.loads(str(msg.content))
                     saved_path = (payload.get("output_path") or "").strip()
-                    if saved_path and "error" not in payload and Path(saved_path).exists():
+                    if (
+                        saved_path
+                        and "error" not in payload
+                        and Path(saved_path).exists()
+                        and _save_payload_matches_stage_for_recovery(state, payload)
+                    ):
                         ok = True
                         path = saved_path
                         report_key, report, changed = _ensure_save_step_recorded(state, payload)
@@ -484,7 +671,8 @@ def _clean_self_check(state: GlobalState) -> GlobalState:
                             }
                 except Exception:
                     pass
-                break
+                if ok:
+                    break
 
     if ok:
         save_agent_report("data_clean_agent", state["messages"][-1], run_dir=state.get("run_dir") or "")
