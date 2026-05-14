@@ -5,6 +5,9 @@ from __future__ import annotations
 import json
 import logging
 import os
+import re
+import shutil
+import subprocess
 import sys
 from pathlib import Path
 from typing import Any
@@ -22,10 +25,10 @@ from langgraph.prebuilt import ToolNode
 
 from core.global_state import GlobalState
 from core.my_llm import call_llm, llm_for
-from core.report_writer import save_agent_report
 from core.timer_utils import make_timer_end, make_timer_start
 from tools.business_tools.bat_tools import bat_tools
 from tools.business_tools.file_reader import read_file
+from tools.eda_tools.generate_eda_charts import EDA_CHART_FILENAMES
 
 logger = logging.getLogger(__name__)
 
@@ -237,6 +240,225 @@ def _build_charts_fallback_section(charts: list[dict[str, str]]) -> str:
     return "\n".join(lines)
 
 
+_QUARTO_FRONTMATTER = """\
+---
+title: "Business Strategy & Insight Report"
+format:
+  html:
+    toc: true
+    toc-depth: 2
+    theme: cosmo
+    embed-resources: true
+  pdf:
+    documentclass: article
+---
+
+"""
+
+
+def _apply_quarto_frontmatter(report: str) -> str:
+    """Prepend Quarto YAML front matter to enable HTML TOC sidebar and PDF rendering.
+
+    If the LLM happened to output a YAML block already, skip to avoid duplication.
+    """
+    report = report.strip()
+    if report.startswith("---"):
+        return report
+    return _QUARTO_FRONTMATTER + report
+
+
+def _remove_invalid_image_refs(report: str, charts: list[dict[str, Any]]) -> str:
+    """Drop image embed lines whose filename is not a known EDA chart.
+
+    Validation uses two layers:
+    - **Dynamic layer** (precise): the ``charts`` list built from the actual
+      files produced by ``generate_eda_charts`` in this run.  Only charts that
+      were truly generated are allowed through.
+    - **Static fallback layer**: ``EDA_CHART_FILENAMES`` — the complete set of
+      all filenames the tool can ever produce, imported directly from
+      ``generate_eda_charts.py``.  Used when ``charts`` is empty (e.g. EDA step
+      was skipped), so the guard is never silently disabled.
+
+    Prevents LaTeX fatal errors caused by LLM-invented filenames such as
+    ``categorical_boxplot.png`` (real name: ``categorical_vs_target_boxplot.png``).
+    """
+    # Build the dynamic whitelist from this run's actual charts.
+    dynamic_names: set[str] = set()
+    for c in charts:
+        name = c.get("name") or c.get("rel_path") or ""
+        if name:
+            dynamic_names.add(Path(name).name)
+
+    # Prefer the dynamic (narrower) set; fall back to the static (broader) set.
+    valid_names: frozenset[str] | set[str] = dynamic_names if dynamic_names else EDA_CHART_FILENAMES
+
+    def _keep(m: re.Match) -> str:
+        path = m.group(2)
+        basename = Path(path).name
+        if basename in valid_names:
+            return m.group(0)
+        logger.warning("Removing invalid/invented image reference: %s", path)
+        return ""
+
+    cleaned = re.sub(r"!\[([^\]]*)\]\(([^)]+)\)(?:\{[^}]*\})?", _keep, report)
+    cleaned = re.sub(r"\n{3,}", "\n\n", cleaned)
+    return cleaned
+
+
+def _ensure_figure_paragraphs(report: str) -> str:
+    """Guarantee every image embed is surrounded by blank lines.
+
+    Quarto/Pandoc only renders an image as a labelled figure (with caption)
+    when it is the sole content of a paragraph — i.e. preceded *and* followed
+    by a blank line.  Two images on consecutive lines collapse into an inline
+    image group and lose their ``{#fig-N}`` captions.
+    """
+    lines = report.split("\n")
+    result: list[str] = []
+    for i, line in enumerate(lines):
+        is_image = bool(re.match(r"!\[", line.strip()))
+        prev_blank = (i == 0) or (lines[i - 1].strip() == "")
+        next_blank = (i == len(lines) - 1) or (lines[i + 1].strip() == "")
+
+        if is_image and not prev_blank:
+            result.append("")
+        result.append(line)
+        if is_image and not next_blank:
+            result.append("")
+
+    return "\n".join(result)
+
+
+def _add_quarto_figure_labels(report: str) -> str:
+    """Add Quarto {#fig-N} cross-reference labels to every embedded image.
+
+    Quarto uses these labels to number figures automatically in both HTML and
+    PDF — rendering them as 'Figure N: caption' without any text prefix in the
+    caption itself. This avoids the double-numbering that occurs when a text
+    'Figure N:' prefix is combined with LaTeX/PDF auto-numbering.
+
+    Skips images that already carry a {#fig-...} attribute.
+    """
+    counter = [0]
+
+    def _replacer(m: re.Match) -> str:
+        full = m.group(0)
+        if re.search(r"\{[^}]*#fig-", full):
+            return full  # already labelled
+        caption = m.group(1)
+        path = m.group(2)
+        counter[0] += 1
+        return f"![{caption}]({path}){{#fig-{counter[0]}}}"
+
+    return re.sub(r"!\[([^\]]*)\]\(([^)]+)\)(?!\{)", _replacer, report)
+
+
+def _normalize_section_headings(report: str) -> str:
+    """Ensure body section headings appear in the Quarto HTML sidebar TOC.
+
+    Intentionally called *before* _apply_quarto_frontmatter so it works on
+    the raw LLM output (no YAML present yet). Also handles the case where
+    YAML has already been prepended.
+
+    Two patterns are handled:
+
+    1. **H1 title + H2 sections** — LLM opens with ``# Long Title`` then uses
+       ``## Executive Summary`` for real sections. The YAML ``title:`` already
+       supplies the page H1, so the first H1 body line is stripped; the H2
+       sections remain and appear correctly in the TOC.
+
+    2. **H1-only sections** — LLM uses ``# Section`` for every top-level block
+       with no H2 present. Those headings are shifted to H2 so Quarto lists
+       them in the sidebar.
+    """
+    lines = report.split("\n")
+
+    # Split off YAML front matter if already present (idempotent)
+    yaml_end = -1
+    if report.strip().startswith("---"):
+        for i, line in enumerate(lines[1:], 1):
+            if line.strip() == "---":
+                yaml_end = i
+                break
+    yaml_lines = lines[: yaml_end + 1] if yaml_end >= 0 else []
+    body_lines = lines[yaml_end + 1 :] if yaml_end >= 0 else lines
+
+    # Catalogue heading levels present outside fenced code blocks
+    in_code = False
+    heading_levels: set[int] = set()
+    for line in body_lines:
+        if line.startswith("```"):
+            in_code = not in_code
+        if in_code:
+            continue
+        m = re.match(r"^(#{1,6}) ", line)
+        if m:
+            heading_levels.add(len(m.group(1)))
+
+    if not heading_levels or min(heading_levels) >= 2:
+        return report  # H2+ sections already — nothing to do
+
+    has_h2 = 2 in heading_levels
+    new_body: list[str] = []
+    in_code = False
+
+    if has_h2:
+        # Pattern 1: remove only the first H1 line (the redundant doc title)
+        removed_title = False
+        for line in body_lines:
+            if line.startswith("```"):
+                in_code = not in_code
+            if not removed_title and not in_code and re.match(r"^# [^#]", line):
+                removed_title = True
+                continue
+            new_body.append(line)
+    else:
+        # Pattern 2: only H1 — shift everything down one level to H2+
+        for line in body_lines:
+            if line.startswith("```"):
+                in_code = not in_code
+            if not in_code:
+                m = re.match(r"^(#{1,6})( .+)$", line)
+                if m:
+                    new_level = min(len(m.group(1)) + 1, 6)
+                    line = "#" * new_level + m.group(2)
+            new_body.append(line)
+
+    body_str = "\n".join(new_body)
+    if yaml_lines:
+        return "\n".join(yaml_lines) + "\n" + body_str
+    return body_str
+
+
+def _quarto_render_if_available(md_path: Path) -> None:
+    """Run ``quarto render <file>`` if Quarto is installed; silently skip otherwise.
+
+    Called after saving business_insight_report.md so the HTML is always
+    up-to-date without requiring a manual terminal command.
+    """
+    if not shutil.which("quarto"):
+        return
+    try:
+        result = subprocess.run(
+            ["quarto", "render", str(md_path)],
+            capture_output=True,
+            text=True,
+            timeout=120,
+            cwd=str(md_path.parent),
+        )
+        if result.returncode == 0:
+            html_path = md_path.with_suffix(".html")
+            print(f"[business_translator] HTML rendered → {html_path}")
+        else:
+            logger.warning(
+                "quarto render exited %d: %s",
+                result.returncode,
+                (result.stderr or result.stdout)[:400],
+            )
+    except Exception as exc:
+        logger.warning("quarto render failed: %s", exc)
+
+
 def _default_rag_buckets(state: GlobalState) -> dict[str, list[dict[str, Any]]]:
     """Fallback when the agent never called RAG tools."""
     from tools.business_tools.bat_tools import retrieve_mckinsey_context_impl
@@ -305,7 +527,9 @@ def _draft_business_report_markdown(state: GlobalState) -> str:
         "CRITICAL: be concise; ground every claim in model evidence or retrieved external context. "
         "Output MUST be plain Markdown in English (no YAML front matter). "
         "When EDA charts are available, embed them in relevant sections using standard Markdown "
-        "image syntax `![description](path)` to strengthen evidence presentation."
+        "image syntax `![description](path)` to strengthen evidence presentation. "
+        "CRITICAL: only use the exact file paths listed in the EDA Visualization Charts table — "
+        "never invent, abbreviate, or paraphrase a chart filename."
     )
 
     user_prompt = f"""
@@ -358,12 +582,15 @@ Style rules:
 
     reply = call_llm(sys_prompt, user_prompt, agent_name="business_translator")
     if reply:
-        return _inject_remaining_charts(reply, charts)
+        assembled = _inject_remaining_charts(reply, charts)
+        assembled = _remove_invalid_image_refs(assembled, charts)
+        assembled = _normalize_section_headings(assembled)
+        assembled = _ensure_figure_paragraphs(assembled)
+        assembled = _add_quarto_figure_labels(assembled)
+        return _apply_quarto_frontmatter(assembled)
 
     fallback_charts = _build_charts_fallback_section(charts)
-    return f"""# Business Insight Analysis Report
-
-## Executive Summary
+    fallback = f"""## Executive Summary
 User goal: {user_goal}
 
 ## Model Validation
@@ -379,6 +606,10 @@ Arxiv fallback:
 
 *(LLM returned empty content; check API / quota / STUB_MODE.)*
 """
+    fallback = _normalize_section_headings(fallback)
+    fallback = _ensure_figure_paragraphs(fallback)
+    fallback = _add_quarto_figure_labels(fallback)
+    return _apply_quarto_frontmatter(fallback)
 
 
 def _parse_tool_payload(tool_message: ToolMessage) -> dict[str, Any]:
@@ -489,9 +720,10 @@ def _handle_generate_report(state: GlobalState, tool_message: ToolMessage) -> Gl
     if run_dir:
         reports_dir = Path(run_dir) / "reports"
         reports_dir.mkdir(parents=True, exist_ok=True)
-        out_path = reports_dir / "business_report.md"
+        out_path = reports_dir / "business_insight_report.md"
         out_path.write_text(report, encoding="utf-8")
         print(f"[business_translator] report saved → {out_path}")
+        _quarto_render_if_available(out_path)
 
     return {
         "business_report": report,
@@ -521,8 +753,8 @@ def _business_translator_node(state: GlobalState) -> GlobalState:
         "1. 调用 **retrieve_mckinsey_knowledge**，传入 2–4 条英文检索查询（结合用户目标与上述特征）。\n"
         "2. 若 McKinsey 知识库命中偏少，可调用 **search_arxiv_papers** 补充学术文献（1–3 条查询）。\n"
         "3. 调用 **load_report_style_skeletons** 加载写作结构参考（可选但推荐）。\n"
-        "4. 调用 **generate_business_report** 生成最终 Markdown；该步骤会汇总 GlobalState 中的指标、EDA、RAG 结果并落盘到 "
-        f"{run_dir + '/reports/business_report.md' if run_dir else 'run_dir/reports/business_report.md'}。\n"
+        "4. 调用 **generate_business_report** 生成最终报告；该步骤会汇总 GlobalState 中的指标、EDA、RAG 结果并落盘到 "
+        f"{run_dir + '/reports/business_insight_report.md' if run_dir else 'run_dir/reports/business_insight_report.md'}。\n"
         "**务必控制轮次**：完成检索与可选 arXiv / skeleton 后，立即调用 **generate_business_report**，"
         "不要重复检索；若无更多信息，也应直接调用 generate_business_report。\n"
         "除上述工具外不要编造外部数据来源。"
@@ -561,15 +793,10 @@ def _save_business_artifacts(state: GlobalState) -> None:
     if run_dir and report:
         reports_dir = Path(run_dir) / "reports"
         reports_dir.mkdir(parents=True, exist_ok=True)
-        out_path = reports_dir / "business_report.md"
+        out_path = reports_dir / "business_insight_report.md"
         out_path.write_text(report, encoding="utf-8")
         print(f"[business_translator] report saved → {out_path}")
-    if report:
-        save_agent_report(
-            "business_translator",
-            AIMessage(content=report),
-            run_dir=run_dir,
-        )
+        _quarto_render_if_available(out_path)
 
 
 def _route_after_business_translator(state: GlobalState) -> str:
@@ -609,14 +836,11 @@ def _bat_finalize_node(state: GlobalState) -> GlobalState:
     if run_dir:
         reports_dir = Path(run_dir) / "reports"
         reports_dir.mkdir(parents=True, exist_ok=True)
-        (reports_dir / "business_report.md").write_text(report, encoding="utf-8")
-        print(f"[business_translator] auto-finalize report saved → {reports_dir / 'business_report.md'}")
+        out_path = reports_dir / "business_insight_report.md"
+        out_path.write_text(report, encoding="utf-8")
+        print(f"[business_translator] auto-finalize report saved → {out_path}")
+        _quarto_render_if_available(out_path)
 
-    save_agent_report(
-        "business_translator",
-        AIMessage(content=report),
-        run_dir=run_dir,
-    )
     return {
         "business_report": report,
         "current_stage": "business_report_done",
