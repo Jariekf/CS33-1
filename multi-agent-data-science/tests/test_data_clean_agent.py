@@ -132,6 +132,28 @@ def test_clean_step_error_records_stage_and_errors():
     assert update["cleaning_report"]["steps"][0]["result"] == payload
 
 
+def test_clean_step_json_decode_error_keeps_raw_preview():
+    update = _tool_state_update_node(
+        {
+            "cleaning_target": "train",
+            "messages": [
+                ToolMessage(
+                    content="not-json",
+                    name="clean_missing_values",
+                    tool_call_id="t-json",
+                )
+            ],
+        }
+    )
+    assert update["current_stage"] == "cleaning_step_failed"
+    err = update["errors"][0]
+    assert err["stage"] == "cleaning_step"
+    assert err["tool"] == "clean_missing_values"
+    assert err["type"] == "JSONDecodeError"
+    assert "raw_content_preview" in err
+    assert "not-json" in err["raw_content_preview"]
+
+
 # ── LLM invoke 测试（需要 API Key）────────────────────────────────────────────
 
 @pytest.mark.skipif(not DEEPSEEK_API_KEY, reason="需要配置 DEEPSEEK_API_KEY")
