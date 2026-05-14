@@ -18,6 +18,31 @@ MAX_CATEGORICAL_GRID_FEATURES = 8
 MAX_CATEGORICAL_TARGET_FEATURES = 8
 MAX_CATEGORY_LEVELS = 10
 
+# Complete set of all chart filenames this tool can ever produce.
+# Imported by the BAT agent as a static whitelist to validate LLM image references.
+# Keep this in sync whenever save_chart() calls are added or renamed below.
+EDA_CHART_FILENAMES: frozenset[str] = frozenset(
+    {
+        # --- always attempted (when data allows) ---
+        "missing_values.png",
+        "target_distribution.png",
+        "numeric_distributions.png",
+        "categorical_distributions.png",
+        "corr_heatmap.png",
+        "outlier_boxplots.png",
+        "rf_importance.png",
+        # --- classification-only ---
+        "class_balance.png",
+        "class_balance_test.png",
+        "numeric_by_target_density.png",
+        "categorical_by_target_rate.png",
+        # --- regression-only ---
+        "numeric_vs_target_regression.png",
+        "categorical_vs_target_boxplot.png",
+        "feature_target_corr.png",
+    }
+)
+
 
 def _setup_plot_style() -> None:
     import matplotlib
