@@ -50,6 +50,136 @@ def _merge_cleaning_report(
     return report_key, existing
 
 
+def _normalize_action_list(value: Any) -> list[dict[str, Any]]:
+    if not isinstance(value, list):
+        return []
+    return [item for item in value if isinstance(item, dict)]
+
+
+def _pick_text(action: dict[str, Any], *keys: str) -> str:
+    for key in keys:
+        raw = action.get(key)
+        if isinstance(raw, str):
+            text = raw.strip()
+            if text:
+                return text
+    return ""
+
+
+def _normalize_type_conversions(value: Any) -> list[dict[str, Any]]:
+    normalized: list[dict[str, Any]] = []
+    for action in _normalize_action_list(value):
+        mapped = dict(action)
+        column = _pick_text(action, "column", "column_name")
+        target_type = _pick_text(action, "target_type", "new_type", "to")
+        if column:
+            mapped["column"] = column
+        if target_type:
+            mapped["target_type"] = target_type
+        normalized.append(mapped)
+    return normalized
+
+
+def _normalize_missing_value_actions(value: Any) -> list[dict[str, Any]]:
+    normalized: list[dict[str, Any]] = []
+    for action in _normalize_action_list(value):
+        mapped = dict(action)
+        column = _pick_text(action, "column", "column_name")
+        strategy = _pick_text(action, "strategy", "imputation_strategy", "action").lower()
+        method = _pick_text(action, "method")
+        if not method and strategy == "fill":
+            method_alias = _pick_text(action, "imputation_strategy")
+            if method_alias.lower() != "fill":
+                method = method_alias
+
+        if column:
+            mapped["column"] = column
+        if strategy:
+            mapped["strategy"] = strategy
+        if method:
+            mapped["method"] = method
+        if "value" not in mapped and "fill_value" in action:
+            mapped["value"] = action.get("fill_value")
+
+        if strategy == "fill_with_zero_if_no_garage":
+            mapped.setdefault("condition_column", "GarageType")
+            mapped.setdefault("condition_value", "NoGarage")
+            mapped.setdefault("value", 0)
+
+        if strategy == "fill_with_constant_or_median":
+            mapped.setdefault("condition_column", "GarageType")
+            mapped.setdefault("condition_value", "NoGarage")
+            mapped.setdefault("condition_fill_value", 0)
+            mapped.setdefault("fallback_method", "median")
+            raw_value = mapped.get("value")
+            if isinstance(raw_value, str) and raw_value.strip():
+                mapped.setdefault("flag_column", raw_value.strip())
+
+        normalized.append(mapped)
+    return normalized
+
+
+def _normalize_outlier_actions(value: Any) -> list[dict[str, Any]]:
+    normalized: list[dict[str, Any]] = []
+    for action in _normalize_action_list(value):
+        mapped = dict(action)
+        column = _pick_text(action, "column", "column_name")
+        if column:
+            mapped["column"] = column
+        normalized.append(mapped)
+    return normalized
+
+
+def _normalize_drop_columns(value: Any) -> list[str]:
+    if not isinstance(value, list):
+        return []
+    normalized: list[str] = []
+    for item in value:
+        if isinstance(item, str):
+            col = item.strip()
+            if col:
+                normalized.append(col)
+            continue
+        if isinstance(item, dict):
+            col = _pick_text(item, "column", "column_name")
+            if col:
+                normalized.append(col)
+    return normalized
+
+
+def _normalize_cleaning_plan(cleaning_plan: Any) -> dict[str, Any]:
+    if not isinstance(cleaning_plan, dict):
+        return {
+            "summary": "",
+            "column_name_actions": [],
+            "type_conversions": [],
+            "missing_value_actions": [],
+            "outlier_actions": [],
+            "drop_columns": [],
+            "notes": [],
+        }
+
+    notes_raw = cleaning_plan.get("notes")
+    if isinstance(notes_raw, list):
+        notes = [str(item) for item in notes_raw]
+    elif notes_raw:
+        notes = [str(notes_raw)]
+    else:
+        notes = []
+
+    normalized = dict(cleaning_plan)
+    normalized["summary"] = str(cleaning_plan.get("summary") or "")
+    normalized["column_name_actions"] = _normalize_action_list(cleaning_plan.get("column_name_actions"))
+    normalized["type_conversions"] = _normalize_type_conversions(cleaning_plan.get("type_conversions"))
+    normalized["missing_value_actions"] = _normalize_missing_value_actions(
+        cleaning_plan.get("missing_value_actions")
+    )
+    normalized["outlier_actions"] = _normalize_outlier_actions(cleaning_plan.get("outlier_actions"))
+    normalized["drop_columns"] = _normalize_drop_columns(cleaning_plan.get("drop_columns"))
+    normalized["notes"] = notes
+    return normalized
+
+
 def _data_clean_node(state: GlobalState) -> GlobalState:
     messages = state["messages"]
     target = state.get("cleaning_target", "train")
@@ -80,10 +210,11 @@ def _data_clean_node(state: GlobalState) -> GlobalState:
             dataset_name = Path(source_path).stem
         prefix = f"cleaned_test_{dataset_name or 'dataset'}"
 
+    normalized_plan = _normalize_cleaning_plan(cleaning_plan) if cleaning_plan else None
     plan_text = (
-        json.dumps(cleaning_plan, ensure_ascii=False, indent=2, default=str)
-        if cleaning_plan
-        else "未提供（请根据画像自行决定清洗步骤）。"
+        json.dumps(normalized_plan, ensure_ascii=False, indent=2, default=str)
+        if normalized_plan is not None
+        else "No cleaning_plan provided. Infer safe cleaning steps from the dataset profile."
     )
 
     if run_dir:
@@ -94,25 +225,38 @@ def _data_clean_node(state: GlobalState) -> GlobalState:
     supervisor_hint = (state.get("supervisor_hints") or {}).get(f"clean_{target}", "").strip()
 
     system_parts = [
-        f"你是数据清洗执行 Agent（ReAct），当前处理：{target} 数据集。",
-        f"源文件路径：{source_path or '未提供'}。",
-        f"当前内存 dataset_id：{dataset_id or '尚未加载'}。",
-        f"数据集描述：{description or '未提供'}。",
-        f"用户诉求：{user_request or '未提供'}。",
-        f"本次运行工作目录：{run_dir or '未设置'}。所有输出文件应保存至此目录下。",
+        f"You are a data cleaning execution agent (ReAct). Current target: {target}.",
+        f"Source file path: {source_path or 'N/A'}.",
+        f"Current dataset_id in memory: {dataset_id or 'not loaded yet'}.",
+        f"Dataset description: {description or 'N/A'}.",
+        f"User request: {user_request or 'N/A'}.",
+        f"Run directory: {run_dir or 'N/A'}. All output files must be saved under this directory.",
         *(
-            [f"[Supervisor 反馈] 上一轮检查未通过：{supervisor_hint}\n请仅针对此问题修复，不要重新执行已完成的步骤。\n"]
-            if supervisor_hint else []
+            [
+                f"[Supervisor hint] Previous check failed: {supervisor_hint}\n"
+                "Only fix the reported problem. Do not redo already completed steps.\n"
+            ]
+            if supervisor_hint
+            else []
         ),
-        "若尚未加载数据，应优先调用 load_dataset_to_store(file_path=...)；路径缺失时使用上面的源文件路径。",
-        "后续按清洗计划依次调用 clean_data_types、clean_missing_values、clean_outliers、clean_drop_columns、clean_duplicates；"
-        "所有清洗工具的 dataset_id 必须与 load 返回的 dataset_id 一致。",
-        "计划中若有 drop_columns，必须调用 clean_drop_columns(dataset_id=..., columns=...) 执行删列。",
-        f"完成后必须调用 save_dataset_from_store 写出 CSV，output_path 使用：{default_save_path}。",
+        "If dataset is not loaded, call load_dataset_to_store(file_path=...) first.",
+        "Then execute cleaning tools according to the cleaning plan in this order as needed: "
+        "clean_data_types, clean_missing_values, clean_outliers, clean_drop_columns, clean_duplicates.",
+        "All tools must use the exact dataset_id returned by load_dataset_to_store.",
+        "If drop_columns exists in plan, call clean_drop_columns(dataset_id=..., columns=[...]).",
+        f"After cleaning, call save_dataset_from_store and write CSV to output_path={default_save_path}.",
+        "Tool-call contract: always pass explicit list args, even when empty.",
+        "Use the normalized cleaning_plan below as the source of truth for tool arguments.",
+        "Mapping: type_conversions -> clean_data_types(dataset_id=..., conversions=[...]); "
+        "missing_value_actions -> clean_missing_values(dataset_id=..., actions=[...], fallback_strategy='fill_zero'); "
+        "outlier_actions -> clean_outliers(dataset_id=..., actions=[...]); "
+        "drop_columns -> clean_drop_columns(dataset_id=..., columns=[...]).",
+        "If a plan section is missing, call the corresponding tool with an empty list instead of omitting params.",
         f"\n--- cleaning_plan ({target}) ---\n",
         plan_text,
-        "\n完成全部清洗步骤并保存后，最终文字回复只汇报本次数据清洗的执行结果（各步骤处理了哪些列、行数变化等），"
-        "不要提及 EDA、特征工程或建模等后续环节。",
+        "\nAfter all cleaning steps and save are complete, your final text response should summarize "
+        "what was executed (columns touched, row/column shape changes, etc.). Do not mention EDA, "
+        "feature engineering, or modeling.",
     ]
 
     messages = [SystemMessage(content="".join(system_parts)), *messages]
@@ -141,13 +285,16 @@ def _tool_state_update_node(state: GlobalState) -> GlobalState:
 
 
 def _parse_tool_payload(tool_message: ToolMessage) -> dict[str, Any]:
+    raw_content = str(tool_message.content)
     try:
-        return json.loads(str(tool_message.content))
-    except json.JSONDecodeError:
+        return json.loads(raw_content)
+    except json.JSONDecodeError as exc:
+        raw_preview = raw_content if len(raw_content) <= 1000 else f"{raw_content[:1000]}... <truncated>"
         return {
             "error": {
-                "type": "JSONDecodeError",
+                "type": exc.__class__.__name__,
                 "message": "工具输出不是合法 JSON",
+                "raw_content_preview": raw_preview,
             }
         }
 
@@ -308,16 +455,16 @@ def _clean_self_check(state: GlobalState) -> GlobalState:
 
     issues: list[str] = []
     if not passed:
-        issues.append(f"{target}_cleaning_passed 为 False 或未写入")
+        issues.append(f"{target}_cleaning_passed is False or missing in state")
     if not path:
-        issues.append(f"{target}_cleaned_data_path 未写入 state")
+        issues.append(f"{target}_cleaned_data_path is missing in state")
     elif not Path(path).exists():
-        issues.append(f"清洗后文件不存在：{path}")
+        issues.append(f"cleaned file does not exist: {path}")
 
     hint = (
-        "；".join(issues)
-        + "。请检查是否已调用 save_dataset_from_store，"
-        + f"只补做缺失的保存步骤，output_path 使用：{path or '请根据上方默认路径填写'}。"
+        " ; ".join(issues)
+        + ". Please verify save_dataset_from_store was called. "
+        + f"Only complete the missing save step with output_path={path or 'the configured default path'}."
     )
 
     hints = dict(state.get("supervisor_hints") or {})
@@ -400,15 +547,15 @@ data_clean_agent = build_data_clean_agent()
 
 if __name__ == "__main__":
     data_clean_agent = build_data_clean_agent(show_graph=True)
-    user_input = input("请输入：")
+    user_input = input("Please enter request: ")
     events = data_clean_agent.stream(
         {
             "messages": [HumanMessage(content=user_input)],
             "user_request": user_input,
             "data_path": str(PROJECT_ROOT / "datasets" / "Financials.csv"),
-            "description": "这是一个金融行业销售数据集，包含销售、折扣、利润、国家、产品和时间字段。",
+            "description": "Sample financial dataset with sales and date fields.",
             "cleaning_plan": {
-                "summary": "示例：先做数值列货币字符串转数值，再将 Date 转为日期（可按画像扩展）。",
+                "summary": "Example: parse numeric-like text and convert dates.",
                 "column_name_actions": [],
                 "type_conversions": [
                     {"column": "Year", "target_type": "numeric"},
@@ -417,7 +564,7 @@ if __name__ == "__main__":
                 "missing_value_actions": [],
                 "outlier_actions": [],
                 "drop_columns": [],
-                "notes": "",
+                "notes": [],
             },
             "cleaned_data_path": str(PROJECT_ROOT / "artifacts" / "Financials_cleaned.csv"),
         },
@@ -426,3 +573,4 @@ if __name__ == "__main__":
     for event in events:
         if "messages" in event:
             _pretty_print_message(event["messages"][-1])
+

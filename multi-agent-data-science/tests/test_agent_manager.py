@@ -17,6 +17,7 @@ from agent.agent_manager import (
     build_agent_manager,
 )
 from core.env_utils import DEEPSEEK_API_KEY
+from tools.agentmanager_tools.create_cleaning_plan import create_cleaning_plan
 
 TESTENV = Path(__file__).resolve().parent / "testenv"
 RAW_CSV = TESTENV / "raw" / "sample.csv"
@@ -268,6 +269,45 @@ def test_create_cleaning_plan_test_updates_state():
     assert state_update["cleaning_plan"] == cleaning_plan
     assert state_update["current_stage"] == "cleaning_plans_created"
     assert state_update["next_action"] == "run_data_cleaning"
+
+
+def test_create_cleaning_plan_parse_error_includes_raw_preview():
+    state_update = _tool_state_update_node(
+        {
+            "messages": [
+                ToolMessage(
+                    content="not-a-json-payload",
+                    name="create_cleaning_plan",
+                    tool_call_id="bad-call",
+                )
+            ]
+        }
+    )
+    assert state_update["current_stage"] == "cleaning_plan_failed"
+    err = state_update["errors"][0]
+    assert err["stage"] == "cleaning_plan"
+    assert err["type"] == "JSONDecodeError"
+    assert "raw_content_preview" in err
+    assert "not-a-json-payload" in err["raw_content_preview"]
+
+
+def test_create_cleaning_plan_accepts_missing_optional_lists():
+    payload = json.loads(
+        create_cleaning_plan.invoke(
+            {
+                "target": "train",
+                "summary": "minimal",
+            }
+        )
+    )
+    assert payload["target"] == "train"
+    assert payload["summary"] == "minimal"
+    assert payload["column_name_actions"] == []
+    assert payload["type_conversions"] == []
+    assert payload["missing_value_actions"] == []
+    assert payload["outlier_actions"] == []
+    assert payload["drop_columns"] == []
+    assert payload["notes"] == []
 
 
 def _print_state_snapshot(state: dict):

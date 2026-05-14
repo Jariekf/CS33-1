@@ -185,3 +185,186 @@ def test_clean_missing_values_soft_warning_and_fallback_scope():
     reasons = {item["reason"] for item in report["unsupported_actions"]}
     assert "unsupported_strategy:median_x" in reasons
     assert "fill_value_missing" in reasons
+
+
+def test_clean_tools_allow_missing_optional_action_lists():
+    dataset_id = put_dataset(
+        pd.DataFrame(
+            {
+                "num_col": [1.0, None, 3.0],
+                "cat_col": ["a", None, "b"],
+            }
+        )
+    )
+
+    type_report = json.loads(clean_data_types.invoke({"dataset_id": dataset_id}))
+    assert "error" not in type_report
+    assert type_report["dataset_id"] == dataset_id
+
+    missing_report = json.loads(clean_missing_values.invoke({"dataset_id": dataset_id}))
+    assert "error" not in missing_report
+    assert missing_report["dataset_id"] == dataset_id
+
+    outlier_report = json.loads(clean_outliers.invoke({"dataset_id": dataset_id}))
+    assert "error" not in outlier_report
+    assert outlier_report["dataset_id"] == dataset_id
+
+
+def test_clean_data_types_supports_manager_alias_and_category_object():
+    dataset_id = put_dataset(
+        pd.DataFrame(
+            {
+                "MSSubClass": [20, 30, None],
+                "SaleType": ["WD", "New", None],
+                "YrSold": [2006, 2007, 2008],
+            }
+        )
+    )
+
+    report = json.loads(
+        clean_data_types.invoke(
+            {
+                "dataset_id": dataset_id,
+                "conversions": [
+                    {"column_name": "MSSubClass", "new_type": "object"},
+                    {"column_name": "SaleType", "new_type": "category"},
+                    {"column": "YrSold", "to": "category"},
+                ],
+            }
+        )
+    )
+
+    cleaned = get_dataset(dataset_id)
+    assert report["converted_columns"] == ["MSSubClass", "SaleType", "YrSold"]
+    assert str(cleaned["MSSubClass"].dtype) == "object"
+    assert str(cleaned["SaleType"].dtype) == "category"
+    assert str(cleaned["YrSold"].dtype) == "category"
+
+
+def test_clean_missing_values_supports_manager_alias_keys():
+    dataset_id = put_dataset(
+        pd.DataFrame(
+            {
+                "num_col": [1.0, None, 3.0],
+                "cat_col": [None, "a", None],
+            }
+        )
+    )
+
+    report = json.loads(
+        clean_missing_values.invoke(
+            {
+                "dataset_id": dataset_id,
+                "actions": [
+                    {"column_name": "num_col", "imputation_strategy": "median"},
+                    {"column_name": "cat_col", "imputation_strategy": "fill", "fill_value": "unknown"},
+                ],
+                "fallback_strategy": "none",
+            }
+        )
+    )
+
+    cleaned = get_dataset(dataset_id)
+    assert cleaned["num_col"].isna().sum() == 0
+    assert cleaned["cat_col"].isna().sum() == 0
+    assert report["has_warnings"] is False
+
+
+def test_clean_missing_values_supports_group_median_legacy_action():
+    dataset_id = put_dataset(
+        pd.DataFrame(
+            {
+                "Neighborhood": ["A", "A", "B", "B", "B"],
+                "LotFrontage": [60.0, None, 80.0, 100.0, None],
+            }
+        )
+    )
+
+    report = json.loads(
+        clean_missing_values.invoke(
+            {
+                "dataset_id": dataset_id,
+                "actions": [
+                    {
+                        "column": "LotFrontage",
+                        "action": "impute_group_median",
+                        "group_by": ["Neighborhood"],
+                    }
+                ],
+                "fallback_strategy": "none",
+            }
+        )
+    )
+
+    cleaned = get_dataset(dataset_id)
+    assert cleaned.loc[1, "LotFrontage"] == 60.0
+    assert cleaned.loc[4, "LotFrontage"] == 90.0
+    assert "LotFrontage" in report["filled_columns"]
+
+
+def test_clean_missing_values_supports_conditional_fill_no_garage():
+    dataset_id = put_dataset(
+        pd.DataFrame(
+            {
+                "GarageType": ["NoGarage", "Attchd", "NoGarage", "Detchd"],
+                "GarageCars": [None, None, 2.0, 1.0],
+            }
+        )
+    )
+
+    report = json.loads(
+        clean_missing_values.invoke(
+            {
+                "dataset_id": dataset_id,
+                "actions": [
+                    {
+                        "column": "GarageCars",
+                        "action": "fill_with_zero_if_no_garage",
+                        "value": 0,
+                    }
+                ],
+                "fallback_strategy": "none",
+            }
+        )
+    )
+
+    cleaned = get_dataset(dataset_id)
+    assert cleaned.loc[0, "GarageCars"] == 0
+    assert pd.isna(cleaned.loc[1, "GarageCars"])
+    assert "GarageCars" in report["filled_columns"]
+
+
+def test_clean_missing_values_supports_conditional_fill_with_flag():
+    dataset_id = put_dataset(
+        pd.DataFrame(
+            {
+                "GarageType": ["NoGarage", "Attchd", "Detchd", "Attchd"],
+                "GarageYrBlt": [None, None, 2005.0, 2001.0],
+            }
+        )
+    )
+
+    report = json.loads(
+        clean_missing_values.invoke(
+            {
+                "dataset_id": dataset_id,
+                "actions": [
+                    {
+                        "column": "GarageYrBlt",
+                        "action": "fill_with_constant_or_median",
+                        "value": "GarageMissingFlag",
+                    }
+                ],
+                "fallback_strategy": "none",
+            }
+        )
+    )
+
+    cleaned = get_dataset(dataset_id)
+    assert cleaned.loc[0, "GarageYrBlt"] == 0
+    assert cleaned.loc[1, "GarageYrBlt"] == 2003.0
+    assert "GarageMissingFlag" in cleaned.columns
+    assert int(cleaned.loc[0, "GarageMissingFlag"]) == 1
+    assert int(cleaned.loc[1, "GarageMissingFlag"]) == 1
+    assert int(cleaned.loc[2, "GarageMissingFlag"]) == 0
+    assert report["has_warnings"] is False
