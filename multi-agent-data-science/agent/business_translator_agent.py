@@ -525,6 +525,7 @@ def _draft_business_report_markdown(state: GlobalState) -> str:
         "Apply the Pyramid Principle (top-down, answer-first), open with SCQA, "
         "structure findings into 3-5 MECE themes, and close with concrete sequenced actions. "
         "CRITICAL: be concise; ground every claim in model evidence or retrieved external context. "
+        "Also CRITICAL: Ensure your 'Recommended Actions' are strictly business and operational actions, excluding data science/engineering tasks. "
         "Output MUST be plain Markdown in English (no YAML front matter). "
         "When EDA charts are available, embed them in relevant sections using standard Markdown "
         "image syntax `![description](path)` to strengthen evidence presentation. "
@@ -572,7 +573,7 @@ Produce a **Business Strategy & Insight Report** as Markdown only (English).
 2. **Situation & Complication** — SCQA opening; if a target distribution or class balance chart is available, embed it here.
 3. **Key Findings** — 3 to 5 MECE themes; claim → evidence → implication. After each theme's evidence paragraph, embed the most relevant EDA chart(s) from the list above (e.g. correlation heatmap for correlation themes, feature importance for model themes, distribution charts for data profile themes). Use each chart at most once.
 4. **Strategic Implications** — business meaning; cite external sources as [1], [2] where applicable.
-5. **Recommended Actions** — sequenced 90-day priorities; concrete owners/metrics/timeframe where possible.
+5. **Recommended Actions** — sequenced 90-day business/operational priorities; concrete owners/metrics/timeframe where possible. CRITICAL: Strictly limit these actions to business, marketing, organizational, or operational initiatives. Do NOT include data science, modeling, engineering, or ML tasks here. (If technical recommendations are necessary, create a brief "6. Technical Roadmap" section, but keep the 90-day priorities purely business-focused).
 
 Style rules:
 - Match the tone of the McKinsey Reports section where relevant.
