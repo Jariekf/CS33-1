@@ -33,7 +33,12 @@ _BUSINESS_HEADING_BLACKLIST: frozenset[str] = frozenset(
         "下一步",
         "下一步行动",
         "下一步操作",
+        "下一步执行",
         "后续行动",
+        "特征工程建议",
+        "建模建议",
+        "推荐模型",
+        "类别不平衡处理",
         # 英文（normalise 时去除尾部 s，且小写）
         "business recommendation",
         "business insight",
@@ -46,22 +51,41 @@ _BUSINESS_HEADING_BLACKLIST: frozenset[str] = frozenset(
         "action item",
         "strategic implication",
         "strategic recommendation",
+        "feature engineering recommendation",
+        "feature engineering suggestion",
+        "modeling recommendation",
+        "modeling suggestion",
+        "recommended model",
     }
 )
 
 _HEADING_RE = re.compile(r"^(#{1,6})\s+(.+?)\s*$")
 _FENCE_RE = re.compile(r"^\s*```")
 _PUNCT_TAIL_RE = re.compile(r"[\s:：。，,\.！!?？]+$")
+# 章节前缀：emoji / 罗马数字 / 阿拉伯数字 / 中文数字 + 序号分隔符
+_HEADING_PREFIX_RE = re.compile(
+    r"^[\s\W\d_]*(?:[一二三四五六七八九十百千]+、)?[\s\W\d_]*"
+)
+_HEADING_SUFFIX_RE = re.compile(r"[\s\W_]+$")
 
 
 def _normalise_heading(text: str) -> str:
-    """Lowercase, strip punctuation/whitespace tail, drop trailing English plural 's'."""
+    """归一化 Markdown 标题用于黑名单匹配。
+
+    流程：
+    1. 小写、剥两端 markdown emphasis（``*_` ``）；
+    2. 剥前缀：emoji、序号（阿拉伯/罗马/中文「一、二、…」）、空白/标点；
+    3. 取冒号 / 中文冒号前的主标题（"下一步：特征工程与建模" → "下一步"）；
+    4. 剥尾部空白/标点/emoji；
+    5. 若以英文复数 s 结尾且去 s 命中黑名单，则归一化为单数。
+    """
     t = text.strip().lower()
-    t = _PUNCT_TAIL_RE.sub("", t)
-    # 去除可能的 markdown emphasis 包裹（**Business Recommendations**）
     t = t.strip("*_`")
     t = _PUNCT_TAIL_RE.sub("", t)
-    # 把 "recommendations" → "recommendation"，"next steps" → "next step"
+    t = _HEADING_PREFIX_RE.sub("", t)
+    t = re.split(r"[:：]", t, maxsplit=1)[0]
+    t = _HEADING_SUFFIX_RE.sub("", t)
+    t = t.strip()
     if t.endswith("s") and not t.endswith("ss"):
         candidate = t[:-1]
         if candidate in _BUSINESS_HEADING_BLACKLIST:

@@ -38,6 +38,54 @@ tools = [
 llm_with_tools = llm_for("data_clean").bind_tools(tools)
 
 
+_CLEAN_TOOL_NAMES = {
+    "load_dataset_to_store",
+    "save_dataset_from_store",
+    "clean_data_types",
+    "clean_missing_values",
+    "clean_outliers",
+    "clean_drop_columns",
+    "clean_duplicates",
+}
+
+
+def _trim_messages_to_clean_round(messages: list[Any]) -> list[Any]:
+    """裁剪历史 messages，只保留本轮 data_clean 子图相关的工具调用/响应链。
+
+    避免上游 (agent_manager) 阶段的长篇 Markdown 总结（含 cleaning plan、
+    业务建议、EDA/特征/建模建议等）污染上下文，导致 data_clean LLM
+    走神变成「复读机」，把上游报告整段抄进 data_clean_agent_report.md。
+    """
+    if not messages:
+        return []
+
+    last_clean_tool_idx: int | None = None
+    for i in range(len(messages) - 1, -1, -1):
+        msg = messages[i]
+        if isinstance(msg, ToolMessage):
+            if msg.name in _CLEAN_TOOL_NAMES:
+                last_clean_tool_idx = i
+            break
+
+    if last_clean_tool_idx is None:
+        return []
+
+    start = last_clean_tool_idx
+    for j in range(last_clean_tool_idx - 1, -1, -1):
+        msg = messages[j]
+        if isinstance(msg, ToolMessage) and msg.name in _CLEAN_TOOL_NAMES:
+            start = j
+            continue
+        if isinstance(msg, AIMessage) and getattr(msg, "tool_calls", None):
+            names = {tc.get("name") for tc in msg.tool_calls}
+            if names & _CLEAN_TOOL_NAMES:
+                start = j
+                continue
+        break
+
+    return messages[start:]
+
+
 def _merge_cleaning_report(
     state: GlobalState, tool_name: str, payload: dict[str, Any]
 ) -> tuple[dict[str, Any], dict[str, Any]]:
@@ -395,9 +443,15 @@ def _data_clean_node(state: GlobalState) -> GlobalState:
         "\nAfter all cleaning steps and save are complete, your final text response should summarize "
         "what was executed (columns touched, row/column shape changes, etc.). Do not mention EDA, "
         "feature engineering, or modeling. Only summarize the current target split.",
+        "\nFinal-response strict format: ONLY a flat list of <=8 bullet points "
+        "(plain '- ' lines). Do NOT output Markdown headings (no '#', no '##', no bold-titled "
+        "sections). Do NOT echo any prior plan, business advice, recommended models, next steps, "
+        "feature engineering advice, or modeling advice. Do NOT include emojis. "
+        "Each bullet must describe a concrete data_clean action on the current target split only.",
     ]
 
-    messages = [SystemMessage(content="".join(system_parts)), *messages]
+    trimmed_history = _trim_messages_to_clean_round(messages)
+    messages = [SystemMessage(content="".join(system_parts)), *trimmed_history]
     response = llm_with_tools.invoke(messages)
     return {"messages": [response]}
 
