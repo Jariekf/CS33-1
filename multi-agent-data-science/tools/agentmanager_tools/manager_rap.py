@@ -1,9 +1,10 @@
-"""Manager RAP: 摘要 + 检索槽位 + arXiv / 可选 Web，再融合为清洗规划参考文本。"""
+"""Manager RAP: summary + retrieval slots + arXiv / optional Web, fused into cleaning-planning context."""
 from __future__ import annotations
 
 import json
 import os
 import re
+import time
 from typing import Annotated, Any
 
 from langchain_core.tools import tool
@@ -201,29 +202,48 @@ def _search_arxiv_light(query: str) -> list[dict[str, Any]]:
     ]
 
 
+_ARXIV_INTER_QUERY_SLEEP = float(os.getenv("ARXIV_INTER_QUERY_SLEEP", "1.5"))
+_ARXIV_RETRY_SLEEP = float(os.getenv("ARXIV_RETRY_SLEEP", "3.0"))
+
+
 def _format_arxiv_context(queries: list[str]) -> tuple[str, int, list[str]]:
     lines: list[str] = []
     errors: list[str] = []
     seen: set[str] = set()
-    for query in queries:
-        try:
-            papers = _search_arxiv_light(query)
-        except Exception as exc:
-            errors.append(f"arxiv:{query}: {exc.__class__.__name__}: {exc}")
-            continue
+    for i, query in enumerate(queries):
+        # Pause between consecutive queries to reduce burst rate-limit risk.
+        if i > 0:
+            time.sleep(_ARXIV_INTER_QUERY_SLEEP)
+
+        papers: list[dict[str, Any]] = []
+        for attempt in range(2):
+            try:
+                papers = _search_arxiv_light(query)
+                break
+            except Exception as exc:
+                msg = str(exc)
+                if ("429" in msg or "429" in repr(exc)) and attempt == 0:
+                    # Back off on rate-limit and retry once.
+                    time.sleep(_ARXIV_RETRY_SLEEP)
+                    continue
+                errors.append(f"arxiv:{query}: {exc.__class__.__name__}: {exc}")
+                break
+
         for paper in papers:
             title = str(paper.get("title") or "Untitled")
             if title in seen:
                 continue
             seen.add(title)
-            summary = str(paper.get("summary") or "")[:600].replace("\n", " ")
+            # Truncate to 300 chars to keep the fusion bundle compact and fast.
+            summary = str(paper.get("summary") or "")[:300].replace("\n", " ")
             url = str(paper.get("url") or "")
             lines.append(f"- {title}: {summary} {url}".strip())
     text = "\n".join(lines)
     return text, len(text), errors
 
 
-def _retrieve_web_light(user_requirement_summary: str) -> tuple[str, int, list[str]]:
+def _retrieve_web_light(query: str) -> tuple[str, int, list[str]]:
+    """Search the web using a short keyword query for better DDG hit rate."""
     if not _RAP_WEB_ENABLED:
         return "", 0, []
     errors: list[str] = []
@@ -231,15 +251,19 @@ def _retrieve_web_light(user_requirement_summary: str) -> tuple[str, int, list[s
         from duckduckgo_search import DDGS
     except ImportError:
         return "", 0, ["duckduckgo-search is not installed"]
+    # Truncate to 80 chars: keyword-style queries outperform long sentences in DDG.
+    short_query = query[:80]
     try:
         rows = []
         with DDGS() as ddgs:
-            for result in ddgs.text(user_requirement_summary[:200], max_results=_WEB_MAX_RESULTS):
+            for result in ddgs.text(short_query, max_results=_WEB_MAX_RESULTS):
                 title = result.get("title") or ""
                 body = (result.get("body") or "")[:400]
                 href = result.get("href") or ""
                 if title or body:
                     rows.append(f"- {title} | {body} | {href}")
+        if not rows:
+            errors.append(f"web: 0 results for query '{short_query}'")
         text = "\n".join(rows)
         return text, len(text), errors
     except Exception as exc:
@@ -324,7 +348,8 @@ def build_manager_rap_context(
     else:
         queries = _queries_from_slots(slots, user_request)
         arxiv_text, arxiv_chars, arxiv_errors = _format_arxiv_context(queries)
-        web_text, web_chars, web_errors = _retrieve_web_light(summary)
+        # Use the first slot query (keyword-style) rather than the long summary sentence.
+        web_text, web_chars, web_errors = _retrieve_web_light(queries[0])
         errors.extend(arxiv_errors)
         errors.extend(web_errors)
         bundle_empty = not (arxiv_text.strip() or web_text.strip())
