@@ -1,18 +1,20 @@
-"""Unit tests for messages trimming in eda_agent and model_agent.
+"""Unit tests for messages trimming in eda_agent / model_agent / data_clean_agent.
 
-These tests guard the root-cause fix for the "EDA / Model agents leak business
-recommendations" issue: the LangGraph ``add_messages`` reducer keeps the original
-``user_request`` HumanMessage and the ``agent_manager`` RAP wrap-up AIMessage in
-``state["messages"]`` for the entire pipeline. EDA and Model agents must
-therefore trim that shared history down to *their own* tool-call chain before
-invoking their LLM, otherwise upstream business framing pollutes the context
-and the LLM hallucinates a "Business Recommendations" section.
+These tests guard the root-cause fix for the "EDA / Model / data_clean agents
+leak business recommendations" issue: the LangGraph ``add_messages`` reducer
+keeps the original ``user_request`` HumanMessage and the ``agent_manager``
+RAP wrap-up AIMessage in ``state["messages"]`` for the entire pipeline.
+Downstream agents must therefore trim that shared history down to *their own*
+tool-call chain before invoking their LLM, otherwise upstream business framing
+pollutes the context and the LLM hallucinates a "Business Recommendations"
+section (or, in the data_clean case, "echoes" the full cleaning_plan report).
 """
 
 from __future__ import annotations
 
 from langchain_core.messages import AIMessage, HumanMessage, ToolMessage
 
+from agent.data_clean_agent import _trim_messages_to_clean_round
 from agent.eda_agent import _trim_messages_to_current_round
 from agent.model_agent import _trim_messages_to_modeling_round
 
@@ -145,3 +147,75 @@ def test_trim_eda_keeps_only_eda_tool_chain() -> None:
         "generate_eda_charts",
         "select_candidate_models_and_metrics",
     ]
+
+
+def test_trim_data_clean_returns_empty_before_first_clean_tool() -> None:
+    """First entry into data_clean subgraph (manager wrap-up present, no clean
+    tool yet) must yield [] to fully shield the LLM from agent_manager's
+    cleaning_plan / business recommendations summary.
+    """
+    history = [
+        HumanMessage(
+            content=(
+                "Please clean the dataset and provide actionable recommendations "
+                "for the marketing campaign."
+            )
+        ),
+        AIMessage(
+            content=(
+                "Manager RAP context: cleaning_plan ready; business advice: "
+                "focus on conversion."
+            )
+        ),
+        _ai_with_tool_call("profile_dataset"),
+        _tool_msg("profile_dataset", '{"rows": 36168}'),
+        _ai_with_tool_call("create_cleaning_plan"),
+        _tool_msg("create_cleaning_plan", '{"target": "train"}'),
+        AIMessage(content="agent_manager wrap-up: cleaning_plan finalized."),
+    ]
+    assert _trim_messages_to_clean_round(history) == []
+
+
+def test_trim_data_clean_keeps_only_clean_tool_chain() -> None:
+    history = [
+        HumanMessage(content="Clean it; actionable recommendations needed."),
+        AIMessage(content="Manager RAP business strategy points."),
+        _ai_with_tool_call("create_cleaning_plan"),
+        _tool_msg("create_cleaning_plan", '{"target": "train"}'),
+        AIMessage(content="agent_manager wrap-up: business advice."),
+        _ai_with_tool_call("load_dataset_to_store"),
+        _tool_msg("load_dataset_to_store", '{"dataset_id": "ds1"}'),
+        _ai_with_tool_call("clean_data_types"),
+        _tool_msg("clean_data_types", '{"converted": []}'),
+        _ai_with_tool_call("clean_missing_values"),
+        _tool_msg("clean_missing_values", '{"filled": []}'),
+        _ai_with_tool_call("save_dataset_from_store"),
+        _tool_msg(
+            "save_dataset_from_store",
+            '{"output_path": "artifacts/clean/cleaned_train_x.csv"}',
+        ),
+    ]
+
+    trimmed = _trim_messages_to_clean_round(history)
+
+    assert trimmed, "Trim must keep the data_clean tool chain"
+    assert not _has_user_request(trimmed)
+    assert not _has_rap_wrapup(trimmed)
+    tool_names_seen = [m.name for m in trimmed if isinstance(m, ToolMessage)]
+    assert tool_names_seen == [
+        "load_dataset_to_store",
+        "clean_data_types",
+        "clean_missing_values",
+        "save_dataset_from_store",
+    ]
+
+
+def test_trim_data_clean_ignores_non_clean_tail() -> None:
+    """If the most recent ToolMessage is not a clean tool, trim returns []."""
+    history = [
+        _ai_with_tool_call("clean_data_types"),
+        _tool_msg("clean_data_types", "{}"),
+        _ai_with_tool_call("profile_dataset"),
+        _tool_msg("profile_dataset", "{}"),
+    ]
+    assert _trim_messages_to_clean_round(history) == []
