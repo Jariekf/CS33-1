@@ -19,7 +19,7 @@ from agent.business_translator_agent import build_business_translator_agent
 from agent.data_clean_agent import build_data_clean_agent
 from agent.eda_agent import build_eda_agent
 from agent.feature_agent import build_feature_agent, _get_current_model
-from agent.model_agent import build_model_agent, _get_current_model as _get_current_model_for_eval
+from agent.model_agent import build_model_agent
 from agent.split_agent import build_split_agent
 from agent.supervisor import make_supervisor
 from core.global_state import GlobalState
@@ -70,15 +70,17 @@ def _route_after_feature(state: GlobalState) -> str:
 
 
 def _route_after_model(state: GlobalState) -> str:
-    """Model Agent 结束后：还有未评估的模型则循环，否则根据 best_model 决定下一步。"""
-    if _get_current_model_for_eval(state) is not None:
-        return "model_agent"
+    """Model Agent 结束后：
+    model_agent 子图在一次运行内已完成 tune_and_select → train(best) → evaluate(best) → 输出总结，
+    因此不需要在主图层面再「per-model 循环」（candidate_models 中未被选为 best 的模型不会
+    出现在 model_results 的 train/evaluate 字段里，循环会陷入死循环）。
+    只看 best_model 是否完成最终评估，即可判定终态。"""
     best_model = state.get("best_model") or {}
-    if best_model.get("model_name"):
+    if best_model.get("model_name") and best_model.get("final_test_metrics"):
         log_node("finalize", success=True, detail=f"best={best_model.get('model_name')}")
         save_state_snapshot(state)
         return "business_translator"
-    log_node("finalize", success=False, detail="best_model not set after model_agent")
+    log_node("finalize", success=False, detail="best_model evaluation not completed")
     return END
 
 
@@ -138,16 +140,20 @@ def _reset_clean_test_internal_retry(state: GlobalState) -> GlobalState:
 
 
 def _prepare_feature_retry(state: GlobalState) -> GlobalState:
-    """Remove the last saved model from feature_dataset_ids so feature_agent re-processes it."""
-    from agent.supervisor import _last_saved_feature_model
-    model = _last_saved_feature_model(state)
-    if model is None:
-        return {}
+    """Remove the failed models from feature_dataset_ids so feature_agent re-processes them."""
+    from agent.supervisor import _failed_feature_models
+    failed = _failed_feature_models(state)
     feature_ids = dict(state.get("feature_dataset_ids") or {})
     test_ids = dict(state.get("testing_feature_dataset_ids") or {})
-    del feature_ids[model]
-    if model in test_ids:
-        del test_ids[model]
+    retries = dict(state.get("supervisor_retry") or {})
+    
+    for model, _ in failed:
+        if retries.get(f"feature:{model}", 0) <= _MAX_SUPERVISOR_RETRY:
+            if model in feature_ids:
+                del feature_ids[model]
+            if model in test_ids:
+                del test_ids[model]
+                
     return {
         "feature_dataset_ids": feature_ids,
         "testing_feature_dataset_ids": test_ids,
@@ -155,22 +161,20 @@ def _prepare_feature_retry(state: GlobalState) -> GlobalState:
 
 
 def _skip_current_feature_model(state: GlobalState) -> GlobalState:
-    """Mark current feature model as skipped so the pipeline can continue."""
-    from agent.feature_agent import _get_current_model as _feat_model
-    model = _feat_model(state)
-    if model is None:
-        return {}
+    """Mark failed feature models as skipped so the pipeline can continue."""
+    from agent.supervisor import _failed_feature_models
+    failed = _failed_feature_models(state)
     feature_ids = dict(state.get("feature_dataset_ids") or {})
-    feature_ids[model] = "skipped"
     hints = dict(state.get("supervisor_hints") or {})
-    hints[f"feature:{model}"] = ""
-    retries = dict(state.get("supervisor_retry") or {})
-    retries[f"feature:{model}"] = 0
-    log_node("supervisor_feature", success=False, detail=f"model={model} skipped after max retries")
+    
+    for model, _ in failed:
+        feature_ids[model] = "skipped"
+        hints[f"feature:{model}"] = ""
+        log_node("supervisor_feature", success=False, detail=f"model={model} skipped after max retries")
+        
     return {
         "feature_dataset_ids": feature_ids,
         "supervisor_hints": hints,
-        "supervisor_retry": retries,
     }
 
 
@@ -218,22 +222,25 @@ def _route_supervisor_eda(state: GlobalState) -> str:
 
 
 def _route_supervisor_feature(state: GlobalState) -> str:
-    from agent.supervisor import _last_saved_feature_model
-    last_model = _last_saved_feature_model(state)
-
-    if last_model:
-        h_key = f"feature:{last_model}"
-        hint = (state.get("supervisor_hints") or {}).get(h_key, "")
-        retry = (state.get("supervisor_retry") or {}).get(h_key, 0)
-        if hint:
-            if retry <= _MAX_SUPERVISOR_RETRY:
-                return "prepare_feature_retry"
-            return "skip_feature_model"
-
-    # No hint on last model → check if more remain
+    from agent.feature_agent import _get_current_model
     if _get_current_model(state) is not None:
         return "feature_agent"
-    return "model_agent"
+        
+    from agent.supervisor import _failed_feature_models
+    failed = _failed_feature_models(state)
+    if not failed:
+        return "model_agent"
+        
+    retries = dict(state.get("supervisor_retry") or {})
+    can_retry = False
+    for model, _ in failed:
+        if retries.get(f"feature:{model}", 0) <= _MAX_SUPERVISOR_RETRY:
+            can_retry = True
+            break
+            
+    if can_retry:
+        return "prepare_feature_retry"
+    return "skip_feature_model"
 
 
 def build_full_pipeline(show_graph: bool = False):
@@ -344,7 +351,7 @@ def build_full_pipeline(show_graph: bool = False):
     graph.add_conditional_edges(
         "model_agent",
         _route_after_model,
-        {"model_agent": "model_agent", "business_translator": "business_translator", END: END},
+        {"business_translator": "business_translator", END: END},
     )
     graph.add_edge("business_translator", END)
     compiled = graph.compile()

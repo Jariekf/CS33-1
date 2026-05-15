@@ -116,3 +116,7 @@ class GlobalState(TypedDict, total=False):
     supervisor_retry: dict[str, int]
     # internal self-check retry counts inside data_clean_agent: {"train": 0, "test": 0}
     clean_internal_retry: dict[str, int]
+    # feature_agent 空转检测：{model_name: 未调用工具的连续次数}
+    feature_no_tool_rounds: dict[str, int]
+    # eda_agent 空转检测：未调用工具的连续次数
+    eda_no_tool_rounds: int

@@ -27,6 +27,50 @@ tools = [tune_and_select_model, train_model, evaluate_model]
 llm_with_tools = llm_for("model").bind_tools(tools)
 
 
+_MODELING_TOOL_NAMES = {
+    "tune_and_select_model",
+    "train_model",
+    "evaluate_model",
+}
+
+
+def _trim_messages_to_modeling_round(messages: list[Any]) -> list[Any]:
+    """裁剪历史 messages，只保留本轮 modeling 子图的工具调用/响应链。
+
+    避免上游 user_request / agent_manager RAP wrap-up / EDA / feature 阶段
+    输出的业务化文本污染 model_agent LLM 的上下文，进而诱发越权写入
+    "业务建议" 类章节。
+    """
+    if not messages:
+        return []
+
+    last_modeling_tool_idx: int | None = None
+    for i in range(len(messages) - 1, -1, -1):
+        msg = messages[i]
+        if isinstance(msg, ToolMessage):
+            if msg.name in _MODELING_TOOL_NAMES:
+                last_modeling_tool_idx = i
+            break
+
+    if last_modeling_tool_idx is None:
+        return []
+
+    start = last_modeling_tool_idx
+    for j in range(last_modeling_tool_idx - 1, -1, -1):
+        msg = messages[j]
+        if isinstance(msg, ToolMessage) and msg.name in _MODELING_TOOL_NAMES:
+            start = j
+            continue
+        if isinstance(msg, AIMessage) and getattr(msg, "tool_calls", None):
+            names = {tc.get("name") for tc in msg.tool_calls}
+            if names & _MODELING_TOOL_NAMES:
+                start = j
+                continue
+        break
+
+    return messages[start:]
+
+
 def _get_current_model(state: GlobalState) -> str | None:
     candidate_models = state.get("candidate_models") or []
     model_results = state.get("model_results") or {}
@@ -134,11 +178,36 @@ def _model_node(state: GlobalState) -> GlobalState:
         "步骤 4 — 当 current_stage 为 model_evaluated 时，不再调用工具，\n"
         "  输出简短总结：最终模型名称、cv_best_score vs final_test_metrics 中各指标对比、\n"
         "  以及对泛化能力的简要判断（CV 分与 test 分差距是否合理）。\n"
-        "  最终文字回复严格限于上述模型结果分析，不要延伸至业务建议或下一步操作说明。"
+        "  最终文字回复严格限于上述模型结果分析。\n"
+        "【严禁事项 — 业务建议归 BAT，本 agent 仅做技术结论】：\n"
+        "  - 严禁出现以下任何章节标题（中英文）：\n"
+        "    · 中文：业务建议 / 业务影响 / 业务洞察 / 业务推荐 / 业务价值 / 业务意义 /\n"
+        "      行动建议 / 推荐操作 / 策略建议 / 战略建议 / 下一步 / 下一步行动 / 下一步操作 / 后续行动\n"
+        "    · 英文：Business Recommendation(s) / Business Insight(s) / Business Action(s) /\n"
+        "      Business Implication(s) / Business Value / Recommendation(s) / Recommended Action(s) /\n"
+        "      Next Step(s) / Action Item(s) / Strategic Implication(s) / Strategic Recommendation(s)\n"
+        "  - 不得讨论营销策略、ROI、客户筛选、阈值与业务取舍等业务层面话题；\n"
+        "  - 业务建议、客户行动、投放策略等内容由 business_translator_agent 在最终\n"
+        "    business_insight_report.md 中统一产出；本 agent 仅汇报模型指标与泛化能力。\n"
+        "  - 若你违规输出上述章节，落盘前会被 save_agent_report 的过滤器自动剥离。"
     )
 
-    messages = [SystemMessage(content=system_content), *messages]
-    response = llm_with_tools.invoke(messages)
+    trimmed_history = _trim_messages_to_modeling_round(messages)
+    if trimmed_history:
+        llm_input = [SystemMessage(content=system_content), *trimmed_history]
+    else:
+        llm_input = [
+            SystemMessage(content=system_content),
+            HumanMessage(
+                content=(
+                    "请按系统提示词执行 modeling 步骤 1~4。"
+                    "禁止复读上游 user_request / agent_manager / EDA / feature 报告，"
+                    "禁止生成业务建议、推荐操作、下一步、Recommendations、Next Steps 等业务类章节。"
+                )
+            ),
+        ]
+
+    response = llm_with_tools.invoke(llm_input)
     return {"messages": [response]}
 
 

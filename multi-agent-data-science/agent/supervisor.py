@@ -96,37 +96,42 @@ def _check_eda(state: GlobalState) -> list[str]:
     return issues
 
 
-def _last_saved_feature_model(state: GlobalState) -> str | None:
-    """Return the most recently saved model (last key in feature_dataset_ids)."""
+def _failed_feature_models(state: GlobalState) -> list[tuple[str, list[str]]]:
+    candidate_models = state.get("candidate_models") or []
     feature_ids = state.get("feature_dataset_ids") or {}
-    return next(reversed(feature_ids), None) if feature_ids else None
+    test_ids = state.get("testing_feature_dataset_ids") or {}
+    has_test = bool(state.get("testing_data_path"))
+    failed = []
+    
+    for model in candidate_models:
+        train_path = feature_ids.get(model, "")
+        if train_path == "skipped":
+            continue
+            
+        problems = []
+        if not train_path:
+            problems.append("训练集特征文件未写入 state")
+        elif not Path(train_path).exists():
+            problems.append(f"训练集特征文件不存在：{train_path}")
+            
+        if has_test:
+            test_path = test_ids.get(model, "")
+            if not test_path:
+                problems.append("测试集特征文件未写入 state")
+            elif not Path(test_path).exists():
+                problems.append(f"测试集特征文件不存在：{test_path}")
+                
+        if problems:
+            failed.append((model, problems))
+            
+    return failed
 
 
 def _check_feature(state: GlobalState) -> list[str]:
     issues: list[str] = []
-    feature_ids = state.get("feature_dataset_ids") or {}
-    if not feature_ids:
-        return issues  # nothing saved yet — nothing to verify
-
-    model = next(reversed(feature_ids))
-    train_path = feature_ids.get(model, "")
-
-    if train_path == "skipped":
-        return issues  # already marked skipped, nothing to verify
-
-    if not train_path:
-        issues.append(f"feature_dataset_ids[{model}] 未写入")
-    elif not Path(train_path).exists():
-        issues.append(f"模型 {model} 训练集特征文件不存在：{train_path}")
-
-    if state.get("testing_data_path"):
-        test_ids = state.get("testing_feature_dataset_ids") or {}
-        test_path = test_ids.get(model, "")
-        if not test_path:
-            issues.append(f"testing_feature_dataset_ids[{model}] 未写入")
-        elif not Path(test_path).exists():
-            issues.append(f"模型 {model} 测试集特征文件不存在：{test_path}")
-
+    for model, problems in _failed_feature_models(state):
+        for p in problems:
+            issues.append(f"[{model}] {p}")
     return issues
 
 
@@ -164,10 +169,6 @@ def _llm_generate_hint(stage: str, state: GlobalState, issues: list[str]) -> str
     label = _STAGE_LABELS.get(stage, stage)
 
     model_ctx = ""
-    if stage == "feature":
-        model = _last_saved_feature_model(state)
-        if model:
-            model_ctx = f"当前模型：{model}。"
 
     run_dir = state.get("run_dir") or ""
     source_ctx = ""
@@ -249,9 +250,6 @@ def _append_supervisor_report(
 
 def _hint_key(stage: str, state: GlobalState) -> str:
     """Return the supervisor_hints dict key for the current stage."""
-    if stage == "feature":
-        model = _last_saved_feature_model(state) or "unknown"
-        return f"feature:{model}"
     return stage
 
 
@@ -272,11 +270,45 @@ def make_supervisor(stage: str, max_retry: int = 2) -> Callable[[GlobalState], G
         raise ValueError(f"Unknown supervisor stage: {stage!r}. Valid: {list(_RULE_CHECKERS)}")
 
     def _node(state: GlobalState) -> GlobalState:
+        if stage == "feature":
+            from agent.feature_agent import _get_current_model
+            if _get_current_model(state) is not None:
+                return {}
+
         issues = checker(state)
+        run_dir = state.get("run_dir") or ""
+
+        if stage == "feature":
+            failed_models = [m for m, _ in _failed_feature_models(state)]
+            
+            if not issues:
+                _append_supervisor_report(run_dir, stage, "pass", [], "", 0)
+                # Ensure all hints are cleared if passing? We can just leave them as they pass the stage
+                return {}
+                
+            retries_dict = dict(state.get("supervisor_retry") or {})
+            max_r = 0
+            for m in failed_models:
+                max_r = max(max_r, retries_dict.get(f"feature:{m}", 0))
+            
+            hint = _llm_generate_hint(stage, state, issues)
+            _append_supervisor_report(run_dir, stage, "fail", issues, hint, max_r)
+            
+            hints = dict(state.get("supervisor_hints") or {})
+            for m in failed_models:
+                hints[f"feature:{m}"] = hint
+                retries_dict[f"feature:{m}"] = retries_dict.get(f"feature:{m}", 0) + 1
+                
+            return {
+                "supervisor_hints": hints,
+                "supervisor_retry": retries_dict,
+                "current_stage": "supervisor_feature_failed",
+            }
+        
+        # Original logic for other stages
         h_key = _hint_key(stage, state)
         r_key = _retry_key(stage, state)
         retry = (state.get("supervisor_retry") or {}).get(r_key, 0)
-        run_dir = state.get("run_dir") or ""
 
         if not issues:
             _append_supervisor_report(run_dir, stage, "pass", [], "", retry)

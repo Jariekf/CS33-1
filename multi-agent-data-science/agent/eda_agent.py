@@ -37,6 +37,51 @@ tools = [
 llm_with_tools = llm_for("eda").bind_tools(tools)
 
 
+_EDA_TOOL_NAMES = {
+    "profile_training_data",
+    "compute_correlation_matrix",
+    "generate_eda_charts",
+    "select_candidate_models_and_metrics",
+}
+_MAX_NO_TOOL_ROUNDS = 2
+
+
+def _trim_messages_to_current_round(messages: list[Any]) -> list[Any]:
+    """裁剪历史 messages，只保留本轮 EDA 子图相关的工具调用/响应链。
+
+    避免上游 (data_clean) 阶段输出的长篇 Markdown 报告污染上下文，
+    导致 LLM 走神变成「复读机」。
+    """
+    if not messages:
+        return []
+
+    last_eda_tool_idx: int | None = None
+    for i in range(len(messages) - 1, -1, -1):
+        msg = messages[i]
+        if isinstance(msg, ToolMessage):
+            if msg.name in _EDA_TOOL_NAMES:
+                last_eda_tool_idx = i
+            break
+
+    if last_eda_tool_idx is None:
+        return []
+
+    start = last_eda_tool_idx
+    for j in range(last_eda_tool_idx - 1, -1, -1):
+        msg = messages[j]
+        if isinstance(msg, ToolMessage) and msg.name in _EDA_TOOL_NAMES:
+            start = j
+            continue
+        if isinstance(msg, AIMessage) and getattr(msg, "tool_calls", None):
+            names = {tc.get("name") for tc in msg.tool_calls}
+            if names & _EDA_TOOL_NAMES:
+                start = j
+                continue
+        break
+
+    return messages[start:]
+
+
 def _merge_eda_report(state: GlobalState, tool_name: str, payload: dict[str, Any]) -> dict[str, Any]:
     existing = dict(state.get("eda_report") or {})
     steps = list(existing.get("steps", []))
@@ -56,6 +101,31 @@ def _eda_node(state: GlobalState) -> GlobalState:
     description = state.get("description") or ""
     testing_data_path = state.get("testing_data_path") or ""
 
+    # ── 空转检测：若上一轮 LLM 没调用工具，累计计数 ──
+    no_tool_rounds = state.get("eda_no_tool_rounds", 0)
+    if messages:
+        last_msg = messages[-1]
+        if isinstance(last_msg, AIMessage) and not getattr(last_msg, "tool_calls", None):
+            no_tool_rounds += 1
+
+    # ── 达到上限：强制终止，避免死循环 ──────────────────────
+    if no_tool_rounds >= _MAX_NO_TOOL_ROUNDS:
+        print(f"[eda_agent] EDA 连续 {no_tool_rounds} 轮未调用任何工具，pipeline 强制终止")
+        # 直接把 supervisor_retry 置为一个极大值，让主图判定放弃
+        retries = dict(state.get("supervisor_retry") or {})
+        retries["eda"] = 999
+        return {
+            "eda_no_tool_rounds": 0,
+            "supervisor_retry": retries,
+            "messages": [
+                AIMessage(
+                    content=(
+                        f"[forced terminate] EDA agent 连续 {no_tool_rounds} 轮未调用工具，pipeline 已强制终止。"
+                    )
+                )
+            ],
+        }
+
     pool = CLASSIFICATION_POOL if task_type == "classification" else REGRESSION_POOL
     pool_str = ", ".join(pool)
     metrics_allowed = CLASSIFICATION_METRICS if task_type == "classification" else REGRESSION_METRICS
@@ -70,11 +140,17 @@ def _eda_node(state: GlobalState) -> GlobalState:
         if supervisor_hint else ""
     )
 
+    description_block = (
+        f"数据集描述（仅供理解列含义，不得作为业务建议依据）：{description}"
+        if description
+        else "数据集描述：未提供"
+    )
+
     system_content = (
         "你是 EDA（探索性数据分析）Agent，负责分析训练集、制定特征工程计划、选出三个候选模型，"
         "并决定本次任务的评估指标。\n"
         f"训练集路径：{training_data_path or '未提供'}。\n"
-        f"数据集描述：{description or '未提供'}。\n"
+        f"{description_block}。\n"
         f"任务类型：{task_type}。\n"
         f"目标列：{target_column or '未提供'}。\n"
         f"本次运行工作目录：{run_dir or '未设置'}。\n"
@@ -115,15 +191,47 @@ def _eda_node(state: GlobalState) -> GlobalState:
         "  (3) 候选模型选择理由；\n"
         "  (4) 评估指标决策理由。\n"
         "【严禁事项】：\n"
+        "  - 重要约束：你必须通过 tool_call 调用上述 4 个工具完成步骤 1~4，"
+        "禁止只输出文字描述假装已完成。即使上游 data_clean / agent_manager 报告很长，"
+        "你也必须独立执行 EDA 工具，不得复述上游内容、不得编造\"环境限制\"；\n"
         "  - 不得虚构或预测特征工程的执行结果（如「已进行 one-hot 编码」「已删除 duration」）；\n"
         "  - 不得虚构或预测模型训练、调参、CV 分数、测试集评估等任何后续阶段的结果；\n"
         "  - 不得编写业务建议、最终模型选择结论或完整流水线总结；\n"
-        "  - EDA 报告只覆盖你实际执行的 4 个工具调用的真实输出，不得延伸至其他 Agent 的职责范围。"
+        "  - EDA 报告只覆盖你实际执行的 4 个工具调用的真实输出，不得延伸至其他 Agent 的职责范围；\n"
+        "  - 严禁出现以下任何章节标题（中英文）：\n"
+        "    · 中文：业务建议 / 业务影响 / 业务洞察 / 业务推荐 / 业务价值 / 业务意义 /\n"
+        "      行动建议 / 推荐操作 / 策略建议 / 战略建议 / 下一步 / 下一步行动 / 下一步操作 / 后续行动\n"
+        "    · 英文：Business Recommendation(s) / Business Insight(s) / Business Action(s) /\n"
+        "      Business Implication(s) / Business Value / Recommendation(s) / Recommended Action(s) /\n"
+        "      Next Step(s) / Action Item(s) / Strategic Implication(s) / Strategic Recommendation(s)\n"
+        "  - 业务建议由 business_translator_agent 在最终 business_insight_report.md 中统一产出；\n"
+        "    若你违规输出上述章节，落盘前会被 save_agent_report 的过滤器自动剥离。"
     )
 
-    messages = [SystemMessage(content=system_content), *messages]
-    response = llm_with_tools.invoke(messages)
-    return {"messages": [response]}
+    # ── 关键修复：只把本轮 EDA 工具调用链送给 LLM ─────────────────────────
+    # 首轮裁剪结果为空时，必须彻底丢弃整个 messages 历史（特别是 user_request
+    # HumanMessage 与 agent_manager 的 RAP wrap-up AIMessage），仅以 SystemMessage
+    # + 一条强约束 HumanMessage 启动 EDA，避免业务语境渗入。
+    trimmed_history = _trim_messages_to_current_round(messages)
+    if trimmed_history:
+        llm_input = [SystemMessage(content=system_content), *trimmed_history]
+    else:
+        llm_input = [
+            SystemMessage(content=system_content),
+            HumanMessage(
+                content=(
+                    "请按系统提示词第 1~4 步逐个调用工具完成 EDA，禁止只输出文字描述。"
+                    "禁止复读上游 data_clean / agent_manager 报告，"
+                    "禁止生成业务建议、推荐操作、下一步、Recommendations、Next Steps 等业务类章节。"
+                )
+            ),
+        ]
+
+    response = llm_with_tools.invoke(llm_input)
+    return {
+        "messages": [response],
+        "eda_no_tool_rounds": no_tool_rounds,
+    }
 
 
 def _tool_state_update_node(state: GlobalState) -> GlobalState:
@@ -187,6 +295,7 @@ def _handle_select_models(state: GlobalState, tool_message: ToolMessage) -> Glob
         "metrics_rationale": payload.get("metrics_rationale", ""),
         "current_stage": "eda_done",
         "next_action": "run_feature_engineering",
+        "eda_no_tool_rounds": 0,
     }
 
 

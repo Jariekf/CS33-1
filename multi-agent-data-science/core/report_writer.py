@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import json
 import os
+import re
 from datetime import datetime
 from pathlib import Path
 from typing import Any
@@ -14,18 +15,154 @@ _DEFAULT_REPORTS_DIR = Path(__file__).resolve().parents[1] / "artifacts" / "repo
 _RAP_REPORT_SUMMARY_CHARS = int(os.getenv("MANAGER_RAP_REPORT_SUMMARY_CHARS", "800"))
 _RAP_REPORT_CONTEXT_CHARS = int(os.getenv("MANAGER_RAP_REPORT_CONTEXT_CHARS", "1200"))
 
+# 只有 business_translator_agent 可以产出业务建议。这里维护一份非 BAT 报告
+# 中必须剥离的章节标题黑名单（大小写不敏感、去除首尾空白与尾部冒号/标点）。
+_BUSINESS_HEADING_BLACKLIST: frozenset[str] = frozenset(
+    {
+        # 中文
+        "业务建议",
+        "业务影响",
+        "业务洞察",
+        "业务推荐",
+        "业务价值",
+        "业务意义",
+        "行动建议",
+        "推荐操作",
+        "策略建议",
+        "战略建议",
+        "下一步",
+        "下一步行动",
+        "下一步操作",
+        "后续行动",
+        # 英文（normalise 时去除尾部 s，且小写）
+        "business recommendation",
+        "business insight",
+        "business action",
+        "business implication",
+        "business value",
+        "recommendation",
+        "recommended action",
+        "next step",
+        "action item",
+        "strategic implication",
+        "strategic recommendation",
+    }
+)
+
+_HEADING_RE = re.compile(r"^(#{1,6})\s+(.+?)\s*$")
+_FENCE_RE = re.compile(r"^\s*```")
+_PUNCT_TAIL_RE = re.compile(r"[\s:：。，,\.！!?？]+$")
+
+
+def _normalise_heading(text: str) -> str:
+    """Lowercase, strip punctuation/whitespace tail, drop trailing English plural 's'."""
+    t = text.strip().lower()
+    t = _PUNCT_TAIL_RE.sub("", t)
+    # 去除可能的 markdown emphasis 包裹（**Business Recommendations**）
+    t = t.strip("*_`")
+    t = _PUNCT_TAIL_RE.sub("", t)
+    # 把 "recommendations" → "recommendation"，"next steps" → "next step"
+    if t.endswith("s") and not t.endswith("ss"):
+        candidate = t[:-1]
+        if candidate in _BUSINESS_HEADING_BLACKLIST:
+            return candidate
+    return t
+
+
+def _strip_non_bat_recommendations(content: str) -> str:
+    """从非 BAT 报告中剥离业务建议类章节。
+
+    扫描 Markdown 文本：
+    - 跳过 fenced code block（``` ... ```）内的内容；
+    - 当遇到 ``# ... ###### Heading`` 且标题在黑名单时，删除从该标题行开始到
+      下一个**同级或更高级**标题（或 EOF）之间的全部行；
+    - 清理删除后可能遗留的孤立 ``---`` 分隔线及 3 行以上连续空行。
+    """
+    if not content:
+        return content
+
+    lines = content.split("\n")
+    out: list[str] = []
+    in_code = False
+    skip_until_level: int | None = None  # 当前正在跳过的章节起始级别
+
+    for line in lines:
+        if _FENCE_RE.match(line):
+            in_code = not in_code
+            if skip_until_level is None:
+                out.append(line)
+            continue
+
+        if in_code:
+            if skip_until_level is None:
+                out.append(line)
+            continue
+
+        m = _HEADING_RE.match(line)
+        if m:
+            level = len(m.group(1))
+            heading = _normalise_heading(m.group(2))
+            if skip_until_level is not None:
+                # 已经处于跳过状态：只要遇到同级或更高级标题就停止跳过
+                if level <= skip_until_level:
+                    skip_until_level = None
+                    # 当前标题本身是否也命中黑名单？继续跳过
+                    if heading in _BUSINESS_HEADING_BLACKLIST:
+                        skip_until_level = level
+                        continue
+                    out.append(line)
+                # 否则仍在 skip 区间内的子标题，不输出
+                continue
+            if heading in _BUSINESS_HEADING_BLACKLIST:
+                skip_until_level = level
+                continue
+            out.append(line)
+            continue
+
+        if skip_until_level is None:
+            out.append(line)
+
+    # 清理：移除孤立的 `---`（前后无内容）以及多余空行
+    cleaned: list[str] = []
+    for i, line in enumerate(out):
+        stripped = line.strip()
+        if stripped == "---":
+            prev_blank = (not cleaned) or cleaned[-1].strip() == ""
+            next_idx = i + 1
+            while next_idx < len(out) and out[next_idx].strip() == "":
+                next_idx += 1
+            next_blank_or_end = next_idx >= len(out)
+            if prev_blank and next_blank_or_end:
+                continue
+        cleaned.append(line)
+
+    text = "\n".join(cleaned)
+    text = re.sub(r"\n{3,}", "\n\n", text)
+    return text.strip("\n")
+
 
 def save_agent_report(agent_name: str, message: Any, model: str = "", run_dir: str = "") -> str:
     """将 agent 最后一条消息追加写入 {run_dir}/reports/{agent_name}_report.md。
 
     对 feature_agent / model_agent 这类循环 agent，传入 model 参数以标注是哪一轮。
     返回写入的文件路径。
+
+    业务建议（Business Recommendation/Next Steps 等同义章节）只允许出现在
+    ``business_translator_agent`` 产出的 ``business_insight_report.md`` 中；
+    其他 agent 的报告会在落盘前经 ``_strip_non_bat_recommendations`` 过滤。
     """
     reports_dir = Path(run_dir) / "reports" if run_dir else _DEFAULT_REPORTS_DIR
     reports_dir.mkdir(parents=True, exist_ok=True)
     path = reports_dir / f"{agent_name}_report.md"
 
     content = str(message.content) if hasattr(message, "content") else str(message)
+
+    if agent_name != "business_translator":
+        filtered = _strip_non_bat_recommendations(content)
+        if not filtered.strip():
+            filtered = "_（业务建议章节已被过滤；该 agent 不负责业务建议。）_"
+        content = filtered
+
     timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
     title = f"## {agent_name}" + (f" — {model}" if model else "") + f"  `{timestamp}`"
     section = f"{title}\n\n{content}\n\n---\n\n"

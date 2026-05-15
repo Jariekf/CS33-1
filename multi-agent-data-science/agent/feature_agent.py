@@ -33,12 +33,57 @@ tools = [
 ]
 llm_with_tools = llm_for("feature").bind_tools(tools)
 
+_FEATURE_TOOL_NAMES = {
+    "load_dataset_to_store",
+    "encode_target_column",
+    "scale_features",
+    "encode_categorical",
+    "save_featured_dataset",
+}
+_MAX_NO_TOOL_ROUNDS = 2
+
 
 def _get_current_model(state: GlobalState) -> str | None:
     candidate_models = state.get("candidate_models") or []
     feature_dataset_ids = state.get("feature_dataset_ids") or {}
     remaining = [m for m in candidate_models if m not in feature_dataset_ids]
     return remaining[0] if remaining else None
+
+
+def _trim_messages_to_current_round(messages: list[Any]) -> list[Any]:
+    """裁剪历史 messages，只保留本轮 feature 子图相关的工具调用/响应链。
+
+    避免上游 (EDA / data_clean) 阶段输出的长篇 Markdown 报告污染上下文，
+    导致 LLM 走神变成「复读机」。
+    """
+    if not messages:
+        return []
+
+    last_feature_tool_idx: int | None = None
+    for i in range(len(messages) - 1, -1, -1):
+        msg = messages[i]
+        if isinstance(msg, ToolMessage):
+            if msg.name in _FEATURE_TOOL_NAMES:
+                last_feature_tool_idx = i
+            break
+
+    if last_feature_tool_idx is None:
+        return []
+
+    start = last_feature_tool_idx
+    for j in range(last_feature_tool_idx - 1, -1, -1):
+        msg = messages[j]
+        if isinstance(msg, ToolMessage) and msg.name in _FEATURE_TOOL_NAMES:
+            start = j
+            continue
+        if isinstance(msg, AIMessage) and getattr(msg, "tool_calls", None):
+            names = {tc.get("name") for tc in msg.tool_calls}
+            if names & _FEATURE_TOOL_NAMES:
+                start = j
+                continue
+        break
+
+    return messages[start:]
 
 
 def _feature_node(state: GlobalState) -> GlobalState:
@@ -51,6 +96,34 @@ def _feature_node(state: GlobalState) -> GlobalState:
     target_column = state.get("target_column") or ""
     candidate_models = state.get("candidate_models") or []
     feature_dataset_ids = state.get("feature_dataset_ids") or {}
+
+    # ── 空转检测：若上一轮 LLM 没调用工具，但当前模型仍未保存特征，累计计数 ──
+    no_tool_rounds = dict(state.get("feature_no_tool_rounds") or {})
+    if current_model and messages:
+        last_msg = messages[-1]
+        if isinstance(last_msg, AIMessage) and not getattr(last_msg, "tool_calls", None):
+            no_tool_rounds[current_model] = no_tool_rounds.get(current_model, 0) + 1
+
+    # ── 达到上限：强制把当前模型标 skipped，避免无限循环 ──────────────────────
+    if current_model and no_tool_rounds.get(current_model, 0) >= _MAX_NO_TOOL_ROUNDS:
+        ids = dict(feature_dataset_ids)
+        ids[current_model] = "skipped"
+        print(
+            f"[feature_agent] {current_model} 空转 "
+            f"{no_tool_rounds[current_model]} 次未调用工具，强制标记 skipped"
+        )
+        return {
+            "feature_dataset_ids": ids,
+            "feature_no_tool_rounds": {},
+            "messages": [
+                AIMessage(
+                    content=(
+                        f"[forced skip] 模型 {current_model} 连续 "
+                        f"{no_tool_rounds[current_model]} 轮未调用工具，已标记为 skipped。"
+                    )
+                )
+            ],
+        }
 
     model_plan = feature_engineering_plan.get(current_model, {}) if current_model else {}
     plan_text = json.dumps(model_plan, ensure_ascii=False, indent=2) if model_plan else "无特定计划，按需处理。"
@@ -101,14 +174,33 @@ def _feature_node(state: GlobalState) -> GlobalState:
         f"4. 调用 save_featured_dataset(dataset_id=train_id, model_name=当前模型名, "
         f"output_dir=\"{output_dir}\", split=\"train\") 保存预处理后的训练集；\n"
         f"{test_save_step}"
+        "重要约束：你必须通过 tool_call 调用工具完成上述步骤，禁止只输出文字描述假装已完成。\n"
         "完成后停止，不要处理其他模型。\n"
         "最终文字回复只汇报当前模型的特征工程处理步骤与结果（编码方式、缩放情况、保存路径），"
         "不要描述模型训练评估或其他候选模型的处理细节，并且不要说与数据清洗和EDA相关内容，只需要汇报特征工程处理步骤与结果。"
     )
 
-    messages = [SystemMessage(content=system_content), *messages]
-    response = llm_with_tools.invoke(messages)
-    return {"messages": [response]}
+    # ── 关键修复：只把本轮 feature 工具调用链送给 LLM ─────────────────────────
+    # 这样可避免上游 EDA/data_clean 阶段输出的长篇 Markdown 干扰当前轮决策
+    trimmed_history = _trim_messages_to_current_round(messages)
+    if trimmed_history:
+        llm_input = [SystemMessage(content=system_content), *trimmed_history]
+    else:
+        llm_input = [
+            SystemMessage(content=system_content),
+            HumanMessage(
+                content=(
+                    f"请开始处理模型 [{current_model}] 的特征工程，"
+                    "严格按上述系统提示词第 1~5 步逐个调用工具，禁止只输出文字描述。"
+                )
+            ),
+        ]
+
+    response = llm_with_tools.invoke(llm_input)
+    return {
+        "messages": [response],
+        "feature_no_tool_rounds": no_tool_rounds,
+    }
 
 
 def _tool_state_update_node(state: GlobalState) -> GlobalState:
@@ -248,6 +340,7 @@ def _handle_save_featured(state: GlobalState, tool_message: ToolMessage) -> Glob
         return {
             "feature_dataset_ids": existing,
             "current_stage": "feature_saved",
+            "feature_no_tool_rounds": {},
         }
 
 
