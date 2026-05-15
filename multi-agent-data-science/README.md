@@ -40,6 +40,51 @@ All intermediate files and reports are written to the run's workspace directory 
 
 ---
 
+## Agent Responsibilities & Report Boundaries
+
+Each agent owns a **specific deliverable** and may not encroach on the others.
+In particular, **business recommendations are produced exclusively by the
+Business Action Translator (BAT)**; every other agent's report is filtered
+before disk write to strip any business-advice sections that leak through.
+
+| Agent | Responsibility | Report file | May write business advice? |
+|---|---|---|---|
+| `supervisor` | Gating checks between stages | `supervisor_report.md` | No |
+| `agent_manager` | Dataset profile + Manager RAP (requirement parse & retrieval) + cleaning plan | `agent_manager_report.md` | No |
+| `split_agent` | Train/test split (infer_task when needed) | `split_agent_report.md` | No |
+| `data_clean_agent` | Type / missing / outlier / duplicate cleaning | `data_clean_agent_report.md` | No |
+| `eda_agent` | Profiling, correlation, charts, candidate model & metric selection | `eda_agent_report.md` | No |
+| `feature_agent` | Per-model feature engineering | `feature_agent_report.md` | No |
+| `model_agent` | HPO, training, evaluation (technical conclusions only) | `model_agent_report.md` | No |
+| `business_translator_agent` (BAT) | McKinsey-style business strategy report | `business_insight_report.md` / `.html` / `.pdf` | **Yes — sole owner** |
+
+### How the boundary is enforced
+
+Three layers, all in [`multi-agent-data-science/`](.):
+
+1. **Context isolation at the source.** EDA and Model agents trim the shared
+   `state["messages"]` down to their own tool-call chain before invoking the
+   LLM (`_trim_messages_to_current_round` in `agent/eda_agent.py`,
+   `_trim_messages_to_modeling_round` in `agent/model_agent.py`). This blocks
+   the original `user_request` HumanMessage and `agent_manager`'s RAP
+   business-strategy AIMessage from polluting their context.
+2. **Prompt-level prohibitions.** The EDA / Model agent system prompts list
+   forbidden heading titles (中文：业务建议 / 行动建议 / 下一步 / … ; English:
+   Business Recommendation(s) / Recommended Actions / Next Step(s) / …) and
+   state that business advice belongs to BAT.
+3. **Save-time filter.** `core/report_writer.save_agent_report` calls
+   `_strip_non_bat_recommendations` on the final AI message for every
+   non-BAT agent. Any matching heading is removed along with its section
+   (until the next heading of equal or higher level).
+
+Run the safety net's unit tests:
+
+```bash
+pytest tests/test_report_writer_filter.py tests/test_agent_message_trim.py -q
+```
+
+---
+
 ## Requirements
 
 | Component | Version |

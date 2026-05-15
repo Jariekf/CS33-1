@@ -16,8 +16,8 @@ from core.env_utils import DEEPSEEK_API_KEY
 from core.graph import (
     _route_after_init,
     _route_after_model,
-    _route_after_test_cleaning_guard,
-    _route_after_train_cleaning_guard,
+    _route_supervisor_clean_test,
+    _route_supervisor_clean_train,
     build_full_pipeline,
 )
 
@@ -38,15 +38,18 @@ def test_pipeline_graph_contains_all_nodes():
     for node in [
         "init_run",
         "split_agent",
+        "supervisor_split",
         "agent_manager",
         "set_clean_train",
         "data_clean_train",
-        "guard_clean_train",
+        "supervisor_clean_train",
         "set_clean_test",
         "data_clean_test",
-        "guard_clean_test",
+        "supervisor_clean_test",
         "eda_agent",
+        "supervisor_eda",
         "feature_agent",
+        "supervisor_feature",
         "model_agent",
         "business_translator",
     ]:
@@ -56,10 +59,10 @@ def test_pipeline_graph_contains_all_nodes():
     assert ("__start__", "init_run") in edges
     assert ("init_run", "agent_manager") in edges
     assert ("init_run", "split_agent") in edges
-    assert ("split_agent", "agent_manager") in edges
+    assert ("split_agent", "supervisor_split") in edges
     assert ("agent_manager", "set_clean_train") in edges
-    assert ("data_clean_train", "guard_clean_train") in edges
-    assert ("data_clean_test", "guard_clean_test") in edges
+    assert ("data_clean_train", "supervisor_clean_train") in edges
+    assert ("data_clean_test", "supervisor_clean_test") in edges
 
 
 def test_route_model_to_business_translator_when_best_model():
@@ -95,23 +98,37 @@ def test_route_init_goes_split_agent_when_not_presplit():
 
 
 def test_route_train_cleaning_guard_to_next_or_end():
-    assert (
-        _route_after_train_cleaning_guard(
-            {"train_cleaning_passed": True, "train_cleaned_data_path": str(RAW_CSV)}
-        )
-        == "set_clean_test"
-    )
-    assert _route_after_train_cleaning_guard({}) == END
+    assert _route_supervisor_clean_train({
+        "supervisor_hints": {"clean_train": ""},
+        "supervisor_retry": {"clean_train": 0},
+    }) == "set_clean_test"
+
+    assert _route_supervisor_clean_train({
+        "supervisor_hints": {"clean_train": "Fail"},
+        "supervisor_retry": {"clean_train": 1},
+    }) == "reset_clean_train_retry"
+
+    assert _route_supervisor_clean_train({
+        "supervisor_hints": {"clean_train": "Fail"},
+        "supervisor_retry": {"clean_train": 3},
+    }) == END
 
 
 def test_route_test_cleaning_guard_to_next_or_end():
-    assert (
-        _route_after_test_cleaning_guard(
-            {"test_cleaning_passed": True, "test_cleaned_data_path": str(RAW_CSV)}
-        )
-        == "eda_agent"
-    )
-    assert _route_after_test_cleaning_guard({}) == END
+    assert _route_supervisor_clean_test({
+        "supervisor_hints": {"clean_test": ""},
+        "supervisor_retry": {"clean_test": 0},
+    }) == "eda_agent"
+
+    assert _route_supervisor_clean_test({
+        "supervisor_hints": {"clean_test": "Fail"},
+        "supervisor_retry": {"clean_test": 1},
+    }) == "reset_clean_test_retry"
+
+    assert _route_supervisor_clean_test({
+        "supervisor_hints": {"clean_test": "Fail"},
+        "supervisor_retry": {"clean_test": 3},
+    }) == END
 
 
 # ── 图：start → init_run ─────────────────────────────────────────────────────

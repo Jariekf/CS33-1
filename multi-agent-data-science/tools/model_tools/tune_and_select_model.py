@@ -381,6 +381,7 @@ def tune_and_select_model(
         best_score = float("-inf")
 
         for model_name in candidate_models:
+            print(f"🚀 开始调优模型: {model_name} (搜索策略: {hpo_strategy})...", flush=True)
             # ── Per-model fallback：单个模型失败不影响其他模型 ──────────────────
             try:
                 featured_train_path = feature_dataset_ids.get(model_name, "")
@@ -426,6 +427,7 @@ def tune_and_select_model(
                             scoring=effective_sklearn_scorer,
                             cv=cv,
                             n_jobs=-1,
+                            verbose=1,
                         )
                         actual_strategy = "grid"
                     elif hpo_strategy == "halving":
@@ -438,6 +440,7 @@ def tune_and_select_model(
                             factor=3,
                             random_state=random_state,
                             n_jobs=-1,
+                            verbose=1,
                         )
                         actual_strategy = "halving"
                     elif hpo_strategy == "bayesian":
@@ -454,6 +457,7 @@ def tune_and_select_model(
                             cv=cv,
                             random_state=random_state,
                             n_jobs=1,  # BayesSearchCV is not thread-safe with n_jobs=-1
+                            verbose=1,
                         )
                         actual_strategy = "bayesian"
                     else:
@@ -465,6 +469,7 @@ def tune_and_select_model(
                             cv=cv,
                             random_state=random_state,
                             n_jobs=-1,
+                            verbose=1,
                         )
                         actual_strategy = "random"
 
