@@ -185,7 +185,7 @@ def _search_arxiv_light(query: str) -> list[dict[str, Any]]:
     except ImportError:
         return []
 
-    max_results = int(os.getenv("ARXIV_MAX_RESULTS", "5"))
+    max_results = int(os.getenv("RAP_ARXIV_MAX_RESULTS", "2"))
     client = arxiv.Client()
     search = arxiv.Search(
         query=query,
