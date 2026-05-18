@@ -19,6 +19,7 @@ class GlobalState(TypedDict, total=False):
     data_path: str
     dataset_name: str
     description: str
+    description_file_path: str  # CLI --description-file 的绝对路径；供 EDA 工具解析列说明
     target_column: str
     task_type: str
 
