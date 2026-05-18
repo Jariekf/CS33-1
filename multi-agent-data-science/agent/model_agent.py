@@ -379,10 +379,129 @@ def _route_after_model(state: GlobalState) -> str:
     return "finalize"
 
 
+def _build_model_report(state: GlobalState, llm_summary: str) -> str:
+    """从 state 数据构建完整的模型报告 Markdown，LLM 步骤 4 文字作为补充追加。"""
+    best_model = state.get("best_model") or {}
+    model_results = state.get("model_results") or {}
+    task_type = (state.get("task_type") or "unknown").lower()
+    primary_metric = state.get("primary_metric") or ""
+    evaluation_metrics = state.get("evaluation_metrics") or []
+
+    model_name = best_model.get("model_name", "unknown")
+    lines: list[str] = []
+
+    # ── 1. CV 调参结果（所有候选模型）────────────────────────────────────────
+    lines.append("### CV 调参结果（训练集，候选模型对比）\n")
+    has_cv = False
+    for name, entry in model_results.items():
+        sel = entry.get("selection_summary") or {}
+        status = sel.get("status", "success")
+        cv_score = entry.get("cv_best_score")
+        cv_std = sel.get("cv_score_std")
+        best_params = entry.get("model_params") or {}
+        search_strategy = sel.get("search_strategy", "")
+        rows_trained = sel.get("rows_trained", "")
+
+        if status == "failed":
+            lines.append(f"**{name}** — ❌ 跳过（{sel.get('error', '未知错误')}）\n")
+        else:
+            is_best = "✅ **最终选择**" if name == model_name else ""
+            lines.append(f"**{name}** {is_best}")
+            lines.append(f"- CV {primary_metric or '得分'}：**{cv_score}**（std={cv_std}）")
+            lines.append(f"- 搜索策略：{search_strategy}　训练样本数：{rows_trained}")
+            if best_params:
+                params_str = "、".join(f"`{k}={v}`" for k, v in best_params.items())
+                lines.append(f"- 最优参数：{params_str}")
+            lines.append("")
+            has_cv = True
+
+    if not has_cv:
+        lines.append("_（CV 调参结果未记录）_\n")
+
+    # ── 2. 最终测试集评估 ───────────────────────────────────────────────────
+    lines.append("### 最终测试集评估\n")
+    final_metrics = best_model.get("final_test_metrics") or {}
+    if final_metrics:
+        # 优先展示 evaluation_metrics 指定的，再展示剩余的
+        ordered = list(evaluation_metrics) + [
+            k for k in final_metrics if k not in evaluation_metrics and not k.endswith("_skipped_reason")
+        ]
+        lines.append("| 指标 | 值 |")
+        lines.append("|---|---|")
+        for m in ordered:
+            if m in final_metrics and not m.endswith("_skipped_reason"):
+                val = final_metrics[m]
+                star = " ⭐" if m == primary_metric else ""
+                lines.append(f"| {m}{star} | {val} |")
+        lines.append("")
+    else:
+        lines.append("_（最终评估数据未记录）_\n")
+
+    # 混淆矩阵
+    cm = best_model.get("confusion_matrix")
+    if cm and task_type == "classification":
+        lines.append("**混淆矩阵：**")
+        lines.append("```")
+        for row in cm:
+            lines.append("  " + "  ".join(str(v) for v in row))
+        lines.append("```\n")
+
+    # ── 3. SHAP 特征重要性 ──────────────────────────────────────────────────
+    shap = best_model.get("shap_explanation") or {}
+    if shap and "error" not in shap:
+        lines.append("### SHAP 特征重要性（全局）\n")
+        lines.append(f"Explainer：{shap.get('explainer_type', '')}　"
+                     f"解释样本数：{shap.get('samples_explained', '')}\n")
+        fi = shap.get("feature_importance") or []
+        if fi:
+            lines.append("| 排名 | 特征 | mean\\|SHAP\\| | 方向 |")
+            lines.append("|---|---|---|---|")
+            for item in fi[:10]:
+                dir_icon = {"positive": "↑ 正向", "negative": "↓ 负向", "mixed": "↔ 混合"}.get(
+                    item.get("direction", ""), item.get("direction", "")
+                )
+                lines.append(
+                    f"| {item['rank']} | {item['feature']} "
+                    f"| {item['mean_abs_shap']} | {dir_icon} |"
+                )
+            lines.append("")
+        plot_path = shap.get("shap_summary_plot_path")
+        if plot_path:
+            lines.append(f"SHAP 图表：`{plot_path}`\n")
+    elif shap.get("error"):
+        lines.append(f"_SHAP 解析失败：{shap['error']}（不影响模型指标）_\n")
+
+    # ── 4. 资源感知指标 ─────────────────────────────────────────────────────
+    resource = best_model.get("resource_metrics") or {}
+    if resource:
+        latency = resource.get("inference_latency_ms_per_sample")
+        size_kb = resource.get("model_size_kb")
+        parts = []
+        if latency is not None:
+            parts.append(f"推理延迟 {latency}ms/样本")
+        if size_kb is not None:
+            parts.append(f"模型大小 {size_kb}KB")
+        if parts:
+            lines.append("### 资源指标\n")
+            lines.append("　".join(parts) + "\n")
+
+    # ── 5. 预测文件路径 ─────────────────────────────────────────────────────
+    pred_path = best_model.get("test_predictions_path")
+    if pred_path:
+        lines.append(f"预测值落盘：`{pred_path}`\n")
+
+    # ── 6. LLM 步骤 4 补充分析 ─────────────────────────────────────────────
+    if llm_summary.strip():
+        lines.append("### 模型 Agent 分析总结\n")
+        lines.append(llm_summary.strip())
+
+    return "\n".join(lines)
+
+
 def _model_finalize_node(state: GlobalState) -> GlobalState:
     """Pipeline 收尾：存 model_report、补全 best_model.task_type、保存 state 快照。"""
     last_msg = state["messages"][-1]
-    model_report_text = str(last_msg.content) if hasattr(last_msg, "content") else ""
+    llm_summary = str(last_msg.content) if hasattr(last_msg, "content") else ""
 
     best_model = dict(state.get("best_model") or {})
     task_type = (state.get("task_type") or "regression").lower()
@@ -391,7 +510,15 @@ def _model_finalize_node(state: GlobalState) -> GlobalState:
     model_name = best_model.get("model_name", "unknown")
     run_dir = state.get("run_dir") or ""
 
-    save_agent_report("model_agent", last_msg, model=model_name, run_dir=run_dir)
+    # 从 state 数据构建完整报告，LLM 步骤 4 作为补充附后
+    full_report = _build_model_report({**state, "best_model": best_model}, llm_summary)
+
+    class _FakeMsg:
+        """让 save_agent_report 能接受纯文本。"""
+        content = full_report
+
+    save_agent_report("model_agent", _FakeMsg(), model=model_name, run_dir=run_dir)
+    model_report_text = full_report
 
     timing = dict(state.get("timing") or {})
     entry = dict(timing.get("model_agent") or {})
@@ -402,7 +529,7 @@ def _model_finalize_node(state: GlobalState) -> GlobalState:
     timing["model_agent"] = entry
 
     updated: GlobalState = {
-        "model_report": model_report_text,
+        "model_report": full_report,
         "best_model": best_model,
         "current_stage": "model_done",
         "timing": timing,
