@@ -23,6 +23,7 @@ scikit-learn==1.8.0
 scikit-optimize==0.10.2
 xgboost==3.2.0
 lightgbm>=4.0.0
+shap>=0.46.0
 
 # Visualisation (optional — used for graph export)
 matplotlib>=3.9.0
