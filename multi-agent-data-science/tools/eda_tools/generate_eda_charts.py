@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import re
 import textwrap
 import warnings
 from pathlib import Path
@@ -172,6 +173,31 @@ def _wrap_axis_label(label: object, width: int = 11) -> str:
     return "\n".join(part.replace(" ", "_") for part in wrapped) if wrapped else text
 
 
+def _wrap_plain_phrase(text: str, width: int = 14) -> str:
+    """Wrap human-readable phrases for axis labels (keep spaces; no ``_`` substitution)."""
+    text = str(text).strip()
+    if len(text) <= width:
+        return text
+    wrapped = textwrap.wrap(text, width=width, break_long_words=False)
+    return "\n".join(wrapped) if wrapped else text
+
+
+def _heatmap_axis_label(col: str, col_labels: dict[str, str], wrap_width: int = 13) -> str:
+    """Heatmap ticks: show **data-dictionary phrase only** when available (dense grid).
+
+    Standard in slides/reports when space is tight; exact column ids remain in
+    the notebook / CSV. Falls back to wrapped column name if no description.
+
+    ``wrap_width`` is intentionally narrow so multi-line labels stay shorter when
+    x-ticks are rotated (avoids sideways overlap).
+    """
+    c = str(col)
+    desc = col_labels.get(c, "")
+    if desc:
+        return _wrap_plain_phrase(desc, width=wrap_width)
+    return _wrap_axis_label(c, width=11)
+
+
 def _missing_overview_rows(df: pd.DataFrame, max_cols: int = 30) -> list[dict[str, Any]]:
     total = max(len(df), 1)
     rows = [
@@ -193,6 +219,91 @@ def _relative_path(path: Path, output_dir: Path) -> str:
         return path.as_posix()
 
 
+def _col_labels_from_text(text: str) -> dict[str, str]:
+    """Parse data_description-style text into {col_name: short_description}.
+
+    Lines look like ``ColumnName: Description text.`` — we keep the phrase
+    before the first ``(`` or ``.`` so parenthetical explanations don't inflate titles.
+    Column names may start with a digit (e.g. ``1stFlrSF``, ``2ndFlrSF``).
+    """
+    col_map: dict[str, str] = {}
+    # First token must start with letter or digit; rest is identifier (incl. underscore).
+    col_line = re.compile(r"^([A-Za-z0-9][A-Za-z0-9_]*)\s*:\s*(.+)$")
+    for line in text.splitlines():
+        m = col_line.match(line.strip())
+        if not m:
+            continue
+        col_name = m.group(1).strip()
+        desc = m.group(2).strip()
+        desc = re.split(r"\s*[\(\.]", desc)[0].strip().rstrip(",;")
+        if col_name and desc:
+            col_map[col_name] = desc
+    return col_map
+
+
+def _load_col_labels(description_file: str = "", description_text: str = "") -> dict[str, str]:
+    """Build column → short label map.
+
+    - If ``description_text`` is non-empty, parse it in-memory (same content as
+      GlobalState ``description`` when using ``--description-file`` — avoids a
+      second disk read for callers that already hold the string).
+    - Else if ``description_file`` points to a readable file, read once and parse.
+    - The LangGraph ToolNode only passes LLM tool args; the EDA agent typically
+      passes ``description_file`` only. Re-reading that small .txt is cheap; the
+      dual path exists for scripts and future injection of ``description_text``.
+    """
+    t = (description_text or "").strip()
+    if t:
+        return _col_labels_from_text(t)
+    if not description_file:
+        return {}
+    path = Path(description_file)
+    if not path.is_file():
+        return {}
+    try:
+        return _col_labels_from_text(path.read_text(encoding="utf-8", errors="ignore"))
+    except Exception:
+        return {}
+
+
+def _readable_label(col: str, col_labels: dict[str, str], max_desc: int = 56) -> str:
+    """Return ``ColName\\n(short description)`` when a dictionary entry exists."""
+    desc = col_labels.get(str(col), "")
+    if not desc:
+        return str(col)
+    if len(desc) > max_desc:
+        trimmed = desc[:max_desc].rsplit(" ", 1)[0]
+        desc = trimmed + "\u2026" if trimmed else desc[:max_desc] + "\u2026"
+    return f"{col}\n({desc})"
+
+
+def _compact_axis_label(col: str, col_labels: dict[str, str], desc_max: int = 36) -> str:
+    """Single-line-ish label for tight axes (heatmap ticks, missing-value rows).
+
+    Uses ``Col — phrase`` when a description exists; phrase is word-trimmed.
+    """
+    c = str(col)
+    desc = col_labels.get(c, "")
+    if not desc:
+        return c
+    if len(desc) > desc_max:
+        desc = desc[:desc_max].rsplit(" ", 1)[0] + "\u2026"
+    return f"{c}\n({desc})"
+
+
+def _barh_two_line_label(col: str, col_labels: dict[str, str]) -> str:
+    """Two-line y tick for horizontal bar charts (same style as missing-values chart)."""
+    c = str(col)
+    stem = c.split("_", 1)[0] if "_" in c else c
+    desc = col_labels.get(c, "") or col_labels.get(stem, "")
+    if not desc:
+        return c
+    # Slightly tighter phrase than subplot titles so bar-chart rows stay compact
+    if len(desc) > 44:
+        desc = desc[:44].rsplit(" ", 1)[0] + "\u2026"
+    return f"{c}\n({desc})"
+
+
 @tool
 def generate_eda_charts(
     file_path: str,
@@ -200,6 +311,8 @@ def generate_eda_charts(
     target_column: str = "",
     task_type: str = "",
     test_file_path: str = "",
+    description_file: str = "",
+    description_text: str = "",
 ) -> str:
     """生成完整 EDA 图表并返回图表 metadata。
 
@@ -209,6 +322,9 @@ def generate_eda_charts(
       target_column：目标列名。为空时用列名启发式推断。
       task_type：任务类型，优先使用 GlobalState 中的 classification/regression。
       test_file_path：测试集 CSV 路径，用于生成测试集类别平衡图。
+      description_file：数据集描述 TXT 路径（可选）。若提供，列名标题会附加可读说明。
+      description_text：与 description_file 同内容的纯文本（可选）。非空时优先解析，
+        避免再次读盘；通常由脚本传入，LLM 调用时保持默认空即可。
 
     返回 JSON，包含 output_dir、plot_count、plot_paths、charts、text_summary。
     """
@@ -218,6 +334,8 @@ def generate_eda_charts(
         "target_column": target_column,
         "task_type": task_type,
         "test_file_path": test_file_path,
+        "description_file": description_file,
+        "description_text": description_text,
     }
     try:
         _setup_plot_style()
@@ -231,6 +349,8 @@ def generate_eda_charts(
         df = pd.read_csv(train_path)
         if df.empty:
             raise ValueError("训练集为空，无法生成 EDA charts。")
+
+        col_labels = _load_col_labels(description_file, description_text)
 
         out = Path(output_dir) if output_dir else train_path.parent / "eda_plots"
         out.mkdir(parents=True, exist_ok=True)
@@ -276,6 +396,7 @@ def generate_eda_charts(
             def draw_missing() -> None:
                 rows = list(reversed(_missing_overview_rows(df)))
                 labels = [row["column"] for row in rows]
+                display_labels = [_compact_axis_label(lb, col_labels) for lb in labels]
                 counts = [int(row["missing_count"]) for row in rows]
                 rates = [float(row["missing_rate"]) for row in rows]
                 y_pos = np.arange(len(rows))
@@ -286,7 +407,7 @@ def generate_eda_charts(
                     offset = max(max(counts) * 0.015, 0.2)
                     ax.text(count + offset, y, f"{rate * 100:.1f}%", va="center", fontsize=8)
                 ax.set_yticks(y_pos)
-                ax.set_yticklabels(labels, fontsize=8)
+                ax.set_yticklabels(display_labels, fontsize=7)
                 ax.set_xlabel("Number of Missing Values")
                 ax.set_ylabel("Variable")
                 ax.set_title("Missing Data Overview", fontsize=14, fontweight="bold")
@@ -308,11 +429,19 @@ def generate_eda_charts(
                     if pd.api.types.is_numeric_dtype(y) and target_type == "regression":
                         pd.to_numeric(y, errors="coerce").dropna().hist(bins=40, color="teal", edgecolor="white")
                         plt.xlabel(str(target_col))
-                        plt.title(f"Training set target distribution: {target_col}")
+                        plt.title(
+                            f"Training set target distribution: {target_col}",
+                            fontsize=14,
+                            fontweight="bold",
+                        )
                     else:
                         y.astype(str).value_counts().head(20).plot(kind="bar", color="coral", edgecolor="white")
                         plt.xticks(rotation=45, ha="right")
-                        plt.title(f"Training set target category counts: {target_col}")
+                        plt.title(
+                            f"Training set target category counts: {target_col}",
+                            fontsize=14,
+                            fontweight="bold",
+                        )
                     plt.ylabel("Count")
 
                 save_chart("target_distribution.png", f"Distribution of target `{target_col}`", draw_target_distribution)
@@ -380,8 +509,8 @@ def generate_eda_charts(
                 ax = plt.subplot(rows, cols, index + 1)
                 series = pd.to_numeric(df[col], errors="coerce").dropna()
                 series.hist(bins=30, color=palette[index], edgecolor="white", ax=ax)
-                ax.set_title(str(col)[:40])
-            plt.suptitle("Numeric feature distributions")
+                ax.set_title(_readable_label(col, col_labels), fontsize=8)
+            plt.suptitle("Numeric feature distributions", fontsize=14, fontweight="bold")
 
         save_chart("numeric_distributions.png", "Histograms for numeric features", draw_numeric_distributions)
 
@@ -400,7 +529,7 @@ def generate_eda_charts(
                 ax = plt.subplot(rows, cols, index + 1)
                 vc = (_top_categories(df[col]).value_counts(normalize=True).sort_values(ascending=False) * 100)
                 vc.plot(kind="bar", color=palette[index], edgecolor="white", ax=ax)
-                ax.set_title(str(col)[:40])
+                ax.set_title(_readable_label(col, col_labels), fontsize=8)
                 ax.set_xlabel("")
                 ax.set_ylabel("Percent of rows (%)")
                 ax.tick_params(axis="x", labelrotation=45)
@@ -419,10 +548,10 @@ def generate_eda_charts(
             if num_df.shape[1] < 2:
                 raise ValueError("至少需要 2 个数值列才能绘制相关热力图。")
             variances = num_df.var(numeric_only=True).sort_values(ascending=False)
-            top_cols = variances.head(min(15, len(variances))).index.tolist()
+            top_cols = variances.head(min(10, len(variances))).index.tolist()
             corr = df[top_cols].apply(pd.to_numeric, errors="coerce").corr(numeric_only=True)
-            plt.figure(figsize=(10, 8))
-            wrapped_labels = [_wrap_axis_label(col) for col in corr.columns]
+            fig, ax = plt.subplots(figsize=(12, 10))
+            wrapped_labels = [_heatmap_axis_label(c, col_labels) for c in corr.columns]
             sns.heatmap(
                 corr,
                 annot=True,
@@ -431,10 +560,35 @@ def generate_eda_charts(
                 center=0,
                 xticklabels=wrapped_labels,
                 yticklabels=wrapped_labels,
+                annot_kws={"size": 10, "weight": "normal"},
+                ax=ax,
+                cbar_kws={"shrink": 0.82},
             )
-            plt.title("Correlation heatmap (top numeric columns by variance)", fontsize=14, fontweight="bold")
-            plt.xticks(rotation=35, ha="right")
-            plt.yticks(rotation=35, va="center")
+            ax.set_title(
+                "Correlation heatmap (top numeric columns by variance)",
+                fontsize=14,
+                fontweight="bold",
+                pad=12,
+            )
+            # Shallow tilt (easier to read than 90°; less overlap than 45° with long phrases)
+            _xt_rot = 28
+            plt.setp(
+                ax.get_xticklabels(),
+                rotation=_xt_rot,
+                ha="right",
+                va="top",
+                fontsize=8,
+                linespacing=0.9,
+            )
+            plt.setp(
+                ax.get_yticklabels(),
+                rotation=0,
+                ha="right",
+                va="center",
+                fontsize=8,
+                linespacing=0.9,
+            )
+            fig.subplots_adjust(left=0.26, right=0.96, bottom=0.42, top=0.90)
 
         save_chart("corr_heatmap.png", "Pearson correlation heatmap for top numeric columns", draw_corr_heatmap)
 
@@ -448,9 +602,9 @@ def generate_eda_charts(
                 ax = plt.subplot(rows, cols, index + 1)
                 series = pd.to_numeric(df[col], errors="coerce").dropna()
                 ax.boxplot(series, orientation="vertical", patch_artist=True, boxprops={"facecolor": palette[index]})
-                ax.set_title(str(col)[:40])
+                ax.set_title(_readable_label(col, col_labels), fontsize=8)
                 ax.set_xticks([])
-            plt.suptitle("Numeric feature boxplots")
+            plt.suptitle("Numeric feature boxplots", fontsize=14, fontweight="bold")
 
         save_chart("outlier_boxplots.png", "Grid boxplots for numeric features", draw_outlier_boxplots)
 
@@ -475,11 +629,15 @@ def generate_eda_charts(
                                 plotted = True
                         if not plotted:
                             sns.histplot(data=work, x=col, hue=target_col, stat="density", common_norm=False, ax=ax)
-                        ax.set_title(str(col)[:40])
+                        ax.set_title(_readable_label(col, col_labels), fontsize=8)
                         ax.set_xlabel("")
                         if index == 0:
                             ax.legend(title=str(target_col))
-                    plt.suptitle("Numeric feature distributions by target class")
+                    plt.suptitle(
+                        "Numeric feature distributions by target class",
+                        fontsize=14,
+                        fontweight="bold",
+                    )
 
                 save_chart(
                     "numeric_by_target_density.png",
@@ -504,7 +662,7 @@ def generate_eda_charts(
                         if index == 0:
                             legend_handles, legend_labels = ax.get_legend_handles_labels()
                         ax.set_ylim(0, 1)
-                        ax.set_title(str(col)[:40])
+                        ax.set_title(_readable_label(col, col_labels), fontsize=8)
                         ax.set_xlabel("")
                         ax.set_ylabel("Class proportion")
                         ax.tick_params(axis="x", labelrotation=45)
@@ -548,8 +706,8 @@ def generate_eda_charts(
                             scatter_kws={"alpha": 0.25, "s": 12},
                             line_kws={"linewidth": 1.5},
                         )
-                        ax.set_title(str(col)[:40])
-                    plt.suptitle("Numeric features vs continuous target")
+                        ax.set_title(_readable_label(col, col_labels), fontsize=8)
+                    plt.suptitle("Numeric features vs continuous target", fontsize=14, fontweight="bold")
 
                 save_chart(
                     "numeric_vs_target_regression.png",
@@ -575,11 +733,11 @@ def generate_eda_charts(
                             }
                         ).dropna()
                         sns.boxplot(data=plot_df, x="feature", y="target", ax=ax, color=palette[index])
-                        ax.set_title(str(col)[:40])
+                        ax.set_title(_readable_label(col, col_labels), fontsize=8)
                         ax.tick_params(axis="x", labelrotation=45)
                         ax.set_xlabel("")
                         ax.set_ylabel(str(target_col))
-                    plt.suptitle("Categorical features vs continuous target")
+                    plt.suptitle("Categorical features vs continuous target", fontsize=14, fontweight="bold")
 
                 save_chart(
                     "categorical_vs_target_boxplot.png",
@@ -602,11 +760,15 @@ def generate_eda_charts(
                     values = [item[2] for item in target_corr]
                     y_pos = np.arange(len(labels))
                     colors = ["coral" if value < 0 else "steelblue" for value in values]
-                    plt.figure(figsize=(9, max(4, 0.4 * len(labels))))
+                    plt.figure(figsize=(9, max(5, 0.55 * len(labels))))
                     plt.barh(y_pos, values, color=colors)
-                    plt.yticks(y_pos, [label[:35] for label in labels], fontsize=8)
+                    plt.yticks(y_pos, [_barh_two_line_label(lb, col_labels) for lb in labels], fontsize=7)
                     plt.xlabel("Pearson correlation with target")
-                    plt.title("Top feature-target linear correlation")
+                    plt.title(
+                        "Top feature-target linear correlation",
+                        fontsize=14,
+                        fontweight="bold",
+                    )
                     plt.axvline(0, color="gray", lw=0.6)
 
                 save_chart(
@@ -646,11 +808,15 @@ def generate_eda_charts(
                 labels = [item[0] for item in pairs]
                 values = [float(item[1]) for item in pairs]
                 y_pos = np.arange(len(labels))
-                plt.figure(figsize=(9, max(4, 0.4 * len(labels))))
+                plt.figure(figsize=(9, max(5, 0.55 * len(labels))))
                 plt.barh(y_pos, values, color="seagreen")
-                plt.yticks(y_pos, [label[:35] for label in labels], fontsize=8)
+                plt.yticks(y_pos, [_barh_two_line_label(lb, col_labels) for lb in labels], fontsize=7)
                 plt.xlabel("Importance")
-                plt.title("RandomForest feature importance (quick n_estimators=50)")
+                plt.title(
+                    "RandomForest feature importance (quick n_estimators=50)",
+                    fontsize=14,
+                    fontweight="bold",
+                )
 
             save_chart(
                 "rf_importance.png",
