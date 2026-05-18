@@ -20,10 +20,11 @@ from core.my_llm import llm_for
 from core.report_writer import save_agent_report, save_state_snapshot
 from core.timer_utils import make_timer_start
 from tools.model_tools.evaluate_model import evaluate_model
+from tools.model_tools.explain_model import explain_model
 from tools.model_tools.train_model import train_model
 from tools.model_tools.tune_and_select_model import tune_and_select_model
 
-tools = [tune_and_select_model, train_model, evaluate_model]
+tools = [tune_and_select_model, train_model, evaluate_model, explain_model]
 llm_with_tools = llm_for("model").bind_tools(tools)
 
 
@@ -31,6 +32,7 @@ _MODELING_TOOL_NAMES = {
     "tune_and_select_model",
     "train_model",
     "evaluate_model",
+    "explain_model",
 }
 
 
@@ -175,9 +177,17 @@ def _model_node(state: GlobalState) -> GlobalState:
         "  model_path、feature_columns_path 来自 train_model 返回值，\n"
         "  model_name、task_type、target_column 从上方任务信息传入，\n"
         f"  evaluation_metrics={evaluation_metrics}，primary_metric='{primary_metric}'。\n\n"
-        "步骤 4 — 当 current_stage 为 model_evaluated 时，不再调用工具，\n"
-        "  输出简短总结：最终模型名称、cv_best_score vs final_test_metrics 中各指标对比、\n"
-        "  以及对泛化能力的简要判断（CV 分与 test 分差距是否合理）。\n"
+        "步骤 3.5 — 若 current_stage 为 model_evaluated，调用 explain_model 进行 SHAP 分析：\n"
+        "  model_path 来自 best_model.model_path，\n"
+        "  featured_test_path = testing_feature_dataset_ids[best_model_name]，\n"
+        "  target_column、model_name、task_type 从上方任务信息传入，\n"
+        f"  output_dir = '{run_dir + '/plots' if run_dir else ''}',\n"
+        "  max_samples=500，top_n_features=20。\n"
+        "  若 explain_model 返回 error，记录原因后继续步骤 4（SHAP 失败不中断 pipeline）。\n\n"
+        "步骤 4 — 当 current_stage 为 model_explained 时，不再调用工具，\n"
+        "  输出简短总结：最终模型名称、cv_best_score vs final_test_metrics 各指标对比、\n"
+        "  泛化能力判断（CV 分与 test 分差距是否合理）、\n"
+        "  以及 SHAP top-3 最重要特征及其方向（若 SHAP 成功）。\n"
         "  最终文字回复严格限于上述模型结果分析。\n"
         "【严禁事项 — 业务建议归 BAT，本 agent 仅做技术结论】：\n"
         "  - 严禁出现以下任何章节标题（中英文）：\n"
@@ -220,6 +230,7 @@ def _tool_state_update_node(state: GlobalState) -> GlobalState:
         "tune_and_select_model": _handle_tune_and_select,
         "train_model": _handle_train,
         "evaluate_model": _handle_evaluate,
+        "explain_model": _handle_explain,
     }
     handler = handlers.get(last_msg.name)
     return handler(state, last_msg) if handler else {}
@@ -294,10 +305,34 @@ def _handle_evaluate(state: GlobalState, tool_message: ToolMessage) -> GlobalSta
         best_model["final_test_metrics"] = test_metrics
         if confusion_matrix is not None:
             best_model["confusion_matrix"] = confusion_matrix
+        if payload.get("resource_metrics"):
+            best_model["resource_metrics"] = payload["resource_metrics"]
+        if payload.get("test_predictions_path"):
+            best_model["test_predictions_path"] = payload["test_predictions_path"]
     return {
         "best_model": best_model,
         "model_results": existing,
         "current_stage": "model_evaluated",
+    }
+
+
+def _handle_explain(state: GlobalState, tool_message: ToolMessage) -> GlobalState:
+    payload = _parse_payload(tool_message)
+    best_model = dict(state.get("best_model") or {})
+    if "error" in payload:
+        # SHAP 失败不中断 pipeline，记录错误继续
+        best_model["shap_explanation"] = {"error": payload["error"]}
+    else:
+        best_model["shap_explanation"] = {
+            "explainer_type": payload.get("explainer_type", ""),
+            "samples_explained": payload.get("samples_explained"),
+            "feature_importance": payload.get("feature_importance", []),
+            "top_features": payload.get("top_features", []),
+            "shap_summary_plot_path": payload.get("shap_summary_plot_path"),
+        }
+    return {
+        "best_model": best_model,
+        "current_stage": "model_explained",
     }
 
 

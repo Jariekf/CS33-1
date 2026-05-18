@@ -31,7 +31,7 @@ from core.env_utils import (
 
 llm_deepseek = ChatOpenAI(
     model=DEEPSEEK_MODEL or "deepseek-chat",
-    temperature=0.3,
+    temperature=0.7,
     api_key=DEEPSEEK_API_KEY,
     base_url=DEEPSEEK_BASEURL,
 )

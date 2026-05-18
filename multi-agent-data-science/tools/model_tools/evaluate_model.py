@@ -56,6 +56,10 @@ def evaluate_model(
       resource_metrics：资源感知指标 dict。
         - inference_latency_ms_per_sample：预热后单样本平均推理延迟（毫秒）。
         - model_size_kb：模型 pkl 文件大小（KB）。
+      test_predictions_path：预测值 CSV 路径（与模型同 run_dir/predictions/）。
+        列顺序：特征列（X_test）→ y_true → y_pred → y_prob_{class}（分类时）。
+        含完整特征列，复盘时可直接定位每条样本的输入特征与预测结果的对应关系。
+        落盘失败时为 null（non-fatal，不影响 metrics 结果）。
     """
     tool_inputs = {
         "model_path": model_path,
@@ -93,6 +97,7 @@ def evaluate_model(
         metrics: dict[str, Any] = {}
         confusion_matrix_result = None
         n_classes_eval: int | None = None
+        y_proba = None  # declared here so prediction-saving block can access it
 
         if task_type == "classification":
             import numpy as np
@@ -113,7 +118,6 @@ def evaluate_model(
 
             # ── Compute y_proba once; reused by roc_auc / log_loss / top-k ──────
             n_classes_eval = int(y_test.nunique())
-            y_proba: Any = None
             _proba_err: str = ""
             if hasattr(model, "predict_proba"):
                 try:
@@ -208,6 +212,29 @@ def evaluate_model(
         # ── 资源感知指标 ──────────────────────────────────────────────────────
         model_size_kb = round(os.path.getsize(model_path) / 1024, 2) if Path(model_path).is_file() else None
 
+        # ── 预测值落盘（可追溯性）────────────────────────────────────────────
+        # 列顺序：特征列 → y_true → y_pred → y_prob_{class}（分类时）
+        # 含 X_test 特征列，复盘时可直接定位是哪条样本、什么特征值导致了该预测
+        # model_path = .../run_dir/models/ModelName.pkl → predictions/ 同级
+        test_predictions_path: str | None = None
+        try:
+            pred_dir = Path(model_path).parent.parent / "predictions"
+            pred_dir.mkdir(parents=True, exist_ok=True)
+            pred_df = X_test.copy()
+            pred_df["y_true"] = y_test.values
+            pred_df["y_pred"] = y_pred
+            if task_type == "classification" and y_proba is not None:
+                classes = (
+                    model.classes_ if hasattr(model, "classes_") else range(y_proba.shape[1])
+                )
+                for i, cls in enumerate(classes):
+                    pred_df[f"y_prob_{cls}"] = y_proba[:, i]
+            pred_path = pred_dir / f"{model_name}_test_predictions.csv"
+            pred_df.to_csv(pred_path, index=True)
+            test_predictions_path = str(pred_path)
+        except Exception as _pred_exc:
+            test_predictions_path = None  # non-fatal, do not abort evaluation
+
         result = {
             "task_type": task_type,
             "model_name": model_name,
@@ -221,6 +248,7 @@ def evaluate_model(
                 "inference_latency_ms_per_sample": inference_latency_ms_per_sample,
                 "model_size_kb": model_size_kb,
             },
+            "test_predictions_path": test_predictions_path,
         }
         output = json.dumps(result, ensure_ascii=False, indent=2)
     except Exception as exc:
