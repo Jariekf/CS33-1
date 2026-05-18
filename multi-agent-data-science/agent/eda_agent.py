@@ -100,6 +100,7 @@ def _eda_node(state: GlobalState) -> GlobalState:
     target_column = state.get("target_column") or ""
     description = state.get("description") or ""
     testing_data_path = state.get("testing_data_path") or ""
+    description_file_path = state.get("description_file_path") or ""
 
     # ── 空转检测：若上一轮 LLM 没调用工具，累计计数 ──
     no_tool_rounds = state.get("eda_no_tool_rounds", 0)
@@ -161,7 +162,10 @@ def _eda_node(state: GlobalState) -> GlobalState:
         "3. 调用 generate_eda_charts 生成完整 EDA 图表："
         f"file_path 传入训练集路径，target_column 传入目标列，task_type 传入 `{task_type}`，"
         f"test_file_path 传入测试集路径 `{testing_data_path}`，"
-        f"output_dir 传入：{run_dir + '/plots' if run_dir else ''}（为空则使用默认路径）；\n"
+        f"output_dir 传入：{run_dir + '/plots' if run_dir else ''}（为空则使用默认路径），"
+        f"description_file 传入：`{description_file_path}`（为空则跳过），"
+        "parameters ``description_text`` 保持默认空即可（勿把整段描述贴进工具参数，以免浪费 token）；"
+        "列说明由上述文件解析。\n"
         "4. 综合以上分析，调用 select_candidate_models_and_metrics 提交最终决策，需同时确定：\n"
         f"   【模型选择】候选模型池（{task_type}）：{pool_str}，恰好选 3 个，名称须精确匹配；\n"
         f"   【评估指标】可选指标：{metrics_str}。\n"

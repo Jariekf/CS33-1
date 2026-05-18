@@ -63,6 +63,7 @@ def run_pipeline(
     testing_data_path: str = "",
     target_column: str = "",
     task_type: str = "",
+    description_file_path: str = "",
 ) -> dict:
     """运行完整多智能体数据科学流水线并返回最终 state。
 
@@ -109,6 +110,7 @@ def run_pipeline(
         "user_request": user_request,
         "data_path": data_path,
         "description": description,
+        "description_file_path": description_file_path,
     }
     if train_t and test_t:
         initial["training_data_path"] = train_t
@@ -310,6 +312,7 @@ if __name__ == "__main__":
     args = _build_arg_parser().parse_args()
     tc_cli, tt_cli = _cli_task_meta_or_exit(args)
     desc_text = _description_from_cli_or_exit(args)
+    desc_file_path = str(Path(args.description_file).expanduser().resolve()) if getattr(args, "description_file", None) else ""
     train_p = (args.train or "").strip()
     test_p = (args.test or "").strip()
     data_p = (args.data or "").strip()
@@ -338,6 +341,7 @@ if __name__ == "__main__":
             testing_data_path=str(p_test),
             target_column=tc_cli,
             task_type=tt_cli,
+            description_file_path=desc_file_path,
         )
     else:
         if not data_p:
@@ -355,4 +359,5 @@ if __name__ == "__main__":
             recursion_limit=args.recursion_limit,
             target_column=tc_cli,
             task_type=tt_cli,
+            description_file_path=desc_file_path,
         )
