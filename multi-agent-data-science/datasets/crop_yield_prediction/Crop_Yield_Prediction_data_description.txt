@@ -1,0 +1,51 @@
+Dataset: Crop Yield Prediction
+
+Overview:
+This dataset contains soil-condition and weather-related measurements used to predict crop type and crop yield. Each row is one agricultural observation with nutrient composition, environmental conditions, a crop label, and a yield value.
+
+Local file:
+- Crop_Yield_Prediction.csv: 2,200 rows, 9 columns
+
+Prediction tasks supported by the data:
+- Crop classification using the Crop column
+- Yield prediction using the Yield column
+
+General data characteristics:
+- No missing values were found in the local file.
+- 22 crop categories are present in the local data:
+  Apple, Banana, Blackgram, ChickPea, Coconut, Coffee, Cotton, Grapes, Jute, KidneyBeans, Lentil, Maize, Mango, MothBeans, MungBean, Muskmelon, Orange, Papaya, PigeonPeas, Pomegranate, Rice, Watermelon
+- Yield values in the local data range from 2 to 120000.
+
+Column descriptions:
+
+Nitrogen:
+Ratio of nitrogen content in the soil.
+
+Phosphorus:
+Ratio of phosphorus content in the soil.
+
+Potassium:
+Ratio of potassium content in the soil.
+
+Temperature:
+Ambient temperature in degrees Celsius.
+
+Humidity:
+Relative humidity in percent.
+
+pH_Value:
+Soil pH value.
+
+Rainfall:
+Rainfall in millimeters.
+
+Crop:
+Crop category associated with the observed conditions.
+
+Yield:
+Observed crop yield for the row.
+
+Suggested modeling notes:
+- Crop is a categorical target and Yield is a numeric target; they should not both be used as predictors for the same supervised task unless the task design explicitly allows it.
+- Soil nutrients and weather variables are all numeric and can be used directly for regression or classification.
+- Yield spans a wide numeric range, so scaling or log transformation may be worth testing depending on the model family.
