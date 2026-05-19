@@ -1,28 +1,28 @@
-Dataset: Academic Success
+Data information
 
-Overview:
-This dataset is a student outcome prediction dataset derived from higher-education records. The local copy contains a training split and a test split. Each row represents one student at the time of enrollment plus first- and second-semester academic information. The modeling goal is to predict the final student status.
+For what purpose was the dataset created?
+The dataset was created in a project that aims to contribute to the reduction of academic dropout and failure in higher education, by using machine learning techniques to identify students at risk at an early stage of their academic path, so that strategies to support them can be put into place. The dataset includes information known at the time of student enrollment – academic path, demographics, and social-economic factors. 
+The problem is formulated as a three category classification task (dropout, enrolled, and graduate) at the end of the normal duration of the course. 
 
-Local files:
-- train.csv: 76,518 rows, 38 columns
-- test.csv: 51,012 rows, 37 columns
+Who funded the creation of the dataset?
+This dataset is supported by program SATDAP - Capacitação da Administração Pública under grant POCI-05-5762-FSE-000191, Portugal.
 
-Prediction task:
-- Task type: Multiclass classification
-- Target column in train.csv: Target
-- Target classes observed in the local training data:
-  - Graduate: 36,282
-  - Dropout: 25,296
-  - Enrolled: 14,940
+What do the instances in this dataset represent?
+Each instance is a student
 
-Source context:
-This dataset corresponds to the UCI dataset "Predict Students' Dropout and Academic Success". UCI describes it as student-level data collected from a higher education institution, combining enrollment information, demographic and socioeconomic variables, and academic performance from the first two semesters.
+Are there recommended data splits?
+The dataset was used, in our project, with a data split of 80% for training and 20% for test.
 
-General data characteristics:
-- No missing values were found in the local training file.
-- Most administrative and background columns are encoded as numeric category codes rather than human-readable labels.
-- The local version includes an id column that is not part of the prediction target.
-- The dataset is moderately imbalanced, with Graduate as the largest class and Enrolled as the smallest.
+Was there any data preprocessing performed?
+We performed a rigorous data preprocessing to handle data from anomalies, unexplainable outliers, and missing values.
+
+Has Missing Values?
+No
+================
+Citation
+M.V.Martins, D. Tolledo, J. Machado, L. M.T. Baptista, V.Realinho. (2021) "Early prediction of student’s performance in higher education: a case study" Trends and Applications in Information Systems and Technologies, vol.1, in Advances in Intelligent Systems and Computing series. Springer. DOI: 10.1007/978-3-030-72657-7_16
+
+================
 
 Column descriptions:
 
@@ -140,7 +140,3 @@ Macroeconomic GDP-related indicator associated with the observation period.
 Target:
 Final student academic status. Values observed locally are Graduate, Dropout, and Enrolled.
 
-Suggested modeling notes:
-- Treat many low-cardinality integer fields as categorical rather than continuous.
-- The curricular-unit performance columns are likely the strongest direct predictors of the final status.
-- id should normally be excluded from model training.
