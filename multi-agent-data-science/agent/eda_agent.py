@@ -185,37 +185,37 @@ def _eda_node(state: GlobalState) -> GlobalState:
         "     Business-oriented percentage deviation with no zero values in the target column → MAPE (highly readable for business purposes; deviation of X percent; suitable for sales/financial forecasting scenarios)；\n"
         "     The `max_error` parameter is rarely used; it is only considered in scenarios requiring high precision (such as part tolerances).\n"
         "   · evaluation_metrics (2–4 lists): Metrics for the final test set summary report,"
-        "     primary_metric 必须包含在内，可加 1~2 个互补指标；\n"
-        "     分类强烈建议：同时包含 f1_macro 和 f1_weighted，前者暴露少数类风险，后者反映整体分布下的表现；\n"
-        "     回归建议：偏态目标值场景可加 max_error 观察最坏情况\n"
-        "   · metrics_rationale：结合数据画像和业务目标，说明选择上述指标的原因。\n"
-        "完成上述 4 个工具调用后，输出最终文字回复，内容严格限定为以下四项：\n"
-        "  (1) 数据画像关键发现（缺失值、异常值、分布特征）；\n"
-        "  (2) 相关矩阵分析结论（列出前几名相关特征，注明方向，指出疑似泄漏特征但不要描述删除操作——删除由 Feature Agent 执行）；\n"
-        "  (3) 候选模型选择理由；\n"
-        "  (4) 评估指标决策理由。\n"
-        "【严禁事项】：\n"
-        "  - 重要约束：你必须通过 tool_call 调用上述 4 个工具完成步骤 1~4，"
-        "禁止只输出文字描述假装已完成。即使上游 data_clean / agent_manager 报告很长，"
-        "你也必须独立执行 EDA 工具，不得复述上游内容、不得编造\"环境限制\"；\n"
-        "  - 不得虚构或预测特征工程的执行结果（如「已进行 one-hot 编码」「已删除 duration」）；\n"
-        "  - 不得虚构或预测模型训练、调参、CV 分数、测试集评估等任何后续阶段的结果；\n"
-        "  - 不得编写业务建议、最终模型选择结论或完整流水线总结；\n"
-        "  - EDA 报告只覆盖你实际执行的 4 个工具调用的真实输出，不得延伸至其他 Agent 的职责范围；\n"
-        "  - 严禁出现以下任何章节标题（中英文）：\n"
+        "     The primary metric must be included, and 1–2 complementary metrics may be added;\n"
+        "     Classification Strongly recommended: Include both f1_macro and f1_weighted; the former highlights risks associated with a small number of classes, while the latter reflects performance across the entire distribution;\n"
+        "     Backpropagation recommendation: For scenarios with skewed target values, add `max_error` to account for worst-case scenarios.\n"
+        "   · metrics_rationale: Explain the rationale for selecting the above metrics, taking into account the data profile and business objectives.\n"
+        "After executing the four tool calls described above, output the final text response, which must be strictly limited to the following four items:\n"
+        "  (1) Key findings from the data profiling (missing values, outliers, distribution characteristics);\n"
+       "   (2) Conclusions from the correlation matrix analysis (list the top few correlated features, indicate their direction, and identify suspected leakage features—but do not describe the deletion operation, as deletion is performed by the Feature Agent);\n"
+        "  (3) Rationale for selecting the candidate model;\n"
+        "  (4) Rationale for the choice of evaluation metrics.\n"
+        "[Prohibited Activities]:\n"
+        "  - Important requirement: You must use `tool_call` to invoke the four tools listed above to complete steps 1 through 4,"
+        "Do not simply output text descriptions to pretend the task is complete. Even if the upstream data_clean / agent_manager reports are lengthy,"
+        "you must run the EDA tools independently; do not repeat the content from upstream, and do not fabricate 'environmental constraints';\n"
+        "  - Do not fabricate or predict the results of feature engineering (e.g., 'one-hot encoding has been performed' or 'duration has been removed');\n"
+        "  - Do not fabricate or predict results for any subsequent stages, such as model training, hyperparameter tuning, CV scores, or test set evaluations;\n"
+        "  - Do not write business recommendations, conclusions regarding final model selection, or complete pipeline summaries;\n"
+        "  - The EDA report must cover only the actual output of the four tool calls you executed and must not extend into the scope of other agents’ responsibilities;\n"
+        "  - The following section titles (in both Chinese and English) are strictly prohibited:\n"
         "    · 中文：业务建议 / 业务影响 / 业务洞察 / 业务推荐 / 业务价值 / 业务意义 /\n"
         "      行动建议 / 推荐操作 / 策略建议 / 战略建议 / 下一步 / 下一步行动 / 下一步操作 / 后续行动\n"
-        "    · 英文：Business Recommendation(s) / Business Insight(s) / Business Action(s) /\n"
+        "    · English：Business Recommendation(s) / Business Insight(s) / Business Action(s) /\n"
         "      Business Implication(s) / Business Value / Recommendation(s) / Recommended Action(s) /\n"
         "      Next Step(s) / Action Item(s) / Strategic Implication(s) / Strategic Recommendation(s)\n"
-        "  - 业务建议由 business_translator_agent 在最终 business_insight_report.md 中统一产出；\n"
-        "    若你违规输出上述章节，落盘前会被 save_agent_report 的过滤器自动剥离。"
+       "  - Business recommendations should be consolidated by the business_translator_agent in the final business_insight_report.md;\n"
+        "    If you include the above sections in violation of these guidelines, they will be automatically removed by the save_agent_report filter before the report is saved."
     )
 
-    # ── 关键修复：只把本轮 EDA 工具调用链送给 LLM ─────────────────────────
-    # 首轮裁剪结果为空时，必须彻底丢弃整个 messages 历史（特别是 user_request
-    # HumanMessage 与 agent_manager 的 RAP wrap-up AIMessage），仅以 SystemMessage
-    # + 一条强约束 HumanMessage 启动 EDA，避免业务语境渗入。
+    # ── Critical Fix: Send only the current round’s EDA tool call chain to the LLM ─────────────────────────
+    # When the first round of pruning yields no results, the entire message history must be completely discarded (especially the RAP wrap-up AIMessage for user_request
+    # HumanMessage and agent_manager), and EDA must be initiated using only SystemMessage
+    # + a single strictly constrained HumanMessage to prevent business context from leaking in.
     trimmed_history = _trim_messages_to_current_round(messages)
     if trimmed_history:
         llm_input = [SystemMessage(content=system_content), *trimmed_history]
@@ -224,9 +224,9 @@ def _eda_node(state: GlobalState) -> GlobalState:
             SystemMessage(content=system_content),
             HumanMessage(
                 content=(
-                    "请按系统提示词第 1~4 步逐个调用工具完成 EDA，禁止只输出文字描述。"
-                    "禁止复读上游 data_clean / agent_manager 报告，"
-                    "禁止生成业务建议、推荐操作、下一步、Recommendations、Next Steps 等业务类章节。"
+                    "Please follow the system prompts in steps 1 through 4 to run the tool and complete the EDA; do not simply output text descriptions."
+                    "Do not repeat the content from the upstream data_clean or agent_manager reports,"
+                    "Do not generate business-related sections such as business suggestions, recommended actions, next steps, Recommendations, or Next Steps."
                 )
             ),
         ]
@@ -257,7 +257,7 @@ def _parse_tool_payload(tool_message: ToolMessage) -> dict[str, Any]:
     try:
         return json.loads(str(tool_message.content))
     except json.JSONDecodeError:
-        return {"error": {"type": "JSONDecodeError", "message": "工具输出不是合法 JSON"}}
+        return {"error": {"type": "JSONDecodeError", "message": "The tool's output is an invalid JSON"}}
 
 
 def _handle_eda_step(state: GlobalState, tool_message: ToolMessage) -> GlobalState:
@@ -319,18 +319,18 @@ def _show_graph_if_needed(agent_graph, show_graph: bool) -> None:
         output_dir.mkdir(parents=True, exist_ok=True)
         mmd_path = output_dir / "eda_agent_graph.mmd"
         mmd_path.write_text(agent_graph.get_graph().draw_mermaid(), encoding="utf-8")
-        print(f"Mermaid 源码已保存: {mmd_path}")
+        print(f"The Mermaid source code has been saved: {mmd_path}")
         image_path = output_dir / "eda_agent_graph.png"
         image_bytes = agent_graph.get_graph().draw_mermaid_png()
         image_path.write_bytes(image_bytes)
-        print(f"Graph 图片已保存: {image_path}")
+        print(f"Graph image saved: {image_path}")
         try:
             from IPython.display import Image, display
             display(Image(filename=str(image_path)))
         except Exception:
             pass
     except Exception as exc:
-        print(f"图渲染失败: {exc}")
+        print(f"Image rendering failed: {exc}")
 
 
 def _pretty_print_message(message) -> None:
@@ -368,7 +368,7 @@ eda_agent = build_eda_agent()
 
 if __name__ == "__main__":
     eda_agent = build_eda_agent(show_graph=True)
-    user_input = input("请输入：")
+    user_input = input("Please enter:")
     events = eda_agent.stream(
         {
             "messages": [HumanMessage(content=user_input)],
