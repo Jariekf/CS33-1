@@ -1,0 +1,288 @@
+Multi-Class Prediction of Obesity Risk
+Playground Series - Season 4, Episode 2
+
+
+============================================================
+1. Competition Basic Information
+============================================================
+
+Competition Name:
+Multi-Class Prediction of Obesity Risk
+
+Platform:
+Kaggle
+
+Series:
+Playground Series - Season 4, Episode 2
+
+Status:
+Late Submission
+
+Competition Host:
+Kaggle
+
+Prizes & Awards:
+Swag
+
+Points or Medals:
+This competition does not award Points or Medals.
+
+
+============================================================
+2. Main Pages
+============================================================
+
+Overview:
+https://www.kaggle.com/competitions/playground-series-s4e2/overview
+
+Data:
+https://www.kaggle.com/competitions/playground-series-s4e2/data
+
+Code:
+https://www.kaggle.com/competitions/playground-series-s4e2/code
+
+Models:
+https://www.kaggle.com/competitions/playground-series-s4e2/models
+
+Discussion:
+https://www.kaggle.com/competitions/playground-series-s4e2/discussion
+
+Leaderboard:
+https://www.kaggle.com/competitions/playground-series-s4e2/leaderboard
+
+Rules:
+https://www.kaggle.com/competitions/playground-series-s4e2/rules
+
+Team:
+https://www.kaggle.com/competitions/playground-series-s4e2/team
+
+Submissions:
+https://www.kaggle.com/competitions/playground-series-s4e2/submissions
+
+Header Image:
+https://www.kaggle.com/competitions/68479/images/header
+
+
+============================================================
+3. Overview
+============================================================
+
+Welcome to the 2024 Kaggle Playground Series.
+
+Kaggle plans to continue the spirit of previous playground competitions by providing interesting and approachable datasets for the community to practice machine learning skills.
+
+The Playground Series usually provides one competition each month.
+
+
+============================================================
+4. Goal
+============================================================
+
+The goal of this competition is to use different factors to predict obesity risk in individuals.
+
+This obesity risk is related to cardiovascular disease.
+
+Target Variable:
+NObeyesdad
+
+Task Type:
+Multi-class classification
+
+
+============================================================
+5. Evaluation
+============================================================
+
+Submissions are evaluated using accuracy score.
+
+Evaluation Metric:
+Accuracy Score
+
+Metric URL:
+https://en.wikipedia.org/wiki/Accuracy_and_precision
+
+
+============================================================
+6. Submission File Format
+============================================================
+
+For each id row in the test set, participants must predict the class value of the target variable NObeyesdad.
+
+The submission file must contain a header and follow this format:
+
+id,NObeyesdad
+20758,Normal_Weight
+20759,Normal_Weight
+20760,Normal_Weight
+etc.
+
+
+============================================================
+7. About the Tabular Playground Series
+============================================================
+
+The goal of the Tabular Playground Series is to provide the Kaggle community with lightweight challenges.
+
+These challenges can be used to learn and improve skills in different areas of machine learning and data science.
+
+The competitions usually last only a few weeks.
+
+The datasets are generally lightweight and suitable for:
+- quick model iteration
+- feature engineering
+- visualization practice
+- machine learning skill development
+- data science experimentation
+
+
+============================================================
+8. Synthetically Generated Datasets
+============================================================
+
+The Playground competitions use synthetic data.
+
+Using synthetic data helps Kaggle balance two goals:
+- providing real-world-like data with named features
+- keeping test labels private
+
+The datasets are generated from real-world data, but they are not exactly the same as the original datasets.
+
+The goal is to create interesting datasets with fewer synthetic artifacts.
+
+Kaggle also encourages feedback from participants to improve future competition datasets.
+
+
+============================================================
+9. Prizes
+============================================================
+
+1st Place:
+Choice of Kaggle merchandise
+
+2nd Place:
+Choice of Kaggle merchandise
+
+3rd Place:
+Choice of Kaggle merchandise
+
+Note:
+To encourage more participation from beginners, Kaggle merchandise will only be awarded once per person in this series.
+
+If a person has previously won, Kaggle will skip to the next team.
+
+
+============================================================
+10. Citation
+============================================================
+
+Walter Reade, Ashley Chow. (2024).
+Multi-Class Prediction of Obesity Risk.
+Kaggle.
+
+Citation URL:
+https://kaggle.com/competitions/playground-series-s4e2
+
+
+============================================================
+11. Participation Information
+============================================================
+
+Entrants:
+8,346
+
+Participants:
+3,746
+
+Teams:
+3,587
+
+Submissions:
+29,669
+
+
+============================================================
+12. Tags
+============================================================
+
+Beginner:
+https://www.kaggle.com/competitions?tagIds=13102-Beginner
+
+Time Series Analysis:
+https://www.kaggle.com/competitions?tagIds=13209-Time+Series+Analysis
+
+Tabular:
+https://www.kaggle.com/competitions?tagIds=14101-Tabular
+
+Multiclass Classification:
+https://www.kaggle.com/competitions?tagIds=14202-Multiclass+Classification
+
+
+============================================================
+13. Table of Contents
+============================================================
+
+Overview:
+https://www.kaggle.com/competitions/playground-series-s4e2/overview/abstract
+
+Evaluation:
+https://www.kaggle.com/competitions/playground-series-s4e2/overview/evaluation
+
+Timeline:
+https://www.kaggle.com/competitions/playground-series-s4e2/overview/timeline
+
+About the Tabular Playground Series:
+https://www.kaggle.com/competitions/playground-series-s4e2/overview/about-the-tabular-playground-series
+
+Prizes:
+https://www.kaggle.com/competitions/playground-series-s4e2/overview/prizes
+
+Citation:
+https://www.kaggle.com/competitions/playground-series-s4e2/overview/citation
+
+
+============================================================
+14. Data
+============================================================
+
+The dataset for this competition, including both train and test files, was generated from a deep learning model.
+
+The deep learning model was trained on the Obesity or CVD Risk dataset.
+
+Original Dataset:
+https://www.kaggle.com/datasets/aravindpcoder/obesity-or-cvd-risk-classifyregressorcluster
+
+The feature distributions are close to the original dataset, but they are not exactly the same.
+
+Participants are allowed to use the original dataset as part of this competition.
+
+The original dataset can be used to:
+- explore differences between the synthetic dataset and the original dataset
+- check whether adding the original data improves model performance
+
+
+============================================================
+15. Dataset Note
+============================================================
+
+This dataset is especially suitable for:
+- visualizations
+- clustering
+- general exploratory data analysis
+- EDA practice
+
+
+============================================================
+16. Files
+============================================================
+
+train.csv:
+The training dataset.
+The target variable NObeyesdad is included.
+NObeyesdad is a categorical target.
+
+test.csv:
+The test dataset.
+The objective is to predict the class of NObeyesdad for each row.
+
+sample_submission.csv:
+A sample submission file in the correct format.

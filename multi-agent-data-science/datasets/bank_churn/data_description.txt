@@ -1,0 +1,248 @@
+Binary Classification with a Bank Churn Dataset
+Playground Series - Season 4, Episode 1
+
+============================================================
+1. Competition Basic Information
+============================================================
+
+Competition Name:
+Binary Classification with a Bank Churn Dataset
+
+Platform:
+Kaggle
+
+Status:
+Late Submission
+
+Series:
+2024 Kaggle Playground Series
+Season 4, Episode 1
+
+
+============================================================
+2. Main Pages
+============================================================
+
+Overview:
+https://www.kaggle.com/competitions/playground-series-s4e1/overview
+
+Data:
+https://www.kaggle.com/competitions/playground-series-s4e1/data
+
+Code:
+https://www.kaggle.com/competitions/playground-series-s4e1/code
+
+Models:
+https://www.kaggle.com/competitions/playground-series-s4e1/models
+
+Discussion:
+https://www.kaggle.com/competitions/playground-series-s4e1/discussion
+
+Leaderboard:
+https://www.kaggle.com/competitions/playground-series-s4e1/leaderboard
+
+Rules:
+https://www.kaggle.com/competitions/playground-series-s4e1/rules
+
+Team:
+https://www.kaggle.com/competitions/playground-series-s4e1/team
+
+Submissions:
+https://www.kaggle.com/competitions/playground-series-s4e1/submissions
+
+
+============================================================
+3. Overview
+============================================================
+
+Welcome to the 2024 Kaggle Playground Series! Happy New Year! 
+
+This is the first episode of Season 4. The series continues the spirit of previous playground competitions by providing interesting and approachable datasets for the community to practice machine learning skills.
+
+The Playground Series usually provides one competition each month.
+
+
+============================================================
+4. Goal
+============================================================
+
+The task is to predict whether a customer continues with their bank account or closes it  (e.g., churns).
+
+Target variable:
+Exited
+
+============================================================
+5. Evaluation
+============================================================
+
+Submissions are evaluated using the area under the ROC curve.
+
+Evaluation Metric:
+Area Under the ROC Curve
+
+Reference:
+http://en.wikipedia.org/wiki/Receiver_operating_characteristic
+
+The metric compares the predicted probability with the observed target value.
+
+
+============================================================
+6. Submission File Format
+============================================================
+
+For each id in the test set, participants must predict the probability of the target variable Exited.
+
+The submission file must contain a header and follow this format:
+
+id,Exited
+165034,0.9
+165035,0.1
+165036,0.5
+etc.
+
+
+============================================================
+9. About the Tabular Playground Series
+============================================================
+
+The goal of the Tabular Playground Series is to provide the Kaggle community with lightweight challenges.
+
+These challenges help participants learn and practice different aspects of machine learning and data science.
+
+The competitions usually last only a few weeks.
+
+The datasets are generally lightweight and suitable for:
+- fast experimentation
+- model testing
+- feature engineering
+- visualization practice
+- machine learning skill development
+
+
+============================================================
+10. Synthetically Generated Datasets
+============================================================
+
+The Playground competitions use synthetic data.
+
+The purpose of synthetic data is to balance:
+- having real-world-like data with named features
+- preventing public access to test labels
+
+The datasets are generated to be similar to real-world data, but they are not exactly the same as the original datasets.
+
+Kaggle uses this approach to create more interesting competitions while keeping the test labels private.
+
+============================================================
+11. Citation
+============================================================
+
+Walter Reade, Ashley Chow. (2024).
+Binary Classification with a Bank Churn Dataset.
+Kaggle.
+
+Citation URL:
+https://kaggle.com/competitions/playground-series-s4e1
+
+
+============================================================
+12. Dataset Description
+============================================================
+
+The dataset for this competition (both train and test) was generated from a deep learning model trained on the Bank Customer Churn Prediction dataset. 
+
+Feature distributions are close to, but not exactly the same, as the original. 
+
+Feel free to use the original dataset as part of this competition, both to explore differences as well as to see whether incorporating the original in training improves model performance.
+
+Original Dataset:
+https://www.kaggle.com/datasets/shubhammeshram579/bank-customer-churn-prediction
+
+The original dataset can be used to:
+- explore differences between the synthetic and original datasets
+- check whether adding original data improves model performance
+
+
+============================================================
+13. Files
+============================================================
+
+train.csv:
+The training dataset.
+The target variable Exited is included.
+
+test.csv:
+The test dataset.
+The objective is to predict the probability of Exited.
+
+sample_submission.csv:
+A sample submission file in the correct format.
+
+
+============================================================
+14. About the Bank Customer Churn Dataset
+============================================================
+
+The bank customer churn dataset is commonly used for predicting customer churn in the banking industry.
+
+It contains information about bank customers who either:
+- left the bank
+- continued to be customers
+
+The dataset can be used to understand which customer features may be related to churn behavior.
+
+
+============================================================
+15. Dataset Attributes
+============================================================
+
+1. id
+A unique row identifier.
+
+2. CustomerId
+A unique identifier for each customer.
+
+3. Surname
+The customer's surname or last name.
+
+4. CreditScore
+A numerical value representing the customer's credit score.
+
+5. Geography
+The country where the customer resides.
+Possible values include France, Spain, and Germany.
+
+6. Gender
+The customer's gender.
+Possible values include Male and Female.
+
+7. Age
+The customer's age.
+
+8. Tenure
+The number of years the customer has been with the bank.
+
+9. Balance
+The customer's account balance.
+
+10. NumOfProducts
+The number of bank products the customer uses.
+Examples may include savings accounts or credit cards.
+
+11. HasCrCard
+Whether the customer has a credit card.
+1 = yes
+0 = no
+
+12. IsActiveMember
+Whether the customer is an active member.
+1 = yes
+0 = no
+
+13. EstimatedSalary
+The estimated salary of the customer.
+
+14. Exited
+Whether the customer has churned.
+1 = yes
+0 = no
