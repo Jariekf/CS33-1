@@ -17,10 +17,10 @@ def create_cleaning_plan(
     drop_columns: list[str] | None = None,
     notes: list[str] | None = None,
 ) -> str:
-    """记录针对训练集或测试集的数据清洗计划。需调用两次：target="train" 和 target="test"。
+    """Record the data cleaning plan for the training or test set. Must be called twice: target="train" and target="test".
 
-    target: "train" 表示训练集清洗计划，"test" 表示测试集清洗计划。
-    notes: 可选的补充说明列表，每条说明为一个简短字符串。必须是字符串列表，不可以是裸文本。
+    target: "train" denotes the training-set cleaning plan; "test" denotes the test-set cleaning plan.
+    notes: optional list of supplementary notes; each note is a short string. Must be a list of strings, not bare text.
     """
     normalized_notes: list[str]
     if notes is None:

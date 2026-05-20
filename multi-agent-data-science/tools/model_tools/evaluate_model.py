@@ -23,43 +23,47 @@ def evaluate_model(
     evaluation_metrics: list[str] | None = None,
     primary_metric: str = "",
 ) -> str:
-    """在预处理好的测试集上评估训练好的模型，返回评估指标。
+    """Evaluate a trained model on a preprocessed test set and return evaluation metrics.
 
-    工作流位置：train_model（全量重训）→ **evaluate_model（测试集评估）**
+    Pipeline position: train_model (full retrain) -> **evaluate_model (test-set evaluation)**
 
-    前置条件：feature agent 已对测试集做了与训练集完全一致的预处理（缩放、编码，含目标列编码），
-    并将结果保存为 CSV，路径存入 state.testing_feature_dataset_ids[model_name]。
+    Precondition: the feature agent has applied preprocessing identical to that of the training set
+    (scaling, encoding, including target-column encoding) to the test set, saved the result as a CSV,
+    and stored the path in state.testing_feature_dataset_ids[model_name].
 
-    参数：
-      model_path (str)：train_model 返回的模型 pkl 路径。
-      feature_columns_path (str)：train_model 返回的特征列名 JSON 路径，用于从测试集中提取对齐的特征列。
-      featured_test_data_path (str)：feature agent 输出的预处理后测试集 CSV 路径
-        (state.testing_feature_dataset_ids[model_name])。
-      model_name (str)：模型名称。
-      task_type (str)："classification" 或 "regression"。
-      target_column (str)：目标列名，从测试集中提取 y_test。
-      evaluation_metrics (list)：EDA Agent 指定的重点评估指标列表（如 ["roc_auc", "f1_weighted"]）。
-        写入结果 JSON，供 model agent 复盘和 supervisor agent 审查时划定关注范围。
-        工具内部始终计算全量指标（不以此列表为 if-gate）：
-          分类：accuracy、f1_macro、f1_weighted、recall、precision、roc_auc（均计算）。
-          回归：rmse、mae、r2（均计算）。
-      primary_metric (str)：EDA Agent 指定的主要指标（CV 选型所用），写入结果便于下游追踪。
+    Args:
+      model_path (str): path to the model pkl returned by train_model.
+      feature_columns_path (str): path to the feature-column-names JSON returned by train_model,
+        used to extract the aligned feature columns from the test set.
+      featured_test_data_path (str): path to the preprocessed test-set CSV output by the feature agent
+        (state.testing_feature_dataset_ids[model_name]).
+      model_name (str): name of the model.
+      task_type (str): "classification" or "regression".
+      target_column (str): target column name; used to extract y_test from the test set.
+      evaluation_metrics (list): list of key evaluation metrics specified by the EDA Agent
+        (e.g. ["roc_auc", "f1_weighted"]). Written to the result JSON so that the model agent
+        and supervisor agent know which metrics to focus on during review.
+        The tool always computes the full set of metrics internally (this list is not an if-gate):
+          classification: accuracy, f1_macro, f1_weighted, recall, precision, roc_auc (all computed).
+          regression: rmse, mae, r2 (all computed).
+      primary_metric (str): the primary metric specified by the EDA Agent (used for CV model selection);
+        written to the result for downstream tracking.
 
-    返回 JSON，包含：
-      model_name：模型名称。
-      model_path：模型文件路径。
-      primary_metric：主要指标名称。
-      evaluation_metrics：原样透传的重点指标列表。
-      evaluation_metrics：原样透传的重点指标列表。
-      metrics：标量评估指标 dict（不含混淆矩阵）。
-      confusion_matrix：混淆矩阵嵌套列表（仅分类任务，否则为 null）。
-      resource_metrics：资源感知指标 dict。
-        - inference_latency_ms_per_sample：预热后单样本平均推理延迟（毫秒）。
-        - model_size_kb：模型 pkl 文件大小（KB）。
-      test_predictions_path：预测值 CSV 路径（与模型同 run_dir/predictions/）。
-        列顺序：特征列（X_test）→ y_true → y_pred → y_prob_{class}（分类时）。
-        含完整特征列，复盘时可直接定位每条样本的输入特征与预测结果的对应关系。
-        落盘失败时为 null（non-fatal，不影响 metrics 结果）。
+    Returns JSON containing:
+      model_name: name of the model.
+      model_path: path to the model file.
+      primary_metric: name of the primary metric.
+      evaluation_metrics: the key metrics list, passed through as-is.
+      evaluation_metrics: the key metrics list, passed through as-is.
+      metrics: dict of scalar evaluation metrics (excluding the confusion matrix).
+      confusion_matrix: nested-list confusion matrix (classification only; null for regression).
+      resource_metrics: resource-aware metrics dict.
+        - inference_latency_ms_per_sample: average per-sample inference latency after warm-up (ms).
+        - model_size_kb: size of the model pkl file (KB).
+      test_predictions_path: path to the predictions CSV (under run_dir/predictions/ alongside the model).
+        Column order: feature columns (X_test) -> y_true -> y_pred -> y_prob_{class} (classification only).
+        Includes all feature columns so that each sample's input features and prediction can be traced directly during review.
+        null when writing fails (non-fatal; does not affect the metrics result).
     """
     tool_inputs = {
         "model_path": model_path,
@@ -77,16 +81,16 @@ def evaluate_model(
 
         test_df = pd.read_csv(featured_test_data_path)
         if target_column not in test_df.columns:
-            raise ValueError(f"目标列 '{target_column}' 不在测试集中。")
+            raise ValueError(f"Target column '{target_column}' not found in test set.")
 
         y_test = test_df[target_column]
 
-        # 按训练时确定的列序提取 X_test，缺失列填 0
+        # Extract X_test using the column order determined during training; fill missing columns with 0.
         X_test = pd.DataFrame(index=test_df.index)
         for col in feature_columns:
             X_test[col] = test_df[col] if col in test_df.columns else 0
 
-        # ── 推理延迟计时（预热 1 次后正式计时，取均值）────────────────────────
+        # -- Inference latency timing (warm up once, then time formally and average) --
         model.predict(X_test)  # warm-up
         _t0 = time.perf_counter()
         y_pred = model.predict(X_test)
@@ -209,13 +213,13 @@ def evaluate_model(
                 metrics["rmsle"] = None
                 metrics["rmsle_skipped_reason"] = str(exc)
 
-        # ── 资源感知指标 ──────────────────────────────────────────────────────
+        # -- Resource-aware metrics --
         model_size_kb = round(os.path.getsize(model_path) / 1024, 2) if Path(model_path).is_file() else None
 
-        # ── 预测值落盘（可追溯性）────────────────────────────────────────────
-        # 列顺序：特征列 → y_true → y_pred → y_prob_{class}（分类时）
-        # 含 X_test 特征列，复盘时可直接定位是哪条样本、什么特征值导致了该预测
-        # model_path = .../run_dir/models/ModelName.pkl → predictions/ 同级
+        # -- Persist predictions to disk (traceability) --
+        # Column order: feature columns -> y_true -> y_pred -> y_prob_{class} (classification only)
+        # Includes X_test feature columns so each sample's input features and prediction can be traced directly during review.
+        # model_path = .../run_dir/models/ModelName.pkl -> predictions/ is a sibling directory
         test_predictions_path: str | None = None
         try:
             pred_dir = Path(model_path).parent.parent / "predictions"

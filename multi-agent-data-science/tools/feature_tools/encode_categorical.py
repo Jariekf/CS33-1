@@ -19,28 +19,28 @@ def encode_categorical(
     run_dir: str = "",
     test_dataset_id: str = "",
 ) -> str:
-    """对类别列进行编码。encoder 在训练集上 fit，同步 transform 测试集（若提供）。
+    """Encode categorical columns. The encoder is fit on the training set and simultaneously transforms the test set (if provided).
 
-    参数：
-      dataset_id (str)：内存中的训练集数据集 ID。
-      columns (list[str])：需要编码的类别列名列表。
-      method (str)：编码方式。
-        - "label"（默认）：LabelEncoder，将每个类别映射为整数。适合树模型（XGBoost、RandomForest）。
-          拟合好的 encoder 会保存为 pkl。测试集中未见过的类别映射为 -1。
-        - "onehot"：OneHotEncoder，将类别展开为多个 0/1 列，原列被删除。适合线性模型。
-          使用 sklearn OneHotEncoder（handle_unknown='ignore'），fit 在训练集上，
-          确保测试集与训练集 dummy 列完全一致。
-      run_dir (str)：本次运行的工作目录，encoder 保存在 {run_dir}/features/encoders/ 下。
-      test_dataset_id (str)：内存中的测试集数据集 ID（可选）。
-        提供后，使用训练集拟合的 encoder 对测试集做相同变换（transform only，不重新 fit）。
+    Args:
+      dataset_id (str): ID of the in-memory training-set dataset.
+      columns (list[str]): list of categorical column names to encode.
+      method (str): encoding method.
+        - "label" (default): LabelEncoder; maps each category to an integer. Suitable for tree models (XGBoost, RandomForest).
+          The fitted encoder is saved as a pkl. Unseen categories in the test set are mapped to -1.
+        - "onehot": OneHotEncoder; expands categories into multiple 0/1 columns; the original column is deleted. Suitable for linear models.
+          Uses sklearn OneHotEncoder (handle_unknown='ignore'); fit on the training set;
+          ensures the test set has exactly the same dummy columns as the training set.
+      run_dir (str): working directory for this run; the encoder is saved under {run_dir}/features/encoders/.
+      test_dataset_id (str): ID of the in-memory test-set dataset (optional).
+        When provided, the test set is transformed (transform only, no re-fit) using the encoder fit on the training set.
 
-    返回 JSON，包含：
-      encoded_columns：实际完成编码的列名。
-      skipped_columns：跳过的列及原因。
-      method：使用的编码方式。
-      new_columns：onehot 编码后新增的列名列表（仅 method="onehot" 时有效）。
-      encoder_paths：label 编码时每列保存的 encoder pkl 路径（仅 method="label" 时有效）。
-      test_dataset_id：测试集 ID（若已提供并处理）。
+    Returns JSON containing:
+      encoded_columns: names of columns that were actually encoded.
+      skipped_columns: skipped columns and their reasons.
+      method: the encoding method used.
+      new_columns: list of newly added column names after onehot encoding (only valid when method="onehot").
+      encoder_paths: paths to the encoder pkl saved for each column during label encoding (only valid when method="label").
+      test_dataset_id: test-set ID (if provided and processed).
     """
     from sklearn.preprocessing import LabelEncoder, OneHotEncoder
 

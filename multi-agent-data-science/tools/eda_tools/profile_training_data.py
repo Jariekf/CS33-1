@@ -16,13 +16,13 @@ from tools.tool_trace import trace_tool_call
 
 @tool
 def profile_training_data(file_path: str, n_rows: int = 5) -> str:
-    """为训练集生成数据画像，包含缺失值、异常值、类型问题和删除候选列统计。
+    """Generate a data profile for the training set, including missing values, outliers, type issues, and drop-candidate column statistics.
 
-    参数：
-      file_path (str)：训练集 CSV 文件路径（即 state 中的 training_data_path）。
-      n_rows (int)：返回的样例行数，默认 5。
+    Args:
+      file_path (str): path to the training-set CSV file (i.e. training_data_path in state).
+      n_rows (int): number of sample rows to return; default 5.
 
-    返回 JSON，包含 dataset、missing_values、outliers、type_issues、drop_candidates、sample_rows。
+    Returns JSON containing dataset, missing_values, outliers, type_issues, drop_candidates, sample_rows.
     """
     tool_inputs = {"file_path": file_path, "n_rows": n_rows}
     try:

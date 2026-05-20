@@ -18,7 +18,7 @@ from sklearn.model_selection import (
 from tools.model_tools.train_model import _get_model
 from tools.tool_trace import trace_tool_call
 
-# ── 白名单（human-readable display names）────────────────────────────────────
+# -- Whitelist (human-readable display names) --
 _ALLOWED_SCORING = {
     "classification": {
         "f1_weighted",          # weighted avg → reflects overall perf on actual distribution
@@ -44,7 +44,7 @@ _ALLOWED_SCORING = {
     },
 }
 
-# display name → sklearn scoring string（仅需转换的条目；display name == sklearn name 的无需列出）
+# display name -> sklearn scoring string (only entries that need conversion; entries where display name == sklearn name are omitted)
 _SCORING_ALIAS: dict[str, str] = {
     "rmse":     "neg_root_mean_squared_error",
     "mae":      "neg_mean_absolute_error",
@@ -58,12 +58,12 @@ _DEFAULT_SCORING = {"classification": "f1_weighted", "regression": "r2"}
 _ALLOWED_CV_STRATEGY = {"auto", "stratified", "kfold", "timeseries"}
 
 _ALLOWED_HPO_STRATEGY = {"random", "grid", "halving", "bayesian"}
-# random   - RandomizedSearchCV：随机采样，均衡默认选项
-# grid     - GridSearchCV：穷举全部组合，仅适合参数空间小的模型（总组合数 ≤ 30）
-# halving  - HalvingRandomSearchCV：逐轮淘汰劣候选，大空间下比 random 快 2-3 倍
-# bayesian - BayesSearchCV（scikit-optimize）：GP 代理模型指导搜索，有限 iter 下最高效
+# random   - RandomizedSearchCV: random sampling; balanced default option
+# grid     - GridSearchCV: exhaustive search over all combinations; suitable only for models with a small parameter space (total combinations <= 30)
+# halving  - HalvingRandomSearchCV: progressively eliminate inferior candidates; 2-3x faster than random on large spaces
+# bayesian - BayesSearchCV (scikit-optimize): GP surrogate model guides the search; most efficient under a limited iteration budget
 
-# sklearn 中仅适用于二分类的 scorer；多分类时需升级到对应的 multi-class 版本
+# Scorers in sklearn that only apply to binary classification; must be upgraded to the corresponding multi-class version for multi-class tasks.
 _MULTICLASS_SCORER_UPGRADE: dict[str, str] = {
     "roc_auc": "roc_auc_ovr_weighted",
     "recall":  "recall_weighted",
@@ -75,11 +75,11 @@ _CUSTOM_SCORER_NAMES: frozenset[str] = frozenset({"rmsle"})
 
 
 def _to_sklearn_scorer(display_name: str) -> Any:
-    """display name → 实际 sklearn scorer（字符串或 scorer 对象）。
+    """display name -> actual sklearn scorer (string or scorer object).
 
-    - 标准指标：通过 _SCORING_ALIAS 转换为 sklearn scoring 字符串。
-    - rmsle：无内置字符串，构建 make_scorer；预测值 clip ≥ 0 防 log 域错误。
-    - 其余 display name 与 sklearn name 相同（如 r2、f1_weighted）：原样返回。
+    - Standard metrics: converted to a sklearn scoring string via _SCORING_ALIAS.
+    - rmsle: no built-in string; build a make_scorer; clip predictions to >= 0 to prevent log-domain errors.
+    - All other display names that match the sklearn name (e.g. r2, f1_weighted): returned as-is.
     """
     if display_name == "rmsle":
         import numpy as np
@@ -106,11 +106,11 @@ def _to_builtin(value: Any) -> Any:
 
 
 def _resolve_scoring(scoring: str, task_type: str) -> str:
-    """验证并返回经过规范化的 display name（人类可读名）。
+    """Validate and return the normalized display name (human-readable name).
 
-    始终返回 display name（如 "rmse"、"mape"、"roc_auc"），不返回 sklearn neg_* 字符串。
-    调用 _to_sklearn_scorer(display_name) 获取实际用于 sklearn API 的 scorer。
-    无效或空字符串时回退到任务默认值。
+    Always returns the display name (e.g. "rmse", "mape", "roc_auc"), not a sklearn neg_* string.
+    Call _to_sklearn_scorer(display_name) to obtain the scorer actually passed to the sklearn API.
+    Falls back to the task default when the value is invalid or an empty string.
     """
     allowed = _ALLOWED_SCORING.get(task_type, set())
     sklearn_name = _SCORING_ALIAS.get(scoring, scoring)
@@ -122,15 +122,15 @@ def _resolve_scoring(scoring: str, task_type: str) -> str:
 
 
 def _adapt_scorer_for_multiclass(scoring: str, n_classes: int) -> str:
-    """二分类专用 scorer 在多分类（>2 类）任务下会崩溃，自动升级到多分类兼容版本。
+    """Binary-classification-only scorers crash on multi-class (> 2 classes) tasks; automatically upgrade to the multi-class compatible version.
 
-    升级映射：
-      roc_auc   → roc_auc_ovr_weighted  （OvR + support 加权，sklearn 兼容）
-      recall    → recall_weighted
-      precision → precision_weighted
+    Upgrade mappings:
+      roc_auc   -> roc_auc_ovr_weighted  (OvR + support-weighted; sklearn-compatible)
+      recall    -> recall_weighted
+      precision -> precision_weighted
 
-    注：升级仅解决多分类兼容性问题；对 class imbalance 的最佳应对是 StratifiedKFold
-    + EDA agent 选取 f1_weighted / roc_auc_ovr_weighted 作为 primary_metric。
+    Note: the upgrade only resolves multi-class compatibility; the best response to class imbalance
+    is StratifiedKFold + EDA agent selecting f1_weighted / roc_auc_ovr_weighted as primary_metric.
     """
     if n_classes <= 2:
         return scoring
@@ -138,13 +138,13 @@ def _adapt_scorer_for_multiclass(scoring: str, n_classes: int) -> str:
 
 
 def _build_cv(cv_strategy: str, task_type: str, cv_folds: int) -> Any:
-    """根据策略和任务类型构建 sklearn CV 对象。
+    """Build a sklearn CV object based on strategy and task type.
 
-    策略说明：
-      auto       - 分类用 StratifiedKFold，回归用 KFold（默认）
-      stratified - StratifiedKFold，适合类别不平衡的分类任务
-      kfold      - 普通 KFold，适合回归或类别均衡的分类任务
-      timeseries - TimeSeriesSplit，数据有时序关系时必须使用，避免数据泄漏
+    Strategy descriptions:
+      auto       - StratifiedKFold for classification, KFold for regression (default)
+      stratified - StratifiedKFold; recommended for class-imbalanced classification tasks
+      kfold      - plain KFold; suitable for regression or class-balanced classification tasks
+      timeseries - TimeSeriesSplit; must be used when data has a temporal ordering to avoid data leakage
     """
     strategy = cv_strategy.lower() if cv_strategy else "auto"
     if strategy not in _ALLOWED_CV_STRATEGY:
@@ -263,77 +263,77 @@ def tune_and_select_model(
     search_strategy: str = "random",
     extra_param_overrides: dict[str, dict] | None = None,
 ) -> str:
-    """对候选模型执行 CV 超参数搜索与模型选择，返回最佳模型及每个模型的最优参数。
+    """Perform CV hyperparameter search and model selection for candidate models, returning the best model and optimal parameters for each.
 
-    该工具只使用训练集（feature_dataset_ids），不会接触 test set。
-    不保存模型文件；最终重训由 train_model 完成。
+    This tool only uses the training set (feature_dataset_ids) and never touches the test set.
+    It does not save model files; the final retraining is done by train_model.
 
-    参数：
-      feature_dataset_ids (dict)：各候选模型对应的特征工程后训练集路径。
-      candidate_models (list)：候选模型名称列表。
-      task_type (str)："classification" 或 "regression"。
-      target_column (str)：目标列名。
-      cv_folds (int)：交叉验证折数，默认 5。
-        建议：训练集 < 1000 行 → 3 折；1000~20000 行 → 5 折；> 20000 行 → 可用 10 折获得更稳定估计。
-      max_iter_per_model (int)：search_strategy="random"/"halving" 时每模型的采样次数上限，默认 12。
-        search_strategy="grid" 时忽略此参数（穷举全部组合）。
-        建议：参数维度 ≤ 2 → 8~12；维度 3~4 → 15~25；维度 ≥ 5 → 25~40。
-      random_state (int)：随机种子，默认 42。
-      scoring (str)：评分指标，留空时使用任务默认值。
-        分类可选：f1_weighted（默认）、f1_macro、roc_auc、accuracy、recall、precision、log_loss
-          f1_macro   - 等权 per-class 平均，对少数类更敏感，适合类别不平衡场景
-          f1_weighted- 样本量加权平均，反映整体分布下的性能，为默认选项
-          log_loss   - 连续概率校准指标（CTR 预估、风险评分等场景首选）；
-                       需要模型支持 predict_proba，SVM 默认不支持，应避免同时选用
-        回归可选：r2（默认）、rmse、mae、mape、rmsle、max_error
-          技术约束：mape 的 y_true 含 0 时 CV 产生 inf（安全降级）；
-            rmsle 用 make_scorer（无 sklearn 内置字符串）；
-            max_error 的 cv_best_score 为负值（越接近 0 越好）。
-        注：roc_auc、recall、precision 为二分类专用；目标列类别数 > 2 时自动升级为
-        roc_auc_ovr_weighted / recall_weighted / precision_weighted。
-      cv_strategy (str)：交叉验证策略，默认 "auto"。
-        auto       - 分类用 StratifiedKFold，回归用 KFold
-        stratified - StratifiedKFold，类别不平衡时推荐
-        kfold      - 普通 KFold
-        timeseries - TimeSeriesSplit，数据存在时序关系时必须使用，否则会产生数据泄漏
-      search_strategy (str)：超参数搜索策略，默认 "random"。
-        random   - RandomizedSearchCV：随机采样 max_iter_per_model 次。均衡默认选项。
-        grid     - GridSearchCV：穷举全部参数组合。
-                   建议：仅当模型参数空间总组合数 ≤ 30 时使用（如 Ridge、Lasso、LogisticRegression）。
-        halving  - HalvingRandomSearchCV：逐轮淘汰表现差的候选，在相同时间内比 random 探索更多配置。
-                   建议：参数空间大（组合数 > 100）或候选模型多时使用（如 XGBoost、RandomForest）。
-        bayesian - BayesSearchCV（scikit-optimize）：高斯过程代理模型指导搜索，
-                   在相同 iter 预算内通常比 random/halving 找到更优参数组合。
-                   建议：max_iter_per_model 较小（≤ 20）且希望最大化搜索质量时使用。
-                   所有 list 型参数自动转为 Categorical 离散空间，无需额外配置。
+    Args:
+      feature_dataset_ids (dict): paths to the feature-engineered training set for each candidate model.
+      candidate_models (list): list of candidate model names.
+      task_type (str): "classification" or "regression".
+      target_column (str): target column name.
+      cv_folds (int): number of cross-validation folds; default 5.
+        Recommendation: training set < 1000 rows -> 3 folds; 1000-20000 rows -> 5 folds; > 20000 rows -> 10 folds for a more stable estimate.
+      max_iter_per_model (int): upper limit on the number of samples per model when search_strategy="random"/"halving"; default 12.
+        Ignored when search_strategy="grid" (exhaustive search).
+        Recommendation: parameter dimensions <= 2 -> 8-12; dimensions 3-4 -> 15-25; dimensions >= 5 -> 25-40.
+      random_state (int): random seed; default 42.
+      scoring (str): scoring metric; uses the task default when empty.
+        Classification options: f1_weighted (default), f1_macro, roc_auc, accuracy, recall, precision, log_loss
+          f1_macro    - equal-weight per-class average; more sensitive to minority classes; suitable for class-imbalanced scenarios
+          f1_weighted - sample-count-weighted average; reflects performance on the actual distribution; the default option
+          log_loss    - continuous probability calibration metric (preferred for CTR estimation, risk scoring, etc.);
+                        requires models to support predict_proba; SVM does not support it by default and should not be used together
+        Regression options: r2 (default), rmse, mae, mape, rmsle, max_error
+          Technical constraints: mape produces inf during CV when y_true contains 0 (safely degraded);
+            rmsle uses make_scorer (no built-in sklearn string);
+            cv_best_score for max_error is negative (closer to 0 is better).
+        Note: roc_auc, recall, precision are binary-classification-only; when the target column has > 2 classes they are automatically upgraded to
+        roc_auc_ovr_weighted / recall_weighted / precision_weighted.
+      cv_strategy (str): cross-validation strategy; default "auto".
+        auto       - StratifiedKFold for classification, KFold for regression
+        stratified - StratifiedKFold; recommended for class-imbalanced tasks
+        kfold      - plain KFold
+        timeseries - TimeSeriesSplit; must be used when data has a temporal ordering, otherwise data leakage will occur
+      search_strategy (str): hyperparameter search strategy; default "random".
+        random   - RandomizedSearchCV: random sampling for max_iter_per_model iterations. Balanced default option.
+        grid     - GridSearchCV: exhaustive search over all parameter combinations.
+                   Recommended: use only when the total number of combinations in the model's parameter space is <= 30 (e.g. Ridge, Lasso, LogisticRegression).
+        halving  - HalvingRandomSearchCV: progressively eliminate poor-performing candidates; explores more configurations than random in the same time.
+                   Recommended: use when the parameter space is large (combinations > 100) or there are many candidate models (e.g. XGBoost, RandomForest).
+        bayesian - BayesSearchCV (scikit-optimize): Gaussian-process surrogate model guides the search;
+                   typically finds better parameter combinations than random/halving with the same iteration budget.
+                   Recommended: use when max_iter_per_model is small (<= 20) and you want to maximize search quality.
+                   All list-type parameters are automatically converted to Categorical discrete spaces with no additional configuration.
 
-      extra_param_overrides (dict | None)：按模型名注入或覆盖搜索空间中的特定参数，默认 None。
-        key 为模型名，value 为需要追加/覆盖的参数 dict（合并到 _get_param_space 的默认空间之上）。
-        只传需要调整的参数，其余参数保持默认空间不变。
+      extra_param_overrides (dict | None): inject or override specific parameters in the search space by model name; default None.
+        key is the model name, value is a dict of parameters to append/override (merged on top of the default space from _get_param_space).
+        Pass only the parameters that need adjustment; all other parameters remain in the default space.
 
-        常见注入场景：
-          1. 不平衡分类（支持 class_weight 的模型）：
+        Common injection scenarios:
+          1. Imbalanced classification (for models that support class_weight):
              {"LogisticRegression": {"class_weight": ["balanced", None]},
               "RandomForest":       {"class_weight": ["balanced", None]},
               "SVM":                {"class_weight": ["balanced", None]}}
-          2. 大样本扩充树模型 n_estimators 上限：
+          2. Expand n_estimators upper bound for large-sample tree models:
              {"RandomForest":    {"n_estimators": [200, 300, 500]},
               "XGBoost":         {"n_estimators": [200, 300, 500]}}
-          3. 高维特征调整 max_features：
+          3. Adjust max_features for high-dimensional features:
              {"RandomForest": {"max_features": ["sqrt", "log2", 0.3, 0.5]}}
 
-        注意：注入的参数名和类型必须与模型的 sklearn/xgboost 参数接口完全一致，
-        否则会在 fit() 时引发 ValueError。不确定时不传，使用默认空间。
+        Note: injected parameter names and types must exactly match the model's sklearn/xgboost parameter interface,
+        otherwise a ValueError will be raised at fit() time. When uncertain, omit and use the default space.
 
-    返回 JSON，包含：
-      best_model_name、best_model_params、
-      selection_metric（实际使用的 scorer，多分类时可能已升级）、
-      n_classes（目标列唯一类别数，供下游判断任务是二分类还是多分类）、
-      cv_strategy_used、search_strategy_used、best_cv_score、
-      per_model_summary（每个模型的结果，含 status 字段）：
-        - status="success"：best_params / cv_best_score / cv_score_std / scoring / search_strategy
-        - status="failed"：error（失败原因，含异常类型和消息）；该模型不参与 best 评选
-      skipped_models（失败模型列表，供 model_agent 分析失败原因）
+    Returns JSON containing:
+      best_model_name, best_model_params,
+      selection_metric (the scorer actually used; may have been upgraded for multi-class),
+      n_classes (number of unique target classes, for downstream determination of binary vs. multi-class),
+      cv_strategy_used, search_strategy_used, best_cv_score,
+      per_model_summary (results for each model, including a status field):
+        - status="success": best_params / cv_best_score / cv_score_std / scoring / search_strategy
+        - status="failed": error (reason for failure, including exception type and message); the model is excluded from best selection
+      skipped_models (list of failed models, for model_agent to analyze failure reasons)
     """
     resolved_scoring = _resolve_scoring(scoring, task_type)
     cv = _build_cv(cv_strategy, task_type, cv_folds)
@@ -356,10 +356,10 @@ def tune_and_select_model(
     }
     try:
         if not candidate_models:
-            raise ValueError("candidate_models 不能为空。")
+            raise ValueError("candidate_models must not be empty.")
 
-        # ── 多分类检测：用第一个可用数据集探测目标列的唯一类别数 ─────────────
-        # 仅分类任务需要检测；回归任务 resolved_scoring 不含二分类专用 scorer
+        # -- Multi-class detection: probe the number of unique classes in the target column using the first available dataset --
+        # Only needed for classification tasks; resolved_scoring for regression tasks does not contain binary-only scorers.
         n_classes = 2
         if task_type == "classification":
             for _m in candidate_models:
@@ -381,16 +381,16 @@ def tune_and_select_model(
         best_score = float("-inf")
 
         for model_name in candidate_models:
-            print(f"🚀 开始调优模型: {model_name} (搜索策略: {hpo_strategy})...", flush=True)
-            # ── Per-model fallback：单个模型失败不影响其他模型 ──────────────────
+            print(f"Starting tuning for model: {model_name} (search strategy: {hpo_strategy})...", flush=True)
+            # -- Per-model fallback: a failure in one model does not affect the others --
             try:
                 featured_train_path = feature_dataset_ids.get(model_name, "")
                 if not featured_train_path:
-                    raise ValueError(f"feature_dataset_ids 中缺少 '{model_name}' 的路径。")
+                    raise ValueError(f"Path for '{model_name}' is missing in feature_dataset_ids.")
 
                 df = pd.read_csv(featured_train_path)
                 if target_column not in df.columns:
-                    raise ValueError(f"目标列 '{target_column}' 不在训练集中。")
+                    raise ValueError(f"Target column '{target_column}' not found in training set.")
 
                 feature_cols = [c for c in df.columns if c != target_column]
                 X = df[feature_cols]
@@ -492,21 +492,21 @@ def tune_and_select_model(
                     best_model_name = model_name
 
             except Exception as model_exc:
-                # 记录失败原因，继续处理下一个候选模型
+                # Record the failure reason and continue processing the next candidate model.
                 summary[model_name] = {
                     "status": "failed",
                     "error": f"{type(model_exc).__name__}: {model_exc}",
                     "cv_best_score": None,
                 }
 
-        # 若全部模型均失败，整体报错
+        # If all models failed, raise an overall error.
         successful = [m for m, v in summary.items() if v.get("status") == "success"]
         if not successful:
             failed_reasons = {m: v["error"] for m, v in summary.items()}
-            raise ValueError(f"所有候选模型均失败，无法选出最佳模型。失败原因：{failed_reasons}")
+            raise ValueError(f"All candidate models failed; unable to select the best model. Failure reasons: {failed_reasons}")
 
         if not best_model_name:
-            raise ValueError("无法从候选模型中选出最佳模型。")
+            raise ValueError("Unable to select the best model from the candidates.")
 
         skipped_models = [m for m, v in summary.items() if v.get("status") == "failed"]
         result = {

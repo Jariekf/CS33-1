@@ -8,7 +8,7 @@ from tools.tool_trace import trace_tool_call
 
 @tool
 def clean_drop_columns(dataset_id: str, columns: list[str], strict: bool = False) -> str:
-    """删除指定列。默认忽略不存在的列；strict=True 时遇到缺失列会报错。"""
+    """Drop the specified columns. Missing columns are ignored by default; when strict=True, an error is raised for missing columns."""
     tool_inputs = {"dataset_id": dataset_id, "columns": columns, "strict": strict}
     try:
         df = get_dataset(dataset_id).copy()

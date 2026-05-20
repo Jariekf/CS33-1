@@ -23,39 +23,39 @@ def encode_target_column(
     run_dir: str = "",
     test_dataset_id: str = "",
 ) -> str:
-    """对目标列进行编码，使其与指定模型的要求兼容。encoder 在训练集上 fit，同步 transform 测试集（若提供）。
+    """Encode the target column to make it compatible with the requirements of the specified model. The encoder is fit on the training set and simultaneously transforms the test set (if provided).
 
-    工具内部自动判断是否需要编码：
-      - 需要编码的模型（XGBoost、XGBoostRegressor）：
-          分类任务使用 LabelEncoder 将标签映射为 0/1/2...，保存 encoder pkl，同步编码测试集目标列。
-          回归任务确保目标列为 float 数值型，测试集目标列同步转换。
-      - 不需要编码的模型（RandomForest、LogisticRegression、SVM、KNN 等）：
-          sklearn 内部会处理字符串标签，返回 status="skipped"，目标列不变。
-      - 若目标列已经是整数（如 0/1），返回 status="already_numeric"，跳过编码。
+    The tool automatically determines whether encoding is needed:
+      - Models that require encoding (XGBoost, XGBoostRegressor):
+          For classification tasks, LabelEncoder maps labels to 0/1/2...; saves the encoder pkl; simultaneously encodes the test-set target column.
+          For regression tasks, ensures the target column is a float numeric type; the test-set target column is converted simultaneously.
+      - Models that do not require encoding (RandomForest, LogisticRegression, SVM, KNN, etc.):
+          sklearn handles string labels internally; returns status="skipped" and leaves the target column unchanged.
+      - If the target column is already integer (e.g. 0/1), returns status="already_numeric" and skips encoding.
 
-    参数：
-      dataset_id (str)：内存中的训练集数据集 ID。
-      target_column (str)：目标列名称，不要传入特征列。
-      model_name (str)：当前模型名称，如 "XGBoost"、"RandomForest"。
-      task_type (str)：任务类型。
-        - "classification"（默认）：分类任务，标签编码为整数。
-        - "regression"：回归任务，将目标列转换为 float。
-      run_dir (str)：本次运行的工作目录，encoder 保存在 {run_dir}/features/encoders/ 下。
-      test_dataset_id (str)：内存中的测试集数据集 ID（可选）。
-        提供后，使用训练集拟合的 encoder 对测试集目标列做相同变换。
+    Args:
+      dataset_id (str): ID of the in-memory training-set dataset.
+      target_column (str): target column name; do not pass a feature column.
+      model_name (str): current model name, e.g. "XGBoost", "RandomForest".
+      task_type (str): task type.
+        - "classification" (default): classification task; labels are encoded as integers.
+        - "regression": regression task; convert the target column to float.
+      run_dir (str): working directory for this run; the encoder is saved under {run_dir}/features/encoders/.
+      test_dataset_id (str): ID of the in-memory test-set dataset (optional).
+        When provided, the test-set target column is transformed using the encoder fit on the training set.
 
-    返回 JSON，包含：
-      dataset_id：数据集 ID。
-      target_column：目标列名。
-      encoded：是否执行了编码（True/False）。
-      status：执行状态。
-        - "encoded"：成功完成 LabelEncoder 编码。
-        - "already_numeric"：目标列已为整数，跳过编码。
-        - "converted_to_float"：回归任务转换为 float 成功。
-        - "skipped"：当前模型不需要目标列编码。
-      encoder_path：LabelEncoder pkl 路径（status="encoded" 时有值，其余为空字符串）。
-      original_classes：编码前的原始类别列表（status="encoded" 时有值）。
-      test_dataset_id：测试集 ID（若已提供并处理）。
+    Returns JSON containing:
+      dataset_id: dataset ID.
+      target_column: target column name.
+      encoded: whether encoding was performed (True/False).
+      status: execution status.
+        - "encoded": LabelEncoder encoding completed successfully.
+        - "already_numeric": target column is already integer; encoding skipped.
+        - "converted_to_float": regression task conversion to float succeeded.
+        - "skipped": current model does not require target column encoding.
+      encoder_path: path to the LabelEncoder pkl (has a value when status="encoded"; otherwise an empty string).
+      original_classes: list of original classes before encoding (has a value when status="encoded").
+      test_dataset_id: test-set ID (if provided and processed).
     """
     from sklearn.preprocessing import LabelEncoder
 
@@ -76,7 +76,7 @@ def encode_target_column(
                 {
                     "error": {
                         "type": "ColumnNotFound",
-                        "message": f"目标列 '{target_column}' 不存在于数据集中",
+                        "message": f"Target column '{target_column}' does not exist in the dataset",
                     }
                 },
                 ensure_ascii=False,

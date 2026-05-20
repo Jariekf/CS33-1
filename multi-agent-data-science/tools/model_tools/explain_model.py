@@ -36,36 +36,37 @@ def explain_model(
     max_samples: int = 500,
     top_n_features: int = 20,
 ) -> str:
-    """使用 SHAP 对最终模型进行可解释性分析，返回全局特征重要性和方向。
+    """Use SHAP to perform interpretability analysis on the final model and return global feature importance and direction.
 
-    工作流位置：evaluate_model → **explain_model** → business_translator_agent
+    Pipeline position: evaluate_model -> **explain_model** -> business_translator_agent
 
-    参数：
-      model_path (str)：train_model 返回的模型 pkl 路径。
-      featured_test_path (str)：feature agent 输出的预处理后测试集 CSV 路径
-        (state.testing_feature_dataset_ids[model_name])，与 evaluate_model 所用路径相同。
-      target_column (str)：目标列名，用于从测试集中分离 X。
-      model_name (str)：模型名称，用于输出文件命名。
-      task_type (str)："classification" 或 "regression"。
-      output_dir (str)：图表输出目录；留空时自动推断为 model_path 同 run_dir 下的 plots/ 目录。
-      max_samples (int)：用于 SHAP 解释的最大样本数，默认 500。
-        对树模型（TreeExplainer）无性能瓶颈，可适当增大。
-        对线性模型（LinearExplainer）速度也快，可增大。
-        对 KernelExplainer（SVM/KNN 等）计算慢，建议保持 ≤ 500。
-      top_n_features (int)：在特征重要性列表中返回的 top 特征数，默认 20。
+    Args:
+      model_path (str): path to the model pkl returned by train_model.
+      featured_test_path (str): path to the preprocessed test-set CSV output by the feature agent
+        (state.testing_feature_dataset_ids[model_name]); the same path used by evaluate_model.
+      target_column (str): target column name; used to separate X from the test set.
+      model_name (str): model name; used for naming output files.
+      task_type (str): "classification" or "regression".
+      output_dir (str): chart output directory; when empty, automatically inferred as the plots/ directory
+        under the same run_dir as model_path.
+      max_samples (int): maximum number of samples used for SHAP explanation; default 500.
+        No performance bottleneck for tree models (TreeExplainer); can be increased.
+        Also fast for linear models (LinearExplainer); can be increased.
+        Slow for KernelExplainer (SVM/KNN etc.); recommended to keep <= 500.
+      top_n_features (int): number of top features to return in the feature importance list; default 20.
 
-    返回 JSON，包含：
-      model_name：模型名称。
-      explainer_type：实际使用的 SHAP explainer 类名。
-      samples_explained：实际用于 SHAP 计算的样本数。
-      feature_importance：特征重要性列表（按 mean |SHAP| 降序），每项含：
-        - rank：排名（从 1 开始）
-        - feature：特征名
-        - mean_abs_shap：该特征的 mean(|SHAP value|)，值越大影响越大
-        - mean_shap：该特征的 mean(SHAP value)，正值表示正向影响预测，负值反之
-        - direction："positive" | "negative" | "mixed"（|mean_shap| < 0.05 * mean_abs_shap 时为 mixed）
-      top_features：top_n_features 个最重要特征的名称列表（按重要性降序）。
-      shap_summary_plot_path：SHAP bar chart PNG 路径（生成失败时为 null）。
+    Returns JSON containing:
+      model_name: name of the model.
+      explainer_type: class name of the SHAP explainer actually used.
+      samples_explained: actual number of samples used for SHAP computation.
+      feature_importance: list of feature importance entries (descending by mean |SHAP|), each containing:
+        - rank: rank (starting from 1)
+        - feature: feature name
+        - mean_abs_shap: mean(|SHAP value|) for this feature; larger means greater influence
+        - mean_shap: mean(SHAP value) for this feature; positive means positive influence on predictions, negative means the opposite
+        - direction: "positive" | "negative" | "mixed" (mixed when |mean_shap| < 0.05 * mean_abs_shap)
+      top_features: list of the top_n_features most important feature names (descending by importance).
+      shap_summary_plot_path: path to the SHAP bar chart PNG (null if generation fails).
     """
     tool_inputs = {
         "model_path": model_path,
@@ -80,53 +81,53 @@ def explain_model(
         import shap
     except ImportError:
         output = json.dumps(
-            {"error": {"type": "ImportError", "message": "shap 未安装，请运行 pip install shap"}},
+            {"error": {"type": "ImportError", "message": "shap is not installed; please run: pip install shap"}},
             ensure_ascii=False,
         )
         trace_tool_call("explain_model", tool_inputs, output)
         return output
 
     try:
-        # ── 加载模型和特征数据 ──────────────────────────────────────────────
+        # -- Load model and feature data --
         with open(model_path, "rb") as f:
             model = pickle.load(f)
 
         test_df = pd.read_csv(featured_test_path)
         if target_column not in test_df.columns:
-            raise ValueError(f"目标列 '{target_column}' 不在测试集中。")
+            raise ValueError(f"Target column '{target_column}' not found in test set.")
 
         feature_cols = [c for c in test_df.columns if c != target_column]
         X = test_df[feature_cols]
 
-        # ── 采样（针对慢速 explainer）──────────────────────────────────────
+        # -- Sample (for slow explainers) --
         if len(X) > max_samples:
             X = X.sample(n=max_samples, random_state=42).reset_index(drop=True)
         samples_explained = len(X)
 
-        # ── 构建 SHAP Explainer（auto-dispatch）────────────────────────────
-        # shap.Explainer 会自动选择：
-        #   树模型     → TreeExplainer  (exact, fast)
-        #   线性模型   → LinearExplainer (exact, fast)
-        #   其他       → PermutationExplainer / KernelExplainer (approx, slow)
+        # -- Build SHAP Explainer (auto-dispatch) --
+        # shap.Explainer auto-selects:
+        #   tree models   -> TreeExplainer  (exact, fast)
+        #   linear models -> LinearExplainer (exact, fast)
+        #   others        -> PermutationExplainer / KernelExplainer (approx, slow)
         explainer = shap.Explainer(model, X)
         explainer_type = type(explainer).__name__
 
         shap_values = explainer(X)
 
-        # ── 提取 SHAP 矩阵 ─────────────────────────────────────────────────
+        # -- Extract SHAP matrix --
         # shap_values.values shape:
-        #   回归         → (n_samples, n_features)
-        #   二分类       → (n_samples, n_features) or (n_samples, n_features, 2)
-        #   多分类       → (n_samples, n_features, n_classes)
+        #   regression       -> (n_samples, n_features)
+        #   binary classification  -> (n_samples, n_features) or (n_samples, n_features, 2)
+        #   multi-class classification -> (n_samples, n_features, n_classes)
         vals: np.ndarray = shap_values.values
         if vals.ndim == 3:
-            # 取正类（index=1）做二分类；多分类取均值
+            # Use positive class (index=1) for binary classification; average over classes for multi-class.
             if task_type == "classification" and vals.shape[2] == 2:
                 vals = vals[:, :, 1]
             else:
                 vals = vals.mean(axis=2)
 
-        # ── 计算特征重要性 ──────────────────────────────────────────────────
+        # -- Compute feature importance --
         mean_abs = np.abs(vals).mean(axis=0)   # mean |SHAP| per feature
         mean_shap = vals.mean(axis=0)          # mean SHAP per feature (direction)
 
@@ -152,7 +153,7 @@ def explain_model(
 
         top_features = [fi["feature"] for fi in feature_importance]
 
-        # ── 生成 SHAP bar chart ────────────────────────────────────────────
+        # -- Generate SHAP bar chart --
         shap_summary_plot_path: str | None = None
         try:
             import matplotlib

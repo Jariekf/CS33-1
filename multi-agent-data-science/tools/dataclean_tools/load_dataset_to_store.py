@@ -10,14 +10,14 @@ from tools.tool_trace import trace_tool_call
 
 @tool
 def load_dataset_to_store(file_path: str, dataset_id: str = "") -> str:
-    """读取 CSV 数据集到内存 dataset_store，并返回 dataset_id。"""
+    """Read a CSV dataset into the in-memory dataset_store and return the dataset_id."""
     tool_inputs = {"file_path": file_path, "dataset_id": dataset_id}
     try:
         path = Path(file_path).expanduser().resolve()
         if not path.exists():
-            raise FileNotFoundError(f"文件不存在: {path}")
+            raise FileNotFoundError(f"File not found: {path}")
         if not path.is_file():
-            raise ValueError(f"路径不是文件: {path}")
+            raise ValueError(f"Path is not a file: {path}")
 
         df = pd.read_csv(path, sep=None, engine="python")
         final_dataset_id = put_dataset(df, dataset_id=dataset_id or None)

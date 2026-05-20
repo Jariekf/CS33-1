@@ -5,39 +5,39 @@ from langchain_core.tools import tool
 
 from tools.tool_trace import trace_tool_call
 
-# ── Metrics 白名单 ────────────────────────────────────────────────────────────
-# primary_metric / evaluation_metrics 均使用人类可读名（rmse/mae 而非 neg_* 前缀）
-# tune_and_select_model 内部会做 rmse→neg_root_mean_squared_error 的映射
+# -- Metrics whitelist --
+# primary_metric / evaluation_metrics both use human-readable names (rmse/mae rather than neg_* prefix)
+# tune_and_select_model internally maps rmse -> neg_root_mean_squared_error
 CLASSIFICATION_METRICS = {"accuracy", "f1_macro", "f1_weighted", "roc_auc", "precision", "recall", "log_loss"}
 REGRESSION_METRICS = {"r2", "rmse", "mae", "mape", "rmsle", "max_error"}
 
 CLASSIFICATION_POOL = [
-    "LogisticRegression",    # 线性基线，可解释性强
-    "RandomForest",          # 集成树，稳定、抗噪
-    "XGBoost",               # 梯度提升，竞赛级性能
-    "LightGBM",              # 更快的梯度提升，大数据集优先
-    "GradientBoosting",      # sklearn 原生梯度提升，无需额外依赖
-    "ExtraTrees",            # 极端随机树，速度快、方差低
-    "AdaBoost",              # 自适应提升，对不平衡数据有效
-    "SVM",                   # 核方法，中小数据集表现好
-    "KNN",                   # 实例学习，无参数假设
-    "GaussianNB",            # 朴素贝叶斯，极快的概率基线
-    "MLPClassifier",         # 多层感知机，数值特征多/样本量大时有优势
+    "LogisticRegression",    # linear baseline; strong interpretability
+    "RandomForest",          # ensemble trees; stable and noise-resistant
+    "XGBoost",               # gradient boosting; competition-grade performance
+    "LightGBM",              # faster gradient boosting; preferred for large datasets
+    "GradientBoosting",      # sklearn native gradient boosting; no extra dependencies
+    "ExtraTrees",            # extremely randomized trees; fast with low variance
+    "AdaBoost",              # adaptive boosting; effective for imbalanced data
+    "SVM",                   # kernel method; performs well on small-to-medium datasets
+    "KNN",                   # instance-based learning; no parametric assumption
+    "GaussianNB",            # naive Bayes; extremely fast probabilistic baseline
+    "MLPClassifier",         # multilayer perceptron; advantageous when many numeric features or large sample size
 ]
 
 REGRESSION_POOL = [
-    "LinearRegression",          # 线性基线
-    "Ridge",                     # L2 正则，防共线性
-    "Lasso",                     # L1 正则，内置特征选择
-    "ElasticNet",                # L1+L2，兼顾稀疏与稳定
-    "HuberRegressor",            # 鲁棒回归，对异常值不敏感
-    "RandomForestRegressor",     # 集成树
-    "XGBoostRegressor",          # 梯度提升
-    "LightGBMRegressor",         # 更快的梯度提升
-    "GradientBoostingRegressor", # sklearn 原生梯度提升
-    "ExtraTreesRegressor",       # 极端随机树
-    "SVR",                       # 支持向量回归
-    "MLPRegressor",              # 多层感知机，复杂非线性关系时可选
+    "LinearRegression",          # linear baseline
+    "Ridge",                     # L2 regularization; guards against multicollinearity
+    "Lasso",                     # L1 regularization; built-in feature selection
+    "ElasticNet",                # L1+L2; balances sparsity and stability
+    "HuberRegressor",            # robust regression; insensitive to outliers
+    "RandomForestRegressor",     # ensemble trees
+    "XGBoostRegressor",          # gradient boosting
+    "LightGBMRegressor",         # faster gradient boosting
+    "GradientBoostingRegressor", # sklearn native gradient boosting
+    "ExtraTreesRegressor",       # extremely randomized trees
+    "SVR",                       # support vector regression
+    "MLPRegressor",              # multilayer perceptron; optional for complex nonlinear relationships
 ]
 
 
@@ -51,65 +51,65 @@ def select_candidate_models_and_metrics(
     evaluation_metrics: list[str],
     metrics_rationale: str,
 ) -> str:
-    """提交 EDA 分析后选定的三个候选模型、特征工程方案、模型选择理由，以及评估指标决策。
+    """Submit the three candidate models selected after EDA analysis, the feature engineering plan, the model selection rationale, and the evaluation metric decisions.
 
-    参数：
-      task_type (str)："classification" 或 "regression"。
+    Args:
+      task_type (str): "classification" or "regression".
 
-      selected_models (list[str])：从候选池中选出的恰好 3 个模型名称，大小写敏感。
-        分类候选池：LogisticRegression、RandomForest、XGBoost、LightGBM、GradientBoosting、
-                    ExtraTrees、AdaBoost、SVM、KNN、GaussianNB、MLPClassifier
-        回归候选池：LinearRegression、Ridge、Lasso、ElasticNet、HuberRegressor、
-                    RandomForestRegressor、XGBoostRegressor、LightGBMRegressor、
-                    GradientBoostingRegressor、ExtraTreesRegressor、SVR、MLPRegressor
-        错误示例：xgboost、random_forest、XGboost（均会被拒绝）。
+      selected_models (list[str]): exactly 3 model names selected from the candidate pool; case-sensitive.
+        Classification pool: LogisticRegression, RandomForest, XGBoost, LightGBM, GradientBoosting,
+                    ExtraTrees, AdaBoost, SVM, KNN, GaussianNB, MLPClassifier
+        Regression pool: LinearRegression, Ridge, Lasso, ElasticNet, HuberRegressor,
+                    RandomForestRegressor, XGBoostRegressor, LightGBMRegressor,
+                    GradientBoostingRegressor, ExtraTreesRegressor, SVR, MLPRegressor
+        Invalid examples: xgboost, random_forest, XGboost (all will be rejected).
 
-      feature_engineering_plan (dict)：各模型的特征工程方案，key 为模型名，value 为方案 dict。
-        示例：
+      feature_engineering_plan (dict): feature engineering plan for each model; key is the model name, value is a plan dict.
+        Example:
         {
-          "XGBoost":            {"scaling": false, "encoding": "label",  "notes": "树模型无需缩放"},
-          "RandomForest":       {"scaling": false, "encoding": "label",  "notes": "集成树，无需缩放"},
-          "LogisticRegression": {"scaling": true,  "encoding": "onehot", "notes": "线性模型需标准化"}
+          "XGBoost":            {"scaling": false, "encoding": "label",  "notes": "tree model; no scaling needed"},
+          "RandomForest":       {"scaling": false, "encoding": "label",  "notes": "ensemble trees; no scaling needed"},
+          "LogisticRegression": {"scaling": true,  "encoding": "onehot", "notes": "linear model requires standardization"}
         }
 
-      model_selection_plan (str)：选择这三个模型的理由，结合数据特征、任务类型和目标列说明。
+      model_selection_plan (str): rationale for choosing these three models, explained in terms of data characteristics, task type, and target column.
 
-      primary_metric (str)：CV 参数调优使用的单一优化指标（决定"最优参数"的判断标准）。
-        分类可选：accuracy、f1_macro、f1_weighted、roc_auc、precision、recall、log_loss
-        回归可选：r2、rmse、mae、mape、rmsle、max_error
-        选择建议（分类）：
-          - 类别均衡、整体准确率为主 → f1_weighted
-          - 存在少数类、需监控类别不平衡风险 → f1_macro
-            （macro 对每个类等权，少数类拉低分数时会立即在 CV 中反映出来）
-          - 类别严重不平衡、关注少数类召回率 → roc_auc 或 recall
-          - 多分类（类别数 > 2）→ f1_macro 或 f1_weighted；
-            roc_auc 会自动升级为 roc_auc_ovr_weighted，
-            但若候选模型中含 SVM（默认不支持 predict_proba），建议改选 f1_macro
-          - 业务目标是概率校准（CTR、点击率、风险评分等）→ log_loss
-            注：log_loss 需要所有候选模型支持 predict_proba；
-            SVM 默认不支持，应从候选模型中去除或改选其他 primary_metric
-        选择建议（回归）：
-          - 默认 → r2（全局拟合优度，直观）
-          - 存在明显异常值 → mae（比 rmse 对离群点更鲁棒）
-          - 目标值分布偏态显著（skewness > 1，如房价、销量、流量）→ rmsle
-            注：rmsle 要求 y_true ≥ 0，且对欠预测的惩罚大于过预测
-          - 业务关心"偏离了百分之几"、目标值无零点 → mape
-            注：mape 要求 y_true ≠ 0，含零时工具自动降级为 None
-          - 极少选 max_error 作为 primary_metric；适合精度要求苛刻、
-            不允许最坏情况出错的场景（如零件公差预测）
+      primary_metric (str): the single optimization metric used for CV hyperparameter tuning (determines the criterion for "best parameters").
+        Classification options: accuracy, f1_macro, f1_weighted, roc_auc, precision, recall, log_loss
+        Regression options: r2, rmse, mae, mape, rmsle, max_error
+        Selection guidance (classification):
+          - Class-balanced; overall accuracy is the main concern -> f1_weighted
+          - Minority classes exist; need to monitor class-imbalance risk -> f1_macro
+            (macro weights each class equally; a drop in minority-class performance is immediately reflected in CV)
+          - Severely imbalanced classes; focus on minority-class recall -> roc_auc or recall
+          - Multi-class (number of classes > 2) -> f1_macro or f1_weighted;
+            roc_auc will be automatically upgraded to roc_auc_ovr_weighted,
+            but if the candidate models include SVM (does not support predict_proba by default), switch to f1_macro
+          - Business goal is probability calibration (CTR, click rate, risk scoring, etc.) -> log_loss
+            Note: log_loss requires all candidate models to support predict_proba;
+            SVM does not support it by default and should be removed from the candidates or another primary_metric should be chosen
+        Selection guidance (regression):
+          - Default -> r2 (global goodness-of-fit; intuitive)
+          - Significant outliers present -> mae (more robust to outliers than rmse)
+          - Target distribution is markedly skewed (skewness > 1, e.g. house prices, sales volume, traffic) -> rmsle
+            Note: rmsle requires y_true >= 0, and penalizes under-prediction more than over-prediction
+          - Business cares about "percentage deviation"; target has no zero values -> mape
+            Note: mape requires y_true != 0; when zeros are present the tool automatically degrades to None
+          - Rarely use max_error as primary_metric; suitable for scenarios where precision requirements are strict
+            and worst-case errors are not allowed (e.g. part-tolerance prediction)
 
-      evaluation_metrics (list[str])：最终 test set 综合评估时报告的指标列表（2~4 个）。
-        分类可选：accuracy、f1_macro、f1_weighted、roc_auc、precision、recall、log_loss
-        回归可选：r2、rmse、mae、mape、rmsle、max_error
-        建议：primary_metric 必须包含在此列表中；可额外加入 1~2 个互补指标。
-        分类强烈建议：同时包含 f1_macro 和 f1_weighted，前者反映少数类风险，后者反映整体分布性能。
-        示例（均衡分类）：["f1_weighted", "f1_macro", "accuracy"]
-        示例（不平衡分类）：["roc_auc", "f1_macro", "f1_weighted"]
-        示例（概率校准场景）：["log_loss", "f1_weighted", "roc_auc"]
-        示例（回归，目标值偏态）：["rmsle", "mae", "r2"]
-        示例（回归，关注最坏情况）：["rmse", "mae", "max_error"]
+      evaluation_metrics (list[str]): list of metrics reported during the final test-set comprehensive evaluation (2-4 items).
+        Classification options: accuracy, f1_macro, f1_weighted, roc_auc, precision, recall, log_loss
+        Regression options: r2, rmse, mae, mape, rmsle, max_error
+        Recommendation: primary_metric must be included in this list; optionally add 1-2 complementary metrics.
+        Classification strongly recommended: include both f1_macro and f1_weighted; the former reflects minority-class risk, the latter reflects overall distribution performance.
+        Example (balanced classification): ["f1_weighted", "f1_macro", "accuracy"]
+        Example (imbalanced classification): ["roc_auc", "f1_macro", "f1_weighted"]
+        Example (probability calibration scenario): ["log_loss", "f1_weighted", "roc_auc"]
+        Example (regression, skewed target): ["rmsle", "mae", "r2"]
+        Example (regression, worst-case focus): ["rmse", "mae", "max_error"]
 
-      metrics_rationale (str)：选择上述指标的理由，结合任务类型、数据特征和业务目标说明。
+      metrics_rationale (str): rationale for choosing the above metrics, explained in terms of task type, data characteristics, and business goals.
     """
     tool_inputs = {
         "task_type": task_type,
@@ -121,30 +121,30 @@ def select_candidate_models_and_metrics(
         "metrics_rationale": metrics_rationale,
     }
     try:
-        # ── 模型名校验 ────────────────────────────────────────────────────────
+        # -- Model name validation --
         pool = CLASSIFICATION_POOL if task_type == "classification" else REGRESSION_POOL
         invalid_models = [m for m in selected_models if m not in pool]
         if invalid_models:
-            raise ValueError(f"模型不在候选池中: {invalid_models}。候选池: {pool}")
+            raise ValueError(f"Models not in candidate pool: {invalid_models}. Candidate pool: {pool}")
         if len(selected_models) != 3:
-            raise ValueError(f"必须选择恰好 3 个模型，收到 {len(selected_models)} 个。")
+            raise ValueError(f"Exactly 3 models must be selected; received {len(selected_models)}.")
 
-        # ── Metrics 校验 ──────────────────────────────────────────────────────
+        # -- Metrics validation --
         allowed = CLASSIFICATION_METRICS if task_type == "classification" else REGRESSION_METRICS
         if primary_metric not in allowed:
             raise ValueError(
-                f"primary_metric '{primary_metric}' 不合法。{task_type} 可选：{sorted(allowed)}"
+                f"primary_metric '{primary_metric}' is invalid. {task_type} options: {sorted(allowed)}"
             )
         invalid_metrics = [m for m in evaluation_metrics if m not in allowed]
         if invalid_metrics:
             raise ValueError(
-                f"evaluation_metrics 中存在不合法项: {invalid_metrics}。{task_type} 可选：{sorted(allowed)}"
+                f"evaluation_metrics contains invalid items: {invalid_metrics}. {task_type} options: {sorted(allowed)}"
             )
         if not evaluation_metrics:
-            raise ValueError("evaluation_metrics 不能为空列表。")
+            raise ValueError("evaluation_metrics must not be an empty list.")
         if primary_metric not in evaluation_metrics:
             raise ValueError(
-                f"primary_metric '{primary_metric}' 必须包含在 evaluation_metrics 中。"
+                f"primary_metric '{primary_metric}' must be included in evaluation_metrics."
             )
 
         result = {
