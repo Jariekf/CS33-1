@@ -44,14 +44,14 @@ def _clean_numeric_series(series: pd.Series) -> pd.Series:
         .str.replace(",", "", regex=False)
         .str.strip()
     )
-    # 独立的 "-" 表示无数据，转为 NaN；不能在上面统一替换，否则会把负号也抹掉
+    # A standalone "-" indicates no data and is converted to NaN; it cannot be replaced uniformly above, as that would also erase negative signs.
     cleaned = cleaned.replace({"-": None, "": None, "nan": None, "None": None})
     return pd.to_numeric(cleaned, errors="coerce")
 
 
 @tool
 def clean_data_types(dataset_id: str, conversions: list[dict[str, Any]] | None = None) -> str:
-    """修正数据类型，支持 numeric、datetime、object、category。"""
+    """Fix data types; supports numeric, datetime, object, and category."""
     tool_inputs = {"dataset_id": dataset_id, "conversions": conversions or []}
     converted_columns = []
     skipped_columns = []

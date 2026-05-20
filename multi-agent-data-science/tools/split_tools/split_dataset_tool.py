@@ -14,13 +14,13 @@ def split_dataset(
     target_column: str,
     run_dir: str,
 ) -> str:
-    """将数据集划分为训练集和测试集。分类任务使用分层抽样，回归任务随机划分。
+    """Split the dataset into training and test sets. Classification tasks use stratified sampling; regression tasks use random splitting.
 
     Args:
-        data_path: 数据集 CSV 文件路径。
-        task_type: 任务类型，"classification" 或 "regression"。
-        target_column: 目标列名称（分类任务必须提供）。
-        run_dir: 本次运行输出目录，用于存放 train/test 文件。
+        data_path: path to the dataset CSV file.
+        task_type: task type, "classification" or "regression".
+        target_column: target column name (required for classification tasks).
+        run_dir: output directory for this run, used to store train/test files.
     """
     source = Path(data_path).expanduser().resolve()
     if not source.is_file():

@@ -1,4 +1,4 @@
-"""Feature Agent 结构、路由、工具和状态更新测试。"""
+"""Feature Agent structure, routing, tool, and state-update tests."""
 
 import json
 import sys
@@ -30,7 +30,7 @@ TESTENV = Path(__file__).resolve().parent / "testenv"
 TRAIN_CSV = TESTENV / "split" / "sample_train.csv"
 
 
-# ── 图结构 ──────────────────────────────────────────────────────────────────
+# ── Graph structure ──────────────────────────────────────────────────────────────────
 
 def test_feature_agent_graph_structure():
     agent = build_feature_agent(show_graph=False)
@@ -72,7 +72,7 @@ def test_get_current_model_returns_first_when_none_done():
     assert _get_current_model(state) == "XGBoost"
 
 
-# ── tool_state_update：save_featured_dataset ─────────────────────────────────
+# ── tool_state_update: save_featured_dataset ─────────────────────────────────
 
 def test_handle_save_featured_merges_dict():
     payload = {"output_path": "/artifacts/features/Ridge_train_featured.csv", "model_name": "Ridge", "rows": 80, "cols": 10}
@@ -100,7 +100,7 @@ def test_handle_save_featured_error_recorded():
     assert update["errors"]
 
 
-# ── scale_features 工具 ──────────────────────────────────────────────────────
+# ── scale_features tool ──────────────────────────────────────────────────────
 
 def test_scale_features_standard(tmp_path):
     import uuid
@@ -124,7 +124,7 @@ def test_scale_features_skips_non_numeric(tmp_path):
     assert "num" in result["scaled_columns"]
 
 
-# ── encode_categorical 工具 ──────────────────────────────────────────────────
+# ── encode_categorical tool ──────────────────────────────────────────────────
 
 def test_encode_categorical_label(tmp_path):
     import uuid
@@ -148,7 +148,7 @@ def test_encode_categorical_onehot():
     assert len(result["new_columns"]) == 2  # cat_a, cat_b
 
 
-# ── save_featured_dataset 工具 ───────────────────────────────────────────────
+# ── save_featured_dataset tool ───────────────────────────────────────────────
 
 def test_save_featured_dataset(tmp_path):
     import uuid
@@ -166,7 +166,7 @@ def test_save_featured_dataset(tmp_path):
     assert result["rows"] == 10
 
 
-# ── 外部循环路由 ─────────────────────────────────────────────────────────────
+# ── External loop routing ─────────────────────────────────────────────────────────────
 
 def test_full_pipeline_feature_routing():
     from core.graph import _route_after_feature, _route_after_eda
@@ -179,36 +179,36 @@ def test_full_pipeline_feature_routing():
     assert _route_after_feature({"candidate_models": ["XGBoost"], "feature_dataset_ids": {"XGBoost": "/a.csv"}}) == "model_agent"
 
 
-# ── LLM invoke 测试（需要 API Key）────────────────────────────────────────────
+# ── LLM invoke tests (requires API Key)────────────────────────────────────────────
 
-@pytest.mark.skipif(not DEEPSEEK_API_KEY, reason="需要配置 DEEPSEEK_API_KEY")
+@pytest.mark.skipif(not DEEPSEEK_API_KEY, reason="DEEPSEEK_API_KEY must be configured")
 def test_feature_agent_invoke_single_model(tmp_path):
-    """单模型特征工程（只处理第一个模型，验证流程可运行）。"""
+    """Single-model feature engineering (processes only the first model, verifies the flow runs)."""
     agent = build_feature_agent(show_graph=False)
     result = agent.invoke(
         {
-            "messages": [HumanMessage(content="开始特征工程")],
+            "messages": [HumanMessage(content="Start feature engineering")],
             "training_data_path": str(TRAIN_CSV),
             "task_type": "classification",
             "target_column": "subscribed",
             "candidate_models": ["LogisticRegression", "RandomForest", "XGBoost"],
             "feature_dataset_ids": {},
             "feature_engineering_plan": {
-                "LogisticRegression": {"scaling": True, "encoding": "onehot", "notes": "线性模型需标准化"},
-                "RandomForest": {"scaling": False, "encoding": "label", "notes": "树模型无需缩放"},
-                "XGBoost": {"scaling": False, "encoding": "label", "notes": "树模型无需缩放"},
+                "LogisticRegression": {"scaling": True, "encoding": "onehot", "notes": "linear models require standardization"},
+                "RandomForest": {"scaling": False, "encoding": "label", "notes": "tree models do not require scaling"},
+                "XGBoost": {"scaling": False, "encoding": "label", "notes": "tree models do not require scaling"},
             },
             "run_dir": str(tmp_path),
         },
         config={"recursion_limit": 80},
     )
     feature_ids = result.get("feature_dataset_ids") or {}
-    assert feature_ids, "应当至少完成一个模型的特征工程"
+    assert feature_ids, "Expected at least one model's feature engineering to complete"
     for model, csv_path in feature_ids.items():
-        assert Path(csv_path).exists(), f"{model} 的特征工程后 CSV 应已写入磁盘"
+        assert Path(csv_path).exists(), f"Feature-engineered CSV for {model} should have been written to disk"
 
 
-# ── 手动集成运行（pytest 不执行）─────────────────────────────────────────────
+# ── Manual integration run (not executed by pytest) ─────────────────────────────────────────────
 
 def _run_feature_agent():
     from agent.feature_agent import _pretty_print_message
@@ -216,16 +216,16 @@ def _run_feature_agent():
     agent = build_feature_agent(show_graph=True)
     events = agent.stream(
         {
-            "messages": [HumanMessage(content="开始特征工程")],
+            "messages": [HumanMessage(content="Start feature engineering")],
             "training_data_path": str(TRAIN_CSV),
             "task_type": "classification",
             "target_column": "subscribed",
             "candidate_models": ["LogisticRegression", "RandomForest", "XGBoost"],
             "feature_dataset_ids": {},
             "feature_engineering_plan": {
-                "LogisticRegression": {"scaling": True, "encoding": "onehot", "notes": "线性模型需标准化"},
-                "RandomForest": {"scaling": False, "encoding": "label", "notes": "树模型无需缩放"},
-                "XGBoost": {"scaling": False, "encoding": "label", "notes": "树模型无需缩放"},
+                "LogisticRegression": {"scaling": True, "encoding": "onehot", "notes": "linear models require standardization"},
+                "RandomForest": {"scaling": False, "encoding": "label", "notes": "tree models do not require scaling"},
+                "XGBoost": {"scaling": False, "encoding": "label", "notes": "tree models do not require scaling"},
             },
         },
         stream_mode="values",

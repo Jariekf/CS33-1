@@ -64,7 +64,7 @@ def test_trim_to_modeling_round_drops_user_request_and_rap_wrapup() -> None:
         ),
         _ai_with_tool_call("profile_dataset"),
         _tool_msg("profile_dataset", '{"rows": 36168}'),
-        AIMessage(content="EDA wrap-up: 候选模型已选定。"),
+        AIMessage(content="EDA wrap-up: candidate models selected."),
         _ai_with_tool_call("tune_and_select_model"),
         _tool_msg("tune_and_select_model", '{"best_model_name": "RandomForest"}'),
         _ai_with_tool_call("train_model"),

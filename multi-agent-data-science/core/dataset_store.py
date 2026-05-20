@@ -14,11 +14,11 @@ def put_dataset(df: pd.DataFrame, dataset_id: str | None = None) -> str:
 
 def get_dataset(dataset_id: str) -> pd.DataFrame:
     if dataset_id not in _DATASET_STORE:
-        raise KeyError(f"dataset_id 不存在: {dataset_id}")
+        raise KeyError(f"dataset_id not found: {dataset_id}")
     return _DATASET_STORE[dataset_id]
 
 
 def update_dataset(dataset_id: str, df: pd.DataFrame) -> None:
     if dataset_id not in _DATASET_STORE:
-        raise KeyError(f"dataset_id 不存在: {dataset_id}")
+        raise KeyError(f"dataset_id not found: {dataset_id}")
     _DATASET_STORE[dataset_id] = df.copy()

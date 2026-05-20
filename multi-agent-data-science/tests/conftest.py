@@ -1,4 +1,4 @@
-"""共享 fixtures 和路径常量。"""
+"""Shared fixtures and path constants."""
 
 import sys
 from pathlib import Path
@@ -15,21 +15,21 @@ TRAIN_CSV   = TESTENV / "split"   / "sample_train.csv"
 TEST_CSV    = TESTENV / "split"   / "sample_test.csv"
 FEATURE_DIR = TESTENV / "feature"
 
-# 三个候选模型的特征工程后训练集 / 测试集（已数值化，model agent 直接使用）
+# Feature-engineered train/test sets for three candidate models (already numeric; model agent uses directly)
 CANDIDATE_MODELS = ["LogisticRegression", "RandomForest", "XGBoost"]
 
 FEATURE_TRAIN_PATHS = {m: FEATURE_DIR / f"{m}_train_featured.csv" for m in CANDIDATE_MODELS}
 FEATURE_TEST_PATHS  = {m: FEATURE_DIR / f"{m}_test_featured.csv"  for m in CANDIDATE_MODELS}
 
-# 样本数据集描述（agent system prompt 使用）
+# Sample dataset description (used by agent system prompts)
 SAMPLE_DESCRIPTION = (
-    "二分类数据集：预测客户是否订阅银行定期存款（subscribed: yes/no）。"
-    "特征：age（年龄）、job（职业）、education（教育程度）、balance（余额）。"
+    "Binary classification dataset: predict whether a customer subscribes to a bank term deposit (subscribed: yes/no). "
+    "Features: age, job (occupation), education (education level), balance (account balance)."
 )
 
-# 清洗计划：填充 balance 的2个缺失值
+# Cleaning plan: fill 2 missing values in the balance column
 SAMPLE_CLEANING_PLAN = {
-    "summary": "balance 列有2个缺失值，用中位数填充。",
+    "summary": "The balance column has 2 missing values; fill with median.",
     "column_name_actions": [],
     "type_conversions": [],
     "missing_value_actions": [{"column": "balance", "strategy": "median"}],
@@ -38,9 +38,9 @@ SAMPLE_CLEANING_PLAN = {
     "notes": "",
 }
 
-# 特征工程计划
+# Feature engineering plan
 SAMPLE_FEATURE_PLAN = {
-    "LogisticRegression": {"scaling": True,  "encoding": "onehot", "notes": "线性模型需标准化"},
-    "RandomForest":       {"scaling": False, "encoding": "label",  "notes": "树模型无需缩放"},
-    "XGBoost":            {"scaling": False, "encoding": "label",  "notes": "树模型无需缩放"},
+    "LogisticRegression": {"scaling": True,  "encoding": "onehot", "notes": "linear models require standardization"},
+    "RandomForest":       {"scaling": False, "encoding": "label",  "notes": "tree models do not require scaling"},
+    "XGBoost":            {"scaling": False, "encoding": "label",  "notes": "tree models do not require scaling"},
 }

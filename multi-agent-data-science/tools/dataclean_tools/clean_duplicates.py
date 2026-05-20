@@ -12,7 +12,7 @@ def clean_duplicates(
     subset: list[str] | None = None,
     keep: str = "first",
 ) -> str:
-    """处理重复数据，支持全行去重或按 subset 去重。"""
+    """Handle duplicate data, supporting full-row deduplication or deduplication by subset."""
     tool_inputs = {"dataset_id": dataset_id, "subset": subset, "keep": keep}
     try:
         df = get_dataset(dataset_id).copy()

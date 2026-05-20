@@ -182,4 +182,4 @@ def test_save_agent_report_empty_after_filter_inserts_placeholder(tmp_path: Path
         assert not text.startswith(f"{level}业务建议")
     assert "营销" not in text
     assert "推广" not in text
-    assert "业务建议章节已被过滤" in text
+    assert "Business recommendation sections have been filtered" in text

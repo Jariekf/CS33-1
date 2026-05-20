@@ -13,7 +13,7 @@ def infer_task(
     confidence: float,
     reason: str,
 ) -> str:
-    """记录 Agent 根据用户问题、数据描述和数据画像判断出的建模任务类型。"""
+    """Record the modeling task type inferred by the Agent based on the user question, data description, and data profile."""
     result = {
         "task_type": task_type,
         "target_column": target_column,

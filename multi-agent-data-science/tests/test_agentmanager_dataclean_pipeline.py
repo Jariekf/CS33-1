@@ -1,4 +1,4 @@
-"""集成：Agent Manager 与 Data Clean Agent 组合为父 LangGraph。"""
+"""Integration: Agent Manager and Data Clean Agent composed as a parent LangGraph."""
 
 import sys
 from pathlib import Path

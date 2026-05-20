@@ -14,9 +14,9 @@ SUPPORTED_SUFFIXES = {".csv", ".xlsx", ".xls", ".json", ".parquet"}
 def _load_dataset(file_path: str) -> pd.DataFrame:
     path = Path(file_path).expanduser().resolve()
     if not path.exists():
-        raise FileNotFoundError(f"文件不存在: {path}")
+        raise FileNotFoundError(f"File not found: {path}")
     if not path.is_file():
-        raise ValueError(f"路径不是文件: {path}")
+        raise ValueError(f"Path is not a file: {path}")
 
     suffix = path.suffix.lower()
     if suffix == ".csv":
@@ -29,7 +29,7 @@ def _load_dataset(file_path: str) -> pd.DataFrame:
         return pd.read_parquet(path)
 
     supported = ", ".join(sorted(SUPPORTED_SUFFIXES))
-    raise ValueError(f"不支持的文件类型: {suffix}。支持: {supported}")
+    raise ValueError(f"Unsupported file type: {suffix}. Supported types: {supported}")
 
 
 def _build_dataset_summary(df: pd.DataFrame, file_path: str) -> dict[str, Any]:
@@ -173,7 +173,7 @@ def _build_sample_rows(df: pd.DataFrame, n_rows: int) -> list[dict[str, Any]]:
 
 @tool
 def profile_dataset(file_path: str, n_rows: int = 2) -> str:
-    """生成数据集质量画像，包含缺失值、异常值、类型问题和删除候选列。"""
+    """Generate a data quality profile for the dataset, including missing values, outliers, type issues, and drop-candidate columns."""
     tool_inputs = {"file_path": file_path, "n_rows": n_rows}
     try:
         df = _load_dataset(file_path)

@@ -314,19 +314,19 @@ def generate_eda_charts(
     description_file: str = "",
     description_text: str = "",
 ) -> str:
-    """生成完整 EDA 图表并返回图表 metadata。
+    """Generate a full set of EDA charts and return chart metadata.
 
-    参数：
-      file_path：训练集 CSV 文件路径。
-      output_dir：图片保存目录。新架构中应传入 {run_dir}/plots。
-      target_column：目标列名。为空时用列名启发式推断。
-      task_type：任务类型，优先使用 GlobalState 中的 classification/regression。
-      test_file_path：测试集 CSV 路径，用于生成测试集类别平衡图。
-      description_file：数据集描述 TXT 路径（可选）。若提供，列名标题会附加可读说明。
-      description_text：与 description_file 同内容的纯文本（可选）。非空时优先解析，
-        避免再次读盘；通常由脚本传入，LLM 调用时保持默认空即可。
+    Args:
+      file_path: path to the training-set CSV file.
+      output_dir: directory in which to save images. In the new architecture, pass {run_dir}/plots.
+      target_column: target column name. When empty, inferred heuristically from column names.
+      task_type: task type; prefer classification/regression from GlobalState.
+      test_file_path: path to the test-set CSV; used to generate the test-set class balance chart.
+      description_file: path to the dataset description TXT file (optional). When provided, column name titles are annotated with human-readable descriptions.
+      description_text: plain text with the same content as description_file (optional). When non-empty, parsed in priority to avoid re-reading from disk;
+        typically passed by scripts; keep the default empty when calling via LLM.
 
-    返回 JSON，包含 output_dir、plot_count、plot_paths、charts、text_summary。
+    Returns JSON containing output_dir, plot_count, plot_paths, charts, text_summary.
     """
     tool_inputs = {
         "file_path": file_path,
@@ -344,11 +344,11 @@ def generate_eda_charts(
 
         train_path = Path(file_path)
         if not train_path.is_file():
-            raise FileNotFoundError(f"训练集文件不存在：{file_path}")
+            raise FileNotFoundError(f"Training set file not found: {file_path}")
 
         df = pd.read_csv(train_path)
         if df.empty:
-            raise ValueError("训练集为空，无法生成 EDA charts。")
+            raise ValueError("Training set is empty; cannot generate EDA charts.")
 
         col_labels = _load_col_labels(description_file, description_text)
 
@@ -501,7 +501,7 @@ def generate_eda_charts(
 
         def draw_numeric_distributions() -> None:
             if not selected_numeric:
-                raise ValueError("没有可绘制的数值特征列。")
+                raise ValueError("No numeric feature columns available to plot.")
             rows, cols = _grid_shape(len(selected_numeric))
             palette = sns.color_palette("colorblind", n_colors=len(selected_numeric))
             plt.figure(figsize=(4 * cols, 3 * rows))
@@ -521,7 +521,7 @@ def generate_eda_charts(
 
         def draw_categorical_distributions() -> None:
             if not selected_categorical:
-                raise ValueError("没有可绘制的类别特征列。")
+                raise ValueError("No categorical feature columns available to plot.")
             rows, cols = _grid_shape(len(selected_categorical))
             palette = sns.color_palette("colorblind", n_colors=len(selected_categorical))
             plt.figure(figsize=(5 * cols, 3.5 * rows))
@@ -546,7 +546,7 @@ def generate_eda_charts(
             if target_col in num_df.columns:
                 num_df = num_df.drop(columns=[target_col])
             if num_df.shape[1] < 2:
-                raise ValueError("至少需要 2 个数值列才能绘制相关热力图。")
+                raise ValueError("At least 2 numeric columns are required to plot the correlation heatmap.")
             variances = num_df.var(numeric_only=True).sort_values(ascending=False)
             top_cols = variances.head(min(10, len(variances))).index.tolist()
             corr = df[top_cols].apply(pd.to_numeric, errors="coerce").corr(numeric_only=True)
@@ -594,7 +594,7 @@ def generate_eda_charts(
 
         def draw_outlier_boxplots() -> None:
             if not selected_numeric:
-                raise ValueError("没有可绘制箱线图的数值特征列。")
+                raise ValueError("No numeric feature columns available to plot boxplots.")
             rows, cols = _grid_shape(len(selected_numeric))
             palette = sns.color_palette("colorblind", n_colors=len(selected_numeric))
             plt.figure(figsize=(4 * cols, 3.2 * rows))
@@ -615,7 +615,7 @@ def generate_eda_charts(
 
                 def draw_numeric_by_target_density() -> None:
                     if not rel_num_cols:
-                        raise ValueError("没有数值特征用于按目标类别绘图。")
+                        raise ValueError("No numeric features available for plotting by target class.")
                     work = _sample_rows(df[[*rel_num_cols, target_col]].dropna())
                     rows, cols = _grid_shape(len(rel_num_cols))
                     plt.figure(figsize=(4.5 * cols, 3.2 * rows))
@@ -649,7 +649,7 @@ def generate_eda_charts(
 
                 def draw_categorical_by_target_rate() -> None:
                     if not rel_cat_cols:
-                        raise ValueError("没有类别特征用于按目标类别绘图。")
+                        raise ValueError("No categorical features available for plotting by target class.")
                     rows, cols = _grid_shape(len(rel_cat_cols), max_cols=2)
                     palette = sns.color_palette("colorblind", n_colors=y.nunique(dropna=True))
                     fig = plt.figure(figsize=(6 * cols, 4.1 * rows))
@@ -690,7 +690,7 @@ def generate_eda_charts(
 
                 def draw_numeric_vs_target_regression() -> None:
                     if not rel_num_cols:
-                        raise ValueError("没有数值特征用于目标回归关系图。")
+                        raise ValueError("No numeric features available for the target regression plot.")
                     work = _sample_rows(df[[*rel_num_cols, target_col]].dropna())
                     rows, cols = _grid_shape(len(rel_num_cols))
                     palette = sns.color_palette("colorblind", n_colors=len(rel_num_cols))
@@ -719,7 +719,7 @@ def generate_eda_charts(
 
                 def draw_categorical_vs_target_boxplot() -> None:
                     if not rel_cat_cols:
-                        raise ValueError("没有类别特征用于目标箱线图。")
+                        raise ValueError("No categorical features available for the target boxplot.")
                     work = _sample_rows(df[[*rel_cat_cols, target_col]].dropna())
                     rows, cols = _grid_shape(len(rel_cat_cols), max_cols=2)
                     palette = sns.color_palette("colorblind", n_colors=len(rel_cat_cols))
@@ -789,7 +789,7 @@ def generate_eda_charts(
                 x_all = pd.concat([x_num, x_cat], axis=1).fillna(0)
                 x_all = x_all.loc[:, x_all.nunique(dropna=False) > 1]
                 if x_all.empty:
-                    raise ValueError("编码后没有可用于 RF importance 的特征。")
+                    raise ValueError("No features available for RF importance after encoding.")
 
                 if target_type == "regression" and pd.api.types.is_numeric_dtype(df[target_col]):
                     y_rf = pd.to_numeric(df[target_col], errors="coerce")
@@ -800,7 +800,7 @@ def generate_eda_charts(
                     encoder = LabelEncoder()
                     y_rf = encoder.fit_transform(df[target_col].astype(str).fillna("__na__"))
                     if len(np.unique(y_rf)) < 2:
-                        raise ValueError("目标列只有一个类别，无法计算 RF importance。")
+                        raise ValueError("Target column has only one class; cannot compute RF importance.")
                     model = RandomForestClassifier(n_estimators=50, max_depth=6, random_state=331, n_jobs=-1)
                     model.fit(x_all, y_rf)
 

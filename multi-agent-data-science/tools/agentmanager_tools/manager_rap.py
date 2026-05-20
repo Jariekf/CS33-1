@@ -313,7 +313,7 @@ def build_manager_rap_context(
     target_column: str = "",
     dataset_profile: Annotated[dict[str, Any] | None, InjectedState("dataset_profile")] = None,
 ) -> str:
-    """在 train/test 清洗计划之前构建 Manager RAP context。"""
+    """Build the Manager RAP context before the train/test cleaning plan."""
     tool_inputs = {
         "user_request": user_request,
         "description": description,

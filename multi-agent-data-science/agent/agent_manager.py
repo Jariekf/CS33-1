@@ -25,7 +25,7 @@ llm_with_tools = llm_for("agent_manager").bind_tools(tools)
 
 
 def _has_complete_task_meta(state: GlobalState) -> bool:
-    """已由 split_agent 或 CLI 注入时，跳过 infer_task，避免重复推断。"""
+    """When tasks have already been injected by split_agent or the CLI, skip `infer_task` to avoid duplicate inference."""
     tt = (state.get("task_type") or "").strip().lower()
     tc = (state.get("target_column") or "").strip()
     return tt in {"classification", "regression"} and bool(tc)
@@ -43,64 +43,64 @@ def _manager_node(state: GlobalState) -> GlobalState:
     rap_summary = state.get("user_requirement_summary") or ""
 
     rap_instruction = (
-        "\nManager RAP advisory context（用于清洗计划参考，不得覆盖数据画像中的事实）：\n"
-        f"需求摘要：{rap_summary or '尚未生成'}\n"
-        f"RAP建议：{rap_context or '尚未生成'}\n"
+        "\nManager RAP advisory context (used as a reference for cleansing plans; must not override facts in the data profile):\n"
+        f"Requirements Summary:{rap_summary or 'Not yet generated'}\n"
+        f"RAP Recommendations:{rap_context or 'Not yet generated'}\n"
     )
     cleaning_plan_contract = (
-        "\ncreate_cleaning_plan contract（必须显式传入这些字段）：\n"
+        "\ncreate_cleaning_plan contract (these fields must be passed explicitly):\n"
         "target, summary, column_name_actions, type_conversions, missing_value_actions, "
-        "outlier_actions, drop_columns, notes。\n"
-        "如果某个字段没有动作，传空列表 []，不要省略参数。\n"
-        "示例：create_cleaning_plan(target='train', summary='...', column_name_actions=[], "
+        "outlier_actions, drop_columns, notes.\n"
+        "If a field has no action, pass an empty list [], but do not omit the parameter.\n"
+        "Example: create_cleaning_plan(target='train', summary='...', column_name_actions=[], "
         "type_conversions=[], missing_value_actions=[], outlier_actions=[], drop_columns=[], notes=[])\n"
     )
 
     if has_meta:
         rap_step = (
-            "2. 调用 build_manager_rap_context(user_request, description, task_type, target_column) 生成 Manager RAP context；\n"
+            "2. Call build_manager_rap_context(user_request, description, task_type, target_column) Generate Manager RAP context;\n"
             if not has_rap_context
-            else "2. 当前 state 已有 Manager RAP context，不要重复调用 build_manager_rap_context；\n"
+            else "2. If the current state already contains a Manager RAP context, do not call `build_manager_rap_context` again;\n"
         )
         workflow = (
-            "工作流要求（严格按顺序执行）：\n"
-            f"1. 调用 profile_dataset(file_path='{training_data_path}') 获取训练集数据画像；\n"
+            "Workflow Requirements (to be executed strictly in order):\n"
+            f"1. Call profile_dataset(file_path='{training_data_path}') Retrieve the training dataset profile;\n"
             f"{rap_step}"
-            "3. 调用 create_cleaning_plan(target='train', ...) 制定训练集清洗计划；\n"
-            "4. 调用 create_cleaning_plan(target='test', ...) 制定测试集清洗计划"
-            "   （测试集通常与训练集步骤相同，但不做基于标签分布的操作）。\n"
-            "说明：当前 state 已包含有效的 task_type 与 target_column（来自 split_agent 或用户指定），"
-            "不要调用 infer_task。\n"
-            "制定清洗计划时把 Manager RAP context 作为背景知识参考，但以实际数据画像为准。\n"
-            "完成以上步骤后停止，生成报告。"
+            "3. Call create_cleaning_plan(target='train', ...) Develop a plan for cleaning the training set;\n"
+            "4. Call create_cleaning_plan(target='test', ...) Develop a test dataset cleaning plan"
+            "   (The process for the test set is typically the same as for the training set, except that no operations based on the label distribution are performed.)\n"
+            "Note: The current state already contains valid `task_type` and `target_column` values (from `split_agent` or specified by the user)"
+            "Do not call `infer_task`.\n"
+            "When developing a cleaning plan, use the Manager RAP context as a reference, but rely on the actual data profile.\n"
+            "Once you have completed the steps above, stop the process and generate the report."
         )
     else:
         rap_step = (
-            "3. 调用 build_manager_rap_context(user_request, description, task_type, target_column) 生成 Manager RAP context；\n"
+            "3. Call build_manager_rap_context(user_request, description, task_type, target_column) generate Manager RAP context;\n"
             if not has_rap_context
-            else "3. 当前 state 已有 Manager RAP context，不要重复调用 build_manager_rap_context；\n"
+            else "3. The current state already has a Manager RAP context; do not call `build_manager_rap_context` again;\n"
         )
         workflow = (
-            "工作流要求（严格按顺序执行）：\n"
-            f"1. 调用 profile_dataset(file_path='{training_data_path}') 获取训练集数据画像；\n"
-            "2. 调用 infer_task，结合画像结果、数据集描述与用户问题判断"
-            " task_type（classification/regression）与 target_column（列名须与实际 CSV 列一致）；\n"
+            "Workflow Requirements (to be executed strictly in order):\n"
+            f"1. Call `profile_dataset(file_path='{training_data_path}')` to retrieve the training dataset profile;\n"
+            "2. Call `infer_task` and use the profiling results, dataset description, and user query to make a determination"
+            " task_type (classification/regression) and target_column (the column name must match the actual CSV column);\n"
             f"{rap_step}"
-            "4. 调用 create_cleaning_plan(target='train', ...) 制定训练集清洗计划；\n"
-            "5. 调用 create_cleaning_plan(target='test', ...) 制定测试集清洗计划"
-            "   （测试集步骤与 train 对齐，不写基于标签分布的特殊操作）。\n"
-            "制定清洗计划时把 Manager RAP context 作为背景知识参考，但以实际数据画像为准。\n"
-            "完成以上步骤后停止，生成报告。"
+            "4. Call `create_cleaning_plan(target='train', ...)` to define a cleaning plan for the training set;\n"
+            "5. Call `create_cleaning_plan(target='test', ...)` to define a cleaning plan for the test set"
+            "  (The steps for the test set align with those for the training set; do not include any special operations based on the label distribution.)\n"
+            "When developing a cleaning plan, use the Manager RAP context as a reference, but rely on the actual data profile.\n"
+            "Once you have completed the steps above, stop the process and generate the report."
         )
 
     messages = [
         SystemMessage(
             content=(
-                "你是一个数据分析 Agent。数据集已完成路径约定：训练集与测试集已分开或即将使用下列路径。\n"
-                f"训练集路径：{training_data_path or '未提供'}。\n"
-                f"测试集路径：{testing_data_path or '未提供'}。\n"
-                f"数据集描述：{description or '未提供'}。\n"
-                f"用户的问题：{user_request or '未提供'}。\n"
+                "You are a data analysis Agent. The dataset path convention has been established: the training set and test set have been separated or will be organized using the following paths.\n"
+                f"Training data path: {training_data_path or 'Not provided'}.\n"
+                f"Test set path: {testing_data_path or 'not provided'}.\n"
+                f"Dataset description: {description or 'Not provided'}.\n"
+                f"User's question: {user_request or 'Not provided'}.\n"
                 + rap_instruction
                 + workflow
                 + cleaning_plan_contract
@@ -269,18 +269,18 @@ def _show_graph_if_needed(agent_graph, show_graph: bool) -> None:
     output_dir.mkdir(parents=True, exist_ok=True)
     mmd_path = output_dir / "agent_manager_graph.mmd"
     mmd_path.write_text(agent_graph.get_graph().draw_mermaid(), encoding="utf-8")
-    print(f"Agent Manager Mermaid 源码已保存: {mmd_path}")
+    print(f"Agent Manager Mermaid The source code has been saved: {mmd_path}")
     try:
         image_path = output_dir / "agent_manager_graph.png"
         image_path.write_bytes(agent_graph.get_graph().draw_mermaid_png())
-        print(f"Graph 图片已保存: {image_path}")
+        print(f"Graph Image saved: {image_path}")
         try:
             from IPython.display import Image, display
             display(Image(filename=str(image_path)))
         except Exception:
             pass
     except Exception as exc:
-        print(f"图渲染失败: {exc}")
+        print(f"Image rendering failed: {exc}")
 
 
 def _pretty_print_message(message) -> None:
@@ -321,13 +321,13 @@ agent_manager = build_agent_manager()
 
 if __name__ == "__main__":
     agent_manager = build_agent_manager(show_graph=True)
-    user_input = input("请输入：")
+    user_input = input("Please enter:")
     events = agent_manager.stream(
         {
             "messages": [HumanMessage(content=user_input)],
             "user_request": user_input,
             "data_path": str(PROJECT_ROOT / "datasets" / "Financials.csv"),
-            "description": "这是一个金融行业销售数据集，包含销售、折扣、利润、国家、产品和时间字段。",
+            "description": "This is a financial industry sales dataset that includes fields for sales, discounts, profit, country, product, and time.",
         },
         stream_mode="values",
     )

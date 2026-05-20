@@ -1,4 +1,4 @@
-"""生成测试资源文件。在项目根目录运行：python tests/testenv/create_testenv.py"""
+"""Generate test resource files. Run from the project root: python tests/testenv/create_testenv.py"""
 
 import sys
 from pathlib import Path
@@ -16,7 +16,7 @@ TESTENV = Path(__file__).parent
 np.random.seed(42)
 N = 40
 
-# ── 原始数据 ─────────────────────────────────────────────────────────────────
+# ── Raw data ─────────────────────────────────────────────────────────────────
 
 jobs = ["admin", "technician", "services", "management"]
 educations = ["primary", "secondary", "tertiary"]
@@ -30,14 +30,14 @@ raw = pd.DataFrame(
         "subscribed": np.random.choice(["yes", "no"], N, p=[0.4, 0.6]),
     }
 )
-# 注入2个缺失值，模拟需要清洗的情况
+# Inject 2 missing values to simulate a dataset that needs cleaning
 raw.loc[[3, 17], "balance"] = np.nan
 
 out = TESTENV / "raw" / "sample.csv"
 raw.to_csv(out, index=False)
 print(f"raw: {out}  ({len(raw)} rows)")
 
-# ── 清洗后数据 ───────────────────────────────────────────────────────────────
+# ── Cleaned data ─────────────────────────────────────────────────────────────
 
 cleaned = raw.copy()
 median_balance = cleaned["balance"].median()
@@ -47,7 +47,7 @@ out = TESTENV / "clean" / "sample_cleaned.csv"
 cleaned.to_csv(out, index=False)
 print(f"clean: {out}  ({len(cleaned)} rows)")
 
-# ── train / test 切分 ────────────────────────────────────────────────────────
+# ── Train / test split ───────────────────────────────────────────────────────
 
 train_df, test_df = train_test_split(
     cleaned, test_size=0.2, random_state=42, stratify=cleaned["subscribed"]
@@ -60,7 +60,7 @@ test_df.to_csv(out_test, index=False)
 print(f"split train: {out_train}  ({len(train_df)} rows)")
 print(f"split test:  {out_test}  ({len(test_df)} rows)")
 
-# ── 特征工程后的训练集 ────────────────────────────────────────────────────────
+# ── Feature-engineered training sets ─────────────────────────────────────────
 
 def encode_target(df: pd.DataFrame) -> pd.DataFrame:
     df = df.copy()
@@ -68,7 +68,7 @@ def encode_target(df: pd.DataFrame) -> pd.DataFrame:
     return df
 
 
-# LogisticRegression / Ridge：StandardScaler + onehot
+# LogisticRegression / Ridge: StandardScaler + onehot
 def make_lr_featured(df: pd.DataFrame) -> pd.DataFrame:
     df = encode_target(df)
     target = df.pop("subscribed")
@@ -82,7 +82,7 @@ def make_lr_featured(df: pd.DataFrame) -> pd.DataFrame:
     return df.astype(float, errors="ignore")
 
 
-# RandomForest / XGBoost：LabelEncoder（无缩放）
+# RandomForest / XGBoost: LabelEncoder (no scaling)
 def make_tree_featured(df: pd.DataFrame) -> pd.DataFrame:
     df = encode_target(df)
     for col in ["job", "education"]:
@@ -112,4 +112,4 @@ for model, train_feat, test_feat in [
     test_feat.to_csv(out, index=False)
     print(f"feature/{model} test:  {out}  ({len(test_feat)} rows)")
 
-print("\ntestenv 生成完成。")
+print("\ntestenv generation complete.")

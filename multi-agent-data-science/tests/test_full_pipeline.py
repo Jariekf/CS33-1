@@ -1,4 +1,4 @@
-"""集成测试：主图结构、路由与 dataset_split 节点（工具层仍为 split_dataset_tool 使用）。"""
+"""Integration tests: main graph structure, routing, and the dataset_split node."""
 
 import sys
 from pathlib import Path
@@ -24,12 +24,12 @@ from core.graph import (
 TESTENV = Path(__file__).resolve().parent / "testenv"
 RAW_CSV = TESTENV / "raw" / "sample.csv"
 SAMPLE_DESCRIPTION = (
-    "二分类数据集：预测客户是否订阅银行定期存款（subscribed: yes/no）。"
-    "特征：age、job、education、balance。"
+    "Binary classification dataset: predict whether a customer subscribes to a bank term deposit (subscribed: yes/no). "
+    "Features: age, job, education, balance."
 )
 
 
-# ── 图结构 ──────────────────────────────────────────────────────────────────
+# ── Graph structure ──────────────────────────────────────────────────────────────────
 
 
 def test_pipeline_graph_contains_all_nodes():
@@ -80,7 +80,7 @@ def test_route_model_to_end_without_best_model():
     }) == END
 
 
-# ── 路由：init_run → split_agent / agent_manager ─────────────────────────────
+# ── Routing: init_run → split_agent / agent_manager ─────────────────────────────
 
 
 def test_route_init_skips_split_when_presplit_paths():
@@ -131,7 +131,7 @@ def test_route_test_cleaning_guard_to_next_or_end():
     }) == END
 
 
-# ── 图：start → init_run ─────────────────────────────────────────────────────
+# ── Graph: start → init_run ─────────────────────────────────────────────────────
 
 
 def test_pipeline_graph_contains_init_run_node():
@@ -144,7 +144,7 @@ def test_pipeline_graph_contains_init_run_node():
     assert ("init_run", "split_agent") in edges
 
 
-# ── LLM invoke 集成测试（需要 API Key）────────────────────────────────────────
+# ── LLM invoke integration tests (requires API Key)────────────────────────────────────────
 
 
 def _configured_deepseek_key() -> bool:
@@ -156,12 +156,12 @@ def _configured_deepseek_key() -> bool:
 
 @pytest.mark.skipif(
     not _configured_deepseek_key(),
-    reason="需要配置有效的 DEEPSEEK_API_KEY（非 .env 示例占位符）",
+    reason="A valid DEEPSEEK_API_KEY must be configured (not a .env placeholder)",
 )
 def test_full_pipeline_invoke_progresses_from_raw_csv():
-    """集成测试：从单 CSV 进入流水线，至少完成 init；若 LLM 走完则应有 split 路径等。"""
+    """Integration test: enter the pipeline from a single CSV, complete at least init; if LLM runs to completion, split paths etc. should be present."""
     pipeline = build_full_pipeline(show_graph=False)
-    user_input = "请分析数据集，执行清洗，并切分训练集和测试集。"
+    user_input = "Please analyze the dataset, run cleaning, and split into train and test sets."
     result = pipeline.invoke(
         {
             "messages": [HumanMessage(content=user_input)],
@@ -171,7 +171,7 @@ def test_full_pipeline_invoke_progresses_from_raw_csv():
         },
         config={"recursion_limit": 120},
     )
-    assert result.get("run_dir"), "init_run 应当生成 run_dir"
+    assert result.get("run_dir"), "init_run should generate run_dir"
     assert Path(result["run_dir"]).exists()
 
     tp = result.get("training_data_path") or ""
@@ -186,14 +186,14 @@ def test_full_pipeline_invoke_progresses_from_raw_csv():
             assert Path(cdp).exists()
 
 
-# ── 手动集成运行（pytest 不执行）─────────────────────────────────────────────
+# ── Manual integration run (not executed by pytest) ─────────────────────────────────────────────
 
 
 def _run_full_pipeline():
     from agent.agent_manager import _pretty_print_message
 
     pipeline = build_full_pipeline(show_graph=True)
-    user_input = input("请输入：")
+    user_input = input("Enter input: ")
     events = pipeline.stream(
         {
             "messages": [HumanMessage(content=user_input)],

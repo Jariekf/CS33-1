@@ -1,4 +1,4 @@
-"""完整流水线：Agent Manager → Data Clean Agent → Split 节点。"""
+"""Full pipeline: Agent Manager → Data Clean Agent → Split node."""
 
 from __future__ import annotations
 
@@ -43,38 +43,38 @@ def _init_run_node(state: GlobalState) -> GlobalState:
         dataset_name = Path(training_data_path).stem
     else:
         dataset_name = "dataset"
-    print(f"[init_run] 本次运行目录：{run_dir}  is_split={is_split}  dataset_name={dataset_name}")
+    print(f"[init_run] run directory: {run_dir}  is_split={is_split}  dataset_name={dataset_name}")
     return {"run_dir": str(run_dir), "is_split": is_split, "dataset_name": dataset_name, "timing": {"pipeline_start": time.time()}}
 
 
 
 def _route_after_init(state: GlobalState) -> str:
-    """已传入 train/test 路径则跳过切分，直接进 agent_manager。"""
+    """If train/test paths are already provided, skip splitting and go directly to agent_manager."""
     if state.get("is_split"):
         return "agent_manager"
     return "split_agent"
 
 
 def _route_after_eda(state: GlobalState) -> str:
-    """EDA 结束后：有候选模型则进入 Feature Agent，否则结束。"""
+    """After EDA: if candidate models exist enter Feature Agent, otherwise end."""
     if state.get("candidate_models"):
         return "feature_agent"
     return END
 
 
 def _route_after_feature(state: GlobalState) -> str:
-    """Feature Agent 结束后：还有未处理的模型则循环，否则进入 Model Agent。"""
+    """After Feature Agent: loop if there are unprocessed models remaining, otherwise enter Model Agent."""
     if _get_current_model(state) is not None:
         return "feature_agent"
     return "model_agent"
 
 
 def _route_after_model(state: GlobalState) -> str:
-    """Model Agent 结束后：
-    model_agent 子图在一次运行内已完成 tune_and_select → train(best) → evaluate(best) → 输出总结，
-    因此不需要在主图层面再「per-model 循环」（candidate_models 中未被选为 best 的模型不会
-    出现在 model_results 的 train/evaluate 字段里，循环会陷入死循环）。
-    只看 best_model 是否完成最终评估，即可判定终态。"""
+    """After Model Agent:
+    The model_agent subgraph completes tune_and_select → train(best) → evaluate(best) → summary in a single run,
+    so no per-model loop is needed at the main graph level (models not selected as best do not appear
+    in model_results train/evaluate fields; looping would cause an infinite loop).
+    Only check whether best_model has finished final evaluation to determine the terminal state."""
     best_model = state.get("best_model") or {}
     if best_model.get("model_name") and best_model.get("final_test_metrics"):
         log_node("finalize", success=True, detail=f"best={best_model.get('model_name')}")
@@ -91,22 +91,22 @@ def _show_graph_if_needed(compiled, show_graph: bool) -> None:
     output_dir.mkdir(parents=True, exist_ok=True)
     mmd_path = output_dir / "full_pipeline.mmd"
     mmd_path.write_text(compiled.get_graph().draw_mermaid(), encoding="utf-8")
-    print(f"Pipeline Mermaid 源码已保存: {mmd_path}  (可粘贴到 https://mermaid.live 查看)")
+    print(f"Pipeline Mermaid source saved: {mmd_path}  (paste into https://mermaid.live to view)")
     try:
         image_path = output_dir / "full_pipeline.png"
         image_path.write_bytes(compiled.get_graph().draw_mermaid_png())
-        print(f"Pipeline Graph 图片已保存: {image_path}")
+        print(f"Pipeline graph image saved: {image_path}")
         try:
             from IPython.display import Image, display
             display(Image(filename=str(image_path)))
         except Exception:
             pass
     except Exception as exc:
-        print(f"图渲染失败: {exc}")
+        print(f"Graph rendering failed: {exc}")
 
 
 def _set_clean_train(state: GlobalState) -> GlobalState:
-    """进入 train 清洗子图：冻结当前 train 路径为 raw（供多轮 ReAct 提示与固定落盘名）。"""
+    """Enter the train cleaning subgraph: freeze the current train path as raw (for multi-round ReAct prompts and stable file naming)."""
     cur = (state.get("training_data_path") or "").strip()
     raw = (state.get("raw_training_data_path") or "").strip()
     out: GlobalState = {"cleaning_target": "train", "dataset_id": ""}
@@ -116,7 +116,7 @@ def _set_clean_train(state: GlobalState) -> GlobalState:
 
 
 def _set_clean_test(state: GlobalState) -> GlobalState:
-    """进入 test 清洗子图：冻结当前 test 路径为 raw。"""
+    """Enter the test cleaning subgraph: freeze the current test path as raw."""
     cur = (state.get("testing_data_path") or "").strip()
     raw = (state.get("raw_testing_data_path") or "").strip()
     out: GlobalState = {"cleaning_target": "test", "dataset_id": ""}
@@ -364,20 +364,20 @@ full_pipeline = build_full_pipeline()
 
 if __name__ == "__main__":
     pipeline = build_full_pipeline(show_graph=True)
-    user_input = input("请输入：")
+    user_input = input("Enter input: ")
     events = pipeline.stream(
         {
             "messages": [HumanMessage(content=user_input)],
             "user_request": user_input,
             # "data_path": str(PROJECT_ROOT / "datasets" / "Financials.csv"),
             "data_path": str(PROJECT_ROOT / "datasets" / "bank-full.csv"),
-            # "description": "这是一个金融行业销售数据集，包含销售、折扣、利润、国家、产品和时间字段。",
+            # "description": "This is a financial industry sales dataset containing fields for sales, discounts, profit, country, product, and time.",
             "description": "The data is related with direct marketing campaigns of a Portuguese banking institution. The marketing campaigns were based on phone calls. Often, more than one contact to the same client was required, in order to access if the product (bank term deposit) would be ('yes') or not ('no') subscribed. There are four datasets: 1) bank-additional-full.csv with all examples (41188) and 20 inputs, ordered by date (from May 2008 to November 2010), very close to the data analyzed in [Moro et al., 2014] 2) bank-additional.csv with 10% of the examples (4119), randomly selected from 1), and 20 inputs. 3) bank-full.csv with all examples and 17 inputs, ordered by date (older version of this dataset with less inputs). 4) bank.csv with 10% of the examples and 17 inputs, randomly selected from 3 (older version of this dataset with less inputs). The smallest datasets are provided to test more computationally demanding machine learning algorithms(e.g., SVM). The classification goal is to predict if the client will subscribe (yes/no) a term deposit (variable y).",
             # "cleaned_data_path": str(PROJECT_ROOT / "artifacts" / "Financials_cleaned.csv"),
            # "cleaned_data_path": str(PROJECT_ROOT / "artifacts" / "bank-full_cleaned.csv"),
         },
         stream_mode="values",
-        # 含 EDA/Feature/Model 多轮工具调用 + BAT 子图，默认 120 易触发 GraphRecursionError
+        # EDA/Feature/Model involve multi-round tool calls + BAT subgraph; default limit of 120 easily triggers GraphRecursionError
         config={"recursion_limit": 280},
     )
     import time

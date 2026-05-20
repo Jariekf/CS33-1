@@ -9,24 +9,24 @@ from tools.tool_trace import trace_tool_call
 
 @tool
 def compute_correlation_matrix(file_path: str, target_column: str = "") -> str:
-    """计算训练集数值列的 Pearson 相关矩阵。
+    """Compute the Pearson correlation matrix for the numeric columns of the training set.
 
-    参数：
-      file_path (str)：训练集 CSV 文件路径。
-      target_column (str)：目标列名。若提供且存在于数值列中，则额外输出
-        各特征与目标列的相关系数绝对值排名（从高到低），帮助判断特征重要性。
+    Args:
+      file_path (str): path to the training-set CSV file.
+      target_column (str): target column name. When provided and present among the numeric columns, additionally outputs
+        the absolute-value ranking of each feature's correlation with the target column (highest to lowest) to help assess feature importance.
 
-    返回 JSON，包含：
-      columns：参与计算的列名列表。
-      matrix：完整相关矩阵（dict of dict）。
-      target_correlation_ranking：各特征与目标列相关度排名（仅当 target_column 有效时存在）。
+    Returns JSON containing:
+      columns: list of column names used in the computation.
+      matrix: full correlation matrix (dict of dict).
+      target_correlation_ranking: ranking of each feature's correlation with the target column (only present when target_column is valid).
     """
     tool_inputs = {"file_path": file_path, "target_column": target_column}
     try:
         df = pd.read_csv(file_path)
         numeric_df = df.select_dtypes(include="number")
         if numeric_df.empty:
-            raise ValueError("训练集中没有数值列，无法计算相关矩阵。")
+            raise ValueError("No numeric columns in the training set; cannot compute correlation matrix.")
 
         corr = numeric_df.corr().round(4)
         result: dict[str, Any] = {

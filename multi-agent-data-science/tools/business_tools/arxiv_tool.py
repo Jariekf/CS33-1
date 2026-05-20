@@ -1,6 +1,6 @@
 """
-Arxiv 检索工具
-封装 arxiv Python 库，为 Business Action Translator (RAG 兜底) 提供文献检索能力。
+arXiv search tool.
+Wraps the arxiv Python library to provide literature search capability for the Business Action Translator (RAG fallback).
 """
 from __future__ import annotations
 
@@ -9,14 +9,14 @@ import os
 
 def search_arxiv(query: str, max_results: int | None = None) -> list[dict]:
     """
-    检索 arxiv 论文。
+    Search arXiv papers.
 
     Args:
-        query: 检索关键词
-        max_results: 最大返回数量，默认使用环境变量 ARXIV_MAX_RESULTS（默认 5）
+        query: search keywords
+        max_results: maximum number of results to return; defaults to the ARXIV_MAX_RESULTS environment variable (default 5)
 
     Returns:
-        论文列表，每项包含 title, summary, url 等字段。
+        list of papers, each containing fields such as title, summary, and url.
     """
     if os.getenv("STUB_MODE", "false").lower() == "true":
         print(f"[Stub Mode] Skipping arXiv retrieval. Query: {query}")

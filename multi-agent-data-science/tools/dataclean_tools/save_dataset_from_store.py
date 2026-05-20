@@ -9,7 +9,7 @@ from tools.tool_trace import trace_tool_call
 
 @tool
 def save_dataset_from_store(dataset_id: str, output_path: str) -> str:
-    """将内存 dataset_store 中的数据集保存为 CSV 文件。"""
+    """Save the dataset from the in-memory dataset_store as a CSV file."""
     tool_inputs = {"dataset_id": dataset_id, "output_path": output_path}
     try:
         df = get_dataset(dataset_id)

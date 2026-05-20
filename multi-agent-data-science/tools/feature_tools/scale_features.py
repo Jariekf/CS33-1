@@ -19,24 +19,24 @@ def scale_features(
     run_dir: str = "",
     test_dataset_id: str = "",
 ) -> str:
-    """对指定数值列进行特征缩放。scaler 在训练集上 fit，同步 transform 测试集（若提供）。
+    """Scale the specified numeric columns. The scaler is fit on the training set and simultaneously transforms the test set (if provided).
 
-    参数：
-      dataset_id (str)：内存中的训练集数据集 ID。
-      columns (list[str])：需要缩放的数值列名列表。不在数据集中或非数值的列会被跳过。
-      method (str)：缩放方法。
-        - "standard"（默认）：StandardScaler，将列转换为均值 0、方差 1。
-        - "minmax"：MinMaxScaler，将列缩放至 [0, 1] 区间。
-      run_dir (str)：本次运行的工作目录，scaler 保存在 {run_dir}/features/scalers/ 下。
-      test_dataset_id (str)：内存中的测试集数据集 ID（可选）。
-        提供后，使用训练集拟合的 scaler 对测试集做相同变换（transform only，不重新 fit）。
+    Args:
+      dataset_id (str): ID of the in-memory training-set dataset.
+      columns (list[str]): list of numeric column names to scale. Columns not in the dataset or non-numeric columns are skipped.
+      method (str): scaling method.
+        - "standard" (default): StandardScaler; transforms the column to mean 0, variance 1.
+        - "minmax": MinMaxScaler; scales the column to the [0, 1] range.
+      run_dir (str): working directory for this run; the scaler is saved under {run_dir}/features/scalers/.
+      test_dataset_id (str): ID of the in-memory test-set dataset (optional).
+        When provided, the test set is transformed (transform only, no re-fit) using the scaler fit on the training set.
 
-    返回 JSON，包含：
-      scaled_columns：实际完成缩放的列名。
-      skipped_columns：跳过的列及原因。
-      method：使用的缩放方法。
-      scaler_path：保存的 scaler pkl 文件路径。
-      test_dataset_id：测试集 ID（若已提供并处理）。
+    Returns JSON containing:
+      scaled_columns: names of columns that were actually scaled.
+      skipped_columns: skipped columns and their reasons.
+      method: the scaling method used.
+      scaler_path: path to the saved scaler pkl file.
+      test_dataset_id: test-set ID (if provided and processed).
     """
     from sklearn.preprocessing import MinMaxScaler, StandardScaler
 

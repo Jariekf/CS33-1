@@ -37,11 +37,12 @@ _MODELING_TOOL_NAMES = {
 
 
 def _trim_messages_to_modeling_round(messages: list[Any]) -> list[Any]:
-    """裁剪历史 messages，只保留本轮 modeling 子图的工具调用/响应链。
+    """
+    Filter historical messages to retain only the tool call/response chains for the current modeling subgraph.
 
-    避免上游 user_request / agent_manager RAP wrap-up / EDA / feature 阶段
-    输出的业务化文本污染 model_agent LLM 的上下文，进而诱发越权写入
-    "业务建议" 类章节。
+    This prevents business-oriented text generated during the upstream user_request / agent_manager RAP wrap-up / EDA / feature stages
+    from contaminating the model_agent LLM's context, which could trigger unauthorized writing
+    to sections classified as "business recommendations."
     """
     if not messages:
         return []
@@ -91,7 +92,7 @@ def _model_node(state: GlobalState) -> GlobalState:
     best_model = state.get("best_model") or {}
     current_stage = state.get("current_stage") or ""
 
-    # EDA Agent 决定的指标
+    # Metrics Determined by the EDA Agent
     primary_metric = state.get("primary_metric") or ""
     evaluation_metrics = state.get("evaluation_metrics") or []
     metrics_rationale = state.get("metrics_rationale") or ""
@@ -102,104 +103,106 @@ def _model_node(state: GlobalState) -> GlobalState:
     output_dir = f"{run_dir}/models" if run_dir else ""
 
     system_content = (
-        "你是模型训练与评估 Agent。请严格遵循传统数据科学工作流：\n"
-        "先在训练集上做 CV 调参与模型选择，分析结果后再用全量训练集重训最佳模型，最后仅一次使用测试集做最终评估。\n\n"
-        "【任务信息】\n"
-        f"任务类型：{task_type}。目标列：{target_column or '未提供'}。\n"
-        f"候选模型：{candidate_models}。\n"
-        f"当前阶段：{current_stage or '未开始'}。已有 model_results 键：{list(model_results.keys())}。\n"
-        f"本次运行工作目录：{run_dir or '未设置'}。\n"
-        f"各候选模型预处理后训练集路径：{json.dumps(feature_dataset_ids, ensure_ascii=False)}。\n"
-        f"各候选模型预处理后测试集路径：{json.dumps(testing_feature_dataset_ids, ensure_ascii=False)}。\n"
-        f"已选最佳模型：{chosen_model or '尚未选择'}。\n\n"
-        "【EDA Agent 已确定的评估指标（直接使用，无需重新判断）】\n"
-        f"primary_metric（CV 调优指标）：{primary_metric or '未设置，请使用任务默认值'}。\n"
-        f"evaluation_metrics（综合评估指标列表）：{evaluation_metrics or '未设置，请使用任务默认指标'}。\n"
-        f"metrics 选择理由：{metrics_rationale or '未提供'}。\n\n"
-        "【执行步骤，按顺序完成，不跳步，不重复】\n\n"
-        "步骤 1 — 若 current_stage 不是 model_selected / model_trained / model_evaluated，\n"
-        "调用 tune_and_select_model，需自主制定以下 HPO 策略：\n"
-        f"  · scoring【强制】= '{primary_metric or ''}' —— 这是 EDA Agent 已经决定的 primary_metric，"
-        "直接传入，不得替换为其他指标，不得留空。\n"
-        "  · cv_strategy：特征含时序列 → timeseries；否则 → auto\n"
-        "  · cv_folds：训练集行数 < 1000 → 3；1000~20000 → 5；> 20000 → 10\n"
-        "  · search_strategy 选择原则：\n"
-        "    - 参数空间总组合数 ≤ 30（如 Ridge/Lasso/LogisticRegression）→ grid\n"
-        "    - 希望最大化搜索质量、iter 预算 ≤ 20 → bayesian（GP 代理模型，最样本高效）\n"
-        "    - 参数空间大（组合数 > 100）且 iter 预算充裕 → halving（逐轮淘汰）\n"
-        "    - 其余均衡场景 → random\n"
-        "    - 多个候选模型混合类型时，以参数空间最大的模型为准决定策略\n"
-        "  · max_iter_per_model：参数维度 ≤ 2 → 12；维度 3~4 → 20；维度 ≥ 5 → 30\n"
-        "    （search_strategy=grid 时忽略此参数）\n"
-        "  · extra_param_overrides（可选）：按模型名注入/覆盖特定超参，其余参数保持默认搜索空间。\n"
-        "    只在有明确数据证据时才传，不确定则留 None。常见场景：\n"
-        "    - 不平衡分类（EDA 报告显示类别比例 > 5:1）→\n"
+        "You are the Model Training and Evaluation Agent. Please strictly follow the traditional data science workflow: \n"
+        "First, perform hyperparameter tuning and model selection on the training set. After analyzing the results, "
+        "retrain the best model using the full training set, and finally evaluate it using the test set just once.\n\n"
+        "[Task Information]\n"
+        f"Task type: {task_type}. Target column: {target_column or 'Not provided'}.\n"
+        f"Candidate models: {candidate_models}.\n"
+        f"Current stage: {current_stage or 'Not started'}. Existing model_results key: {list(model_results.keys())}\n"
+        f"Working directory for this run: {run_dir or 'Not set'}.\n"
+        f"Paths to the preprocessed training sets for each candidate model: {json.dumps(feature_dataset_ids, ensure_ascii=False)}\n"
+        f"Paths to the test sets for each candidate model after preprocessing: {json.dumps(testing_feature_dataset_ids, ensure_ascii=False)}\n"
+        f"Selected best model: {chosen_model or 'Not selected yet'}\n\n"
+        "[EDA Agent: Predefined Evaluation Metrics (Use as is; no need to re-evaluate)]\n"
+        f"primary_metric (CV tuning metric): {primary_metric or 'Not set, please use the task default'}\n"
+        f"evaluation_metrics (List of Comprehensive Evaluation Indicators): {evaluation_metrics or 'Not set, please use the default task metrics'}.\n"
+        f"Reasons for choosing metrics: {metrics_rationale or 'Not provided'}\n\n"
+        "[Follow these steps in order; do not skip any steps or repeat any steps.]\n\n"
+        "Step 1 — If current_stage is not model_selected / model_trained / model_evaluated,\n"
+        "When calling `tune_and_select_model`, you must define the following HPO strategies yourself:\n"
+        f"· scoring [Required] = '{primary_metric or ''}' — This is the primary_metric already determined by the EDA Agent,"
+        "Pass directly; do not substitute with other metrics, and do not leave blank.\n"
+        "  · cv_strategy: If features include time series → timeseries; otherwise → auto\n"
+        "  · cv_folds: Number of rows in the training set < 1000 → 3; 1000–20,000 → 5; > 20,000 → 10\n"
+        "  · search_strategy Selection Criteria:\n"
+        "    - Total number of combinations in the parameter space ≤ 30 (e.g., Ridge, Lasso, LogisticRegression) → grid\n"
+        "    - To maximize search quality, with an iter budget ≤ 20 → Bayesian (GP surrogate model, most sample-efficient)\n"
+        "    - Large parameter space (number of combinations > 100) and ample iter budget → halving (elimination by rounds)\n"
+        "    - Other equilibrium scenarios → random\n"
+        "    - When combining multiple candidate models, the strategy is determined based on the model with the largest parameter space.\n"
+        "  · max_iter_per_model: For models with ≤ 2 dimensions → 12; for models with 3–4 dimensions → 20; for models with ≥ 5 dimensions → 30\n"
+        "    (Ignore this parameter when `search_strategy=grid`)\n"
+        "  · extra_param_overrides (optional): Injects or overrides specific hyperparameters by model name; "
+        "    all other parameters remain in the default search space.\n"
+        "    Pass a value only when there is clear data evidence; otherwise, leave it as `None`. Common scenarios:\n"
+        "    - Imbalanced classification (EDA report shows a class ratio > 5:1) →\n"
         '      {"LogisticRegression": {"class_weight": ["balanced", null]},\n'
         '       "RandomForest": {"class_weight": ["balanced", null]},\n'
         '       "SVM": {"class_weight": ["balanced", null]}}\n'
-        "      （仅支持 class_weight 的模型：LogisticRegression/RandomForest/SVM/LightGBM）\n"
-        "    - 训练集 > 50000 行，扩充树模型 n_estimators 上限 →\n"
+        "      (Models that support only `class_weight`: LogisticRegression, RandomForest, SVM, LightGBM)\n"
+        "    - Training set > 50,000 rows; increase the upper limit of `n_estimators` for the tree model →\n"
         '      {"RandomForest": {"n_estimators": [200, 300, 500]},\n'
         '       "XGBoost": {"n_estimators": [200, 300, 500]}}\n'
-        "    - 特征维度 > 100，RandomForest 加大 max_features 范围 →\n"
+        "    - Number of feature dimensions > 100; RandomForest increases the max_features range →\n"
         '      {"RandomForest": {"max_features": ["sqrt", "log2", 0.3, 0.5]}}\n'
-        "  · feature_dataset_ids、candidate_models、task_type、target_column 从上方任务信息传入\n\n"
-        "【自愈策略 — 遇到工具失败时，按以下优先级降级重试，不得放弃整个建模阶段】\n\n"
-        "  ① tune_and_select_model 返回 error（全部候选模型均失败）\n"
-        "    → 重试 1：保持原参数，改 search_strategy=random、max_iter_per_model=8，排查是否为 HPO 配置问题\n"
-        "    → 重试 2：cv_folds 减半（最低 3），缓解训练集过小导致的 CV split 不足\n"
-        "    → 重试 3：scoring 降级为任务默认值（分类→f1_weighted，回归→r2），排除 scorer 不兼容\n"
-        "    → 最终兜底：candidate_models 替换为 baseline（分类→LogisticRegression，回归→Ridge），\n"
-        "               model_params={}，直接调用 train_model 跳过调参\n\n"
-        "  ② tune_and_select_model 返回 skipped_models（部分模型失败）\n"
-        "    → 无需重试，从成功模型中选 best_model_name，在步骤 2 分析中说明跳过原因\n\n"
-        "  ③ train_model 返回 error\n"
-        "    → 重试：model_params={} 以默认参数重训（排除调参结果不兼容问题）\n"
-        "    → 仍失败：换 best_model_name 为 per_model_summary 中 cv_best_score 次高的成功模型\n\n"
-        "  ④ evaluate_model 返回 error\n"
-        "    → 检查 target_encoder_path / scaler_path / encoder_paths 是否与 train_model 返回值一致\n"
-        "    → 重试时确保参数对齐；若仍失败，记录错误信息，current_stage 置为 model_evaluated 并报告失败原因\n\n"
-        "  每次降级重试时，须在 tool_call 前用一句话说明「采用了哪条自愈策略及原因」。\n"
-        "  最多重试 2 次；超过后记录 error 原文，继续 pipeline（不中断整个系统）。\n\n"
-        "步骤 2 — 收到 tune_and_select_model 结果后，在【同一次回复】中完成分析并调用 train_model\n"
-        "  （不要先输出纯文字分析再单独调用工具，分析作为 tool_call 前的思考文本随工具调用一起返回）：\n"
-        "  分析要点（简短即可）：\n"
-        "  · 若存在 skipped_models，说明跳过原因\n"
-        "  · 对比成功模型的 cv_best_score 和 cv_score_std，判断最佳模型优势是否显著\n"
-        "  · 若最优与次优分数差 < 0.01，需说明选择依据\n"
-        "  · 若某模型 cv_score_std > 0.03，需指出 CV 不稳定\n"
-        "  · 给出最终采用哪个模型的结论，然后立即调用 train_model：\n"
-        "  featured_train_path = feature_dataset_ids[best_model_name]，\n"
-        "  model_name = best_model_name，model_params = best_model_params，\n"
-        f"  output_dir = {output_dir!r}。\n\n"
-        "步骤 3 — 若 current_stage 为 model_trained，调用 evaluate_model：\n"
-        "  featured_test_data_path = testing_feature_dataset_ids[best_model_name]，\n"
-        "  model_path、feature_columns_path 来自 train_model 返回值，\n"
-        "  model_name、task_type、target_column 从上方任务信息传入，\n"
-        f"  evaluation_metrics={evaluation_metrics}，primary_metric='{primary_metric}'。\n\n"
-        "步骤 3.5 — 若 current_stage 为 model_evaluated，调用 explain_model 进行 SHAP 分析：\n"
-        "  model_path 来自 best_model.model_path，\n"
-        "  featured_test_path = testing_feature_dataset_ids[best_model_name]，\n"
-        "  target_column、model_name、task_type 从上方任务信息传入，\n"
-        f"  output_dir = '{run_dir + '/plots' if run_dir else ''}',\n"
-        "  max_samples=500，top_n_features=20。\n"
-        "  若 explain_model 返回 error，记录原因后继续步骤 4（SHAP 失败不中断 pipeline）。\n\n"
-        "步骤 4 — 当 current_stage 为 model_explained 时，不再调用工具，\n"
-        "  输出简短总结：最终模型名称、cv_best_score vs final_test_metrics 各指标对比、\n"
-        "  泛化能力判断（CV 分与 test 分差距是否合理）、\n"
-        "  以及 SHAP top-3 最重要特征及其方向（若 SHAP 成功）。\n"
-        "  最终文字回复严格限于上述模型结果分析。\n"
-        "【严禁事项 — 业务建议归 BAT，本 agent 仅做技术结论】：\n"
-        "  - 严禁出现以下任何章节标题（中英文）：\n"
+        "  · feature_dataset_ids, candidate_models, task_type, target_column Retrieved from the task information above\n\n"
+        "  [Self-healing Strategy — If a tool fails, retry using the following priority order; do not abandon the entire modeling phase]\n\n"
+        "  ① tune_and_select_model returns error (All candidate models failed)\n"
+        "    → Retry 1: Keep the original parameters, but change `search_strategy=random` and `max_iter_per_model=8` to determine if the issue is related to HPO configuration.\n"
+        "    → Retry 2: Halve the number of CV folds (minimum 3) to mitigate the issue of insufficient CV splits caused by a training set that is too small\n"
+        "    → Retry 3: Downgrade scoring to the task defaults (classification → f1_weighted, regression → r2) to rule out scorer incompatibility\n"
+        "    → Fallback option: Replace `candidate_models` with `baseline` (classification → LogisticRegression, regression → Ridge),\n"
+        "              model_params={}, call train_model directly to skip hyperparameter tuning\n\n"
+        "  ② tune_and_select_model returns skipped_models (some models failed)\n"
+        "    → No need to retry; select `best_model_name` from the successful models and explain the reason for skipping this step in the analysis in Step 2.\n\n"
+        "  ③ train_model returns an error\n"
+        "    → Retry: model_params={} Retrain using default parameters (to rule out incompatibility issues with hyperparameter tuning results)\n"
+        "    → Still failing: Replace `best_model_name` with the second-highest-scoring successful model from `cv_best_score` in `per_model_summary`.\n\n"
+        "  ④ evaluate_model returns an error\n"
+        "    → Check whether `target_encoder_path`, `scaler_path`, and `encoder_paths` match the values returned by `train_model`.\n"
+        "    → When retrying, ensure that the parameters are aligned; if it still fails, log the error message, set `current_stage` to `model_evaluated`, and report the cause of the failure.\n\n"
+        "  Each time you retry after a downgrade, you must include a single sentence before the `tool_call` to explain [which self-healing strategy was used and why.]\n"
+        "  Attempt up to two retries; if exceeded, log the original error and continue the pipeline (without interrupting the entire system).\n\n"
+        "Step 2 — After receiving the results from `tune_and_select_model`, complete the analysis and call `train_model` in the same reply.\n"
+        "  (Do not first output the plain text analysis and then call the tool separately; instead, include the analysis as the input text preceding `tool_call` and return it along with the tool call):\n"
+        "  Key points of the analysis (briefly):\n"
+        "  · If `skipped_models` exists, specify the reason for skipping\n"
+        "  · Compare the `cv_best_score` and `cv_score_std` of the successful model to determine whether the best model offers a significant advantage.\n"
+        "  · If the difference between the highest and second-highest scores is less than 0.01, the basis for the selection must be explained.\n"
+        "  · If a model's cv_score_std is greater than 0.03, it should be noted that the CV is unstable.\n"
+        "  · Provide a conclusion on which model to use, and then immediately call `train_model`:\n"
+        "  featured_train_path = feature_dataset_ids[best_model_name],\n"
+        "  model_name = best_model_name, model_params = best_model_params,\n"
+        f"  output_dir = {output_dir!r}\n\n"
+        "Step 3 — If `current_stage` is `model_trained`, call `evaluate_model`:\n"
+        "  featured_test_data_path = testing_feature_dataset_ids[best_model_name],\n"
+        "  model_path and feature_columns_path are returned by train_model, \n"
+        "  model_name, task_type, target_column Based on the task information provided above,\n"
+        f"  evaluation_metrics={evaluation_metrics}, primary_metric='{primary_metric}'\n\n"
+        "Step 3.5 — If `current_stage` is `model_evaluated`, call `explain_model` to perform SHAP analysis:\n"
+        "  model_path comes from best_model.model_path,\n"
+        "  featured_test_path = testing_feature_dataset_ids[best_model_name],\n"
+        "  target_column, model_name, and task_type are passed in from the task information above,\n"
+        f" output_dir = '{run_dir + '/plots' if run_dir else ''}',\n"
+        "  max_samples=500, top_n_features=20\n"
+        "  If `explain_model` returns an error, log the cause and proceed to step 4 (SHAP failure does not interrupt the pipeline).\n\n"
+        "Step 4 — When `current_stage` is `model_explained`, the tool is no longer called,\n"
+        "  Brief summary: Final model name, comparison of metrics between cv_best_score and final_test_metrics,\n"
+        "  Assessment of generalization ability (whether the difference between the CV score and the test score is reasonable),\n"
+        "  and the top 3 most important features in SHAP, along with their directions (if SHAP is successful).\n"
+        "  The final text response is strictly limited to the analysis of the model results described above.\n"
+        "[Prohibited Actions — Business recommendations are the responsibility of BAT; this agent provides technical conclusions only]:\n"
+        "  - The following chapter titles (in both Chinese and English) are strictly prohibited:\n"
         "    · 中文：业务建议 / 业务影响 / 业务洞察 / 业务推荐 / 业务价值 / 业务意义 /\n"
         "      行动建议 / 推荐操作 / 策略建议 / 战略建议 / 下一步 / 下一步行动 / 下一步操作 / 后续行动\n"
-        "    · 英文：Business Recommendation(s) / Business Insight(s) / Business Action(s) /\n"
+        "    · English: Business Recommendation(s) / Business Insight(s) / Business Action(s) /\n"
         "      Business Implication(s) / Business Value / Recommendation(s) / Recommended Action(s) /\n"
         "      Next Step(s) / Action Item(s) / Strategic Implication(s) / Strategic Recommendation(s)\n"
-        "  - 不得讨论营销策略、ROI、客户筛选、阈值与业务取舍等业务层面话题；\n"
-        "  - 业务建议、客户行动、投放策略等内容由 business_translator_agent 在最终\n"
-        "    business_insight_report.md 中统一产出；本 agent 仅汇报模型指标与泛化能力。\n"
-        "  - 若你违规输出上述章节，落盘前会被 save_agent_report 的过滤器自动剥离。"
+        "  - Do not discuss business-related topics such as marketing strategies, ROI, customer screening, thresholds, and business trade-offs\n"
+        "  - Content such as business recommendations, customer actions, and advertising strategies is handled by business_translator_agent in the final\n"
+        "    All results are consolidated in `business_insight_report.md`; this agent reports only model metrics and generalization capabilities.\n"
+        "  - If you output the above sections in violation of the rules, they will be automatically stripped by the `save_agent_report` filter before being written to disk."
     )
 
     trimmed_history = _trim_messages_to_modeling_round(messages)
@@ -210,9 +213,9 @@ def _model_node(state: GlobalState) -> GlobalState:
             SystemMessage(content=system_content),
             HumanMessage(
                 content=(
-                    "请按系统提示词执行 modeling 步骤 1~4。"
-                    "禁止复读上游 user_request / agent_manager / EDA / feature 报告，"
-                    "禁止生成业务建议、推荐操作、下一步、Recommendations、Next Steps 等业务类章节。"
+                    "Please follow the system prompts to complete modeling steps 1 to 4."
+                    "Do not repeat the upstream user_request / agent_manager / EDA / feature reports,"
+                    "Do not generate business-related sections such as business suggestions, recommended actions, next steps, Recommendations, or Next Steps."
                 )
             ),
         ]
@@ -240,7 +243,7 @@ def _parse_payload(tool_message: ToolMessage) -> dict[str, Any]:
     try:
         return json.loads(str(tool_message.content))
     except json.JSONDecodeError:
-        return {"error": {"type": "JSONDecodeError", "message": "工具输出不是合法 JSON"}}
+        return {"error": {"type": "JSONDecodeError", "message": "The tool's output is not valid JSON"}}
 
 
 def _handle_train(state: GlobalState, tool_message: ToolMessage) -> GlobalState:
@@ -320,7 +323,7 @@ def _handle_explain(state: GlobalState, tool_message: ToolMessage) -> GlobalStat
     payload = _parse_payload(tool_message)
     best_model = dict(state.get("best_model") or {})
     if "error" in payload:
-        # SHAP 失败不中断 pipeline，记录错误继续
+        # SHAP failure does not interrupt the pipeline; errors are logged and processing continues
         best_model["shap_explanation"] = {"error": payload["error"]}
     else:
         best_model["shap_explanation"] = {
@@ -380,7 +383,7 @@ def _route_after_model(state: GlobalState) -> str:
 
 
 def _build_model_report(state: GlobalState, llm_summary: str) -> str:
-    """从 state 数据构建完整的模型报告 Markdown，LLM 步骤 4 文字作为补充追加。"""
+    """Generate a complete model report in Markdown based on the state data, with the text from LLM Step 4 appended as supplementary information."""
     best_model = state.get("best_model") or {}
     model_results = state.get("model_results") or {}
     task_type = (state.get("task_type") or "unknown").lower()
@@ -390,8 +393,8 @@ def _build_model_report(state: GlobalState, llm_summary: str) -> str:
     model_name = best_model.get("model_name", "unknown")
     lines: list[str] = []
 
-    # ── 1. CV 调参结果（所有候选模型）────────────────────────────────────────
-    lines.append("### CV 调参结果（训练集，候选模型对比）\n")
+    # ── 1. CV Hyperparameter Tuning Results (All Candidate Models) ──────────────────────────────────────
+    lines.append("### CV Hyperparameter Tuning Results (Training Set, Comparison of Candidate Models)\n")
     has_cv = False
     for name, entry in model_results.items():
         sel = entry.get("selection_summary") or {}
@@ -403,30 +406,30 @@ def _build_model_report(state: GlobalState, llm_summary: str) -> str:
         rows_trained = sel.get("rows_trained", "")
 
         if status == "failed":
-            lines.append(f"**{name}** — ❌ 跳过（{sel.get('error', '未知错误')}）\n")
+            lines.append(f"**{name}** — ❌ Skip ({sel.get('error', 'Unknown error')})\n")
         else:
-            is_best = "✅ **最终选择**" if name == model_name else ""
+            is_best = "✅ **Final choice**" if name == model_name else ""
             lines.append(f"**{name}** {is_best}")
-            lines.append(f"- CV {primary_metric or '得分'}：**{cv_score}**（std={cv_std}）")
-            lines.append(f"- 搜索策略：{search_strategy}　训练样本数：{rows_trained}")
+            lines.append(f"- CV {primary_metric or 'Score'}: **{cv_score}** (std={cv_std})")
+            lines.append(f"- Search Strategy: {search_strategy}  Number of training samples: {rows_trained}")
             if best_params:
-                params_str = "、".join(f"`{k}={v}`" for k, v in best_params.items())
-                lines.append(f"- 最优参数：{params_str}")
+                params_str = ", ".join(f"`{k}={v}`" for k, v in best_params.items())
+                lines.append(f"- Optimal parameters: {params_str}")
             lines.append("")
             has_cv = True
 
     if not has_cv:
-        lines.append("_（CV 调参结果未记录）_\n")
+        lines.append("_(CV tuning results not recorded)_\n")
 
-    # ── 2. 最终测试集评估 ───────────────────────────────────────────────────
-    lines.append("### 最终测试集评估\n")
+    # ── 2. Evaluation on the Final Test Set ────────────────────────────────────────────
+    lines.append("### Final validation set evaluation\n")
     final_metrics = best_model.get("final_test_metrics") or {}
     if final_metrics:
-        # 优先展示 evaluation_metrics 指定的，再展示剩余的
+        # Display the items specified by `evaluation_metrics` first, then display the remaining items
         ordered = list(evaluation_metrics) + [
             k for k in final_metrics if k not in evaluation_metrics and not k.endswith("_skipped_reason")
         ]
-        lines.append("| 指标 | 值 |")
+        lines.append("| Metric | Value |")
         lines.append("|---|---|")
         for m in ordered:
             if m in final_metrics and not m.endswith("_skipped_reason"):
@@ -435,29 +438,29 @@ def _build_model_report(state: GlobalState, llm_summary: str) -> str:
                 lines.append(f"| {m}{star} | {val} |")
         lines.append("")
     else:
-        lines.append("_（最终评估数据未记录）_\n")
+        lines.append("_(Final evaluation data not recorded)_\n")
 
-    # 混淆矩阵
+    # Confusion Matrix
     cm = best_model.get("confusion_matrix")
     if cm and task_type == "classification":
-        lines.append("**混淆矩阵：**")
+        lines.append("**Confusion matrix:**")
         lines.append("```")
         for row in cm:
             lines.append("  " + "  ".join(str(v) for v in row))
         lines.append("```\n")
 
-    # ── 3. SHAP 特征重要性 ──────────────────────────────────────────────────
+    # ── 3. SHAP Feature Importance ──────────────────────────────────────────────────
     shap = best_model.get("shap_explanation") or {}
     if shap and "error" not in shap:
-        lines.append("### SHAP 特征重要性（全局）\n")
-        lines.append(f"Explainer：{shap.get('explainer_type', '')}　"
-                     f"解释样本数：{shap.get('samples_explained', '')}\n")
+        lines.append("### SHAP Feature Importance (Global)\n")
+        lines.append(f"Explainer: {shap.get('explainer_type', '')}  "
+                     f"Sample size: {shap.get('samples_explained', '')}\n")
         fi = shap.get("feature_importance") or []
         if fi:
-            lines.append("| 排名 | 特征 | mean\\|SHAP\\| | 方向 |")
+            lines.append("| Rank | Feature | mean\\|SHAP\\| | Direction |")
             lines.append("|---|---|---|---|")
             for item in fi[:10]:
-                dir_icon = {"positive": "↑ 正向", "negative": "↓ 负向", "mixed": "↔ 混合"}.get(
+                dir_icon = {"positive": "↑ positive", "negative": "↓ negative", "mixed": "↔ mixed"}.get(
                     item.get("direction", ""), item.get("direction", "")
                 )
                 lines.append(
@@ -467,39 +470,39 @@ def _build_model_report(state: GlobalState, llm_summary: str) -> str:
             lines.append("")
         plot_path = shap.get("shap_summary_plot_path")
         if plot_path:
-            lines.append(f"SHAP 图表：`{plot_path}`\n")
+            lines.append(f"SHAP Chart: `{plot_path}`\n")
     elif shap.get("error"):
-        lines.append(f"_SHAP 解析失败：{shap['error']}（不影响模型指标）_\n")
+        lines.append(f"_SHAP parsing failed: {shap['error']}(Does not affect model metrics)_\n")
 
-    # ── 4. 资源感知指标 ─────────────────────────────────────────────────────
+    # ── 4. Resource-aware metrics ─────────────────────────────────────────────────────
     resource = best_model.get("resource_metrics") or {}
     if resource:
         latency = resource.get("inference_latency_ms_per_sample")
         size_kb = resource.get("model_size_kb")
         parts = []
         if latency is not None:
-            parts.append(f"推理延迟 {latency}ms/样本")
+            parts.append(f"Inference latency {latency} ms/sample")
         if size_kb is not None:
-            parts.append(f"模型大小 {size_kb}KB")
+            parts.append(f"Model size {size_kb} KB")
         if parts:
-            lines.append("### 资源指标\n")
-            lines.append("　".join(parts) + "\n")
+            lines.append("### Resource Metrics\n")
+            lines.append(" ".join(parts) + "\n")
 
-    # ── 5. 预测文件路径 ─────────────────────────────────────────────────────
+    # ── 5. Predict file paths ─────────────────────────────────────────────────────
     pred_path = best_model.get("test_predictions_path")
     if pred_path:
-        lines.append(f"预测值落盘：`{pred_path}`\n")
+        lines.append(f"Predicted results: `{pred_path}`\n")
 
-    # ── 6. LLM 步骤 4 补充分析 ─────────────────────────────────────────────
+    # ── 6. Supplementary Analysis for LLM Step 4 ─────────────────────────────────────────────
     if llm_summary.strip():
-        lines.append("### 模型 Agent 分析总结\n")
+        lines.append("### Summary of the Agent Model Analysis\n")
         lines.append(llm_summary.strip())
 
     return "\n".join(lines)
 
 
 def _model_finalize_node(state: GlobalState) -> GlobalState:
-    """Pipeline 收尾：存 model_report、补全 best_model.task_type、保存 state 快照。"""
+    """Pipeline cleanup: Save `model_report`, complete `best_model.task_type`, and save a state snapshot."""
     last_msg = state["messages"][-1]
     llm_summary = str(last_msg.content) if hasattr(last_msg, "content") else ""
 
@@ -510,11 +513,11 @@ def _model_finalize_node(state: GlobalState) -> GlobalState:
     model_name = best_model.get("model_name", "unknown")
     run_dir = state.get("run_dir") or ""
 
-    # 从 state 数据构建完整报告，LLM 步骤 4 作为补充附后
+    # Generate a complete report from the state data; LLM Step 4 is included below as a supplement
     full_report = _build_model_report({**state, "best_model": best_model}, llm_summary)
 
     class _FakeMsg:
-        """让 save_agent_report 能接受纯文本。"""
+        """Allow `save_agent_report` to accept plain text."""
         content = full_report
 
     save_agent_report("model_agent", _FakeMsg(), model=model_name, run_dir=run_dir)
@@ -546,18 +549,18 @@ def _show_graph_if_needed(agent_graph, show_graph: bool) -> None:
         output_dir.mkdir(parents=True, exist_ok=True)
         mmd_path = output_dir / "model_agent_graph.mmd"
         mmd_path.write_text(agent_graph.get_graph().draw_mermaid(), encoding="utf-8")
-        print(f"Mermaid 源码已保存: {mmd_path}")
+        print(f"The Mermaid source code has been saved:{mmd_path}")
         image_path = output_dir / "model_agent_graph.png"
         image_bytes = agent_graph.get_graph().draw_mermaid_png()
         image_path.write_bytes(image_bytes)
-        print(f"Graph 图片已保存: {image_path}")
+        print(f"Graph image saved: {image_path}")
         try:
             from IPython.display import Image, display
             display(Image(filename=str(image_path)))
         except Exception:
             pass
     except Exception as exc:
-        print(f"图渲染失败: {exc}")
+        print(f"Image rendering failed: {exc}")
 
 
 def _pretty_print_message(message) -> None:

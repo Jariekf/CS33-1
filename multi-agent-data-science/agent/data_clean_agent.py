@@ -50,11 +50,11 @@ _CLEAN_TOOL_NAMES = {
 
 
 def _trim_messages_to_clean_round(messages: list[Any]) -> list[Any]:
-    """裁剪历史 messages，只保留本轮 data_clean 子图相关的工具调用/响应链。
+    """Trim the message history, retaining only the tool call/response chains relevant to the current data_clean subgraph.
 
-    避免上游 (agent_manager) 阶段的长篇 Markdown 总结（含 cleaning plan、
-    业务建议、EDA/特征/建模建议等）污染上下文，导致 data_clean LLM
-    走神变成「复读机」，把上游报告整段抄进 data_clean_agent_report.md。
+    Avoid cluttering the context with lengthy Markdown summaries from the upstream (agent_manager) stage (including cleaning plans,
+    business recommendations, EDA/feature/modeling suggestions, etc.), which can cause the data_clean LLM
+    to lose focus and turn into a "parrot," copying entire sections of the upstream report into data_clean_agent_report.md.
     """
     if not messages:
         return []
@@ -510,7 +510,7 @@ def _parse_tool_payload(tool_message: ToolMessage) -> dict[str, Any]:
         return {
             "error": {
                 "type": exc.__class__.__name__,
-                "message": "工具输出不是合法 JSON",
+                "message": "The tool's output is not valid JSON",
                 "raw_content_preview": raw_preview,
             }
         }
@@ -779,11 +779,11 @@ def _show_graph_if_needed(agent_graph, show_graph: bool) -> None:
         output_dir.mkdir(parents=True, exist_ok=True)
         mmd_path = output_dir / "data_clean_agent_graph.mmd"
         mmd_path.write_text(agent_graph.get_graph().draw_mermaid(), encoding="utf-8")
-        print(f"Mermaid 源码已保存: {mmd_path}")
+        print(f"The Mermaid source code has been saved: {mmd_path}")
         image_path = output_dir / "data_clean_agent_graph.png"
         image_bytes = agent_graph.get_graph().draw_mermaid_png()
         image_path.write_bytes(image_bytes)
-        print(f"Graph 图片已保存: {image_path}")
+        print(f"The image has been saved: {image_path}")
         try:
             from IPython.display import Image, display
 
@@ -791,7 +791,7 @@ def _show_graph_if_needed(agent_graph, show_graph: bool) -> None:
         except Exception:
             pass
     except Exception as exc:
-        print(f"图渲染失败: {exc}")
+        print(f"Image rendering failed: {exc}")
 
 
 def _pretty_print_message(message) -> None:

@@ -10,19 +10,19 @@ from tools.tool_trace import trace_tool_call
 
 @tool
 def clean_outliers(dataset_id: str, actions: list[dict[str, Any]] | None = None) -> str:
-    """处理异常值。
+    """Handle outliers.
 
-    每个 action 必须包含以下字段：
-      - column   (str)：要处理的列名，必须是数值列。
-      - strategy (str)：处理策略，当前唯一支持的值是 "clip_iqr"（将超出 IQR 范围的值截断到边界）。
+    Each action must contain the following fields:
+      - column   (str): the column name to process; must be a numeric column.
+      - strategy (str): the handling strategy; the only currently supported value is "clip_iqr" (clip values outside the IQR range to the boundary).
 
-    示例：
+    Example:
       actions = [
           {"column": "Sales", "strategy": "clip_iqr"},
           {"column": "Profit", "strategy": "clip_iqr"},
       ]
 
-    注意：strategy 必须精确填写 "clip_iqr"，填写其他任何值（如 "iqr"、"clip"、"IQR"）该列会被跳过。
+    Note: strategy must be exactly "clip_iqr"; any other value (e.g. "iqr", "clip", "IQR") will cause the column to be skipped.
     """
     tool_inputs = {"dataset_id": dataset_id, "actions": actions or []}
     processed_columns = []

@@ -215,7 +215,7 @@ llm_pipeline = llm_for("default")
 
 
 def call_llm(system_prompt: str, user_prompt: str, agent_name: str = "") -> str:
-    """单次 Chat 调用（与 CS33-automl ``call_llm`` 对齐），供 BAT 等节点使用。"""
+    """Single Chat call (aligned with CS33-automl call_llm), used by BAT and other nodes."""
     from langchain_core.messages import HumanMessage, SystemMessage
 
     _ = agent_name  # reserved for tracing / logging

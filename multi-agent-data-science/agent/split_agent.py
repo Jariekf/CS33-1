@@ -1,4 +1,4 @@
-"""Split Agent: infer task type then split the dataset."""
+"""Split Agent: First determine the task type, then split the dataset."""
 
 from __future__ import annotations
 
@@ -33,24 +33,24 @@ def _split_agent_node(state: GlobalState) -> GlobalState:
 
     supervisor_hint = (state.get("supervisor_hints") or {}).get("split", "").strip()
     hint_line = (
-        f"[Supervisor 反馈] 上一轮检查未通过：{supervisor_hint}\n请仅针对此问题修复，不要重新执行已完成的步骤。\n"
+        f"[Supervisor Feedback] Failed the previous round of checks: {supervisor_hint}\nPlease fix only this issue; do not repeat steps that have already been completed.\n"
         if supervisor_hint else ""
     )
 
     system_content = (
-        "你是一个数据集划分 Agent，负责推断建模任务并切分数据集。\n"
-        f"数据集路径：{data_path or '未提供'}。\n"
-        f"数据集描述：{description or '未提供'}。\n"
-        f"用户问题：{user_request or '未提供'}。\n"
-        f"本次运行目录：{run_dir or '未提供'}。\n"
+        "You are a dataset splitting agent responsible for inferring modeling tasks and splitting the dataset.\n"
+       f"Dataset path: {data_path or 'Not provided'}.\n"
+       f"Dataset description: {description or 'Not provided'}.\n"
+       f"User query: {user_request or 'Not provided'}.\n"
+       f"Current working directory: {run_dir or 'Not provided'}.\n"
         + hint_line
-        + "工作流（严格按顺序执行）：\n"
-        "1. 调用 infer_task，根据数据集描述和用户问题判断任务类型（classification/regression）和目标列；\n"
-        "2. 调用 split_dataset，传入上一步推断的 task_type 和 target_column，"
-        f"data_path='{data_path}', run_dir='{run_dir}'，将数据集切分为训练集和测试集。\n"
-        "完成以上两步后停止，不要再调用任何工具。\n"
-        "最终文字回复只说明任务类型推断结果和数据集切分情况（训练集/测试集路径与行数），"
-        "不要提及后续数据清洗、EDA 或建模步骤。"
+        + "Workflow (executed strictly in sequence):\n"
+        "1. Call `infer_task` to determine the task type (classification/regression) and target column based on the dataset description and the user's query;\n"
+        "2. Call `split_dataset`, passing in the `task_type` and `target_column` inferred in the previous step,"
+        f"data_path='{data_path}', run_dir='{run_dir}', split the dataset into training and testing sets.\n"
+        "Once you have completed the above two steps, stop there; do not call any further tools. \n"
+        "The final text response should only describe the inferred task type and how the dataset has been split (paths and number of rows for the training and test sets),"
+        "and should not mention subsequent data cleaning, EDA, or modeling steps."
     )
 
     messages = [SystemMessage(content=system_content), *state["messages"]]
@@ -151,7 +151,7 @@ def _show_graph(compiled) -> None:
 
 if __name__ == "__main__":
     agent = build_split_agent(show_graph=True)
-    user_input = input("Enter: ")
+    user_input = input("Please enter: ")
     events = agent.stream(
         {
             "messages": [HumanMessage(content=user_input)],

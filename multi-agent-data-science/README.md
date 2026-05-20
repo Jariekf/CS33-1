@@ -69,8 +69,7 @@ Three layers, all in [`multi-agent-data-science/`](.):
    the original `user_request` HumanMessage and `agent_manager`'s RAP
    business-strategy AIMessage from polluting their context.
 2. **Prompt-level prohibitions.** The EDA / Model agent system prompts list
-   forbidden heading titles (中文：业务建议 / 行动建议 / 下一步 / … ; English:
-   Business Recommendation(s) / Recommended Actions / Next Step(s) / …) and
+   forbidden heading titles (English:Business Recommendation(s) / Recommended Actions / Next Step(s) / …) and
    state that business advice belongs to BAT.
 3. **Save-time filter.** `core/report_writer.save_agent_report` calls
    `_strip_non_bat_recommendations` on the final AI message for every

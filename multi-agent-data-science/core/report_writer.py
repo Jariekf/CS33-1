@@ -1,4 +1,4 @@
-"""Agent 报告写入 & 纯函数节点日志工具。"""
+"""Agent report writer & pure-function node logging utilities."""
 
 from __future__ import annotations
 
@@ -9,14 +9,14 @@ from datetime import datetime
 from pathlib import Path
 from typing import Any
 
-# 当各 agent 调用 save_agent_report(..., run_dir=...) 时，报告写入 ``{run_dir}/reports``；
-# run_dir 为空（例如仅单独跑某子图）时回退到此目录，避免抛路径错误。
+# When each agent calls save_agent_report(..., run_dir=...), reports are written to {run_dir}/reports;
+# if run_dir is empty (e.g., running a subgraph standalone), falls back to this directory to avoid path errors.
 _DEFAULT_REPORTS_DIR = Path(__file__).resolve().parents[1] / "artifacts" / "reports"
 _RAP_REPORT_SUMMARY_CHARS = int(os.getenv("MANAGER_RAP_REPORT_SUMMARY_CHARS", "800"))
 _RAP_REPORT_CONTEXT_CHARS = int(os.getenv("MANAGER_RAP_REPORT_CONTEXT_CHARS", "1200"))
 
-# 只有 business_translator_agent 可以产出业务建议。这里维护一份非 BAT 报告
-# 中必须剥离的章节标题黑名单（大小写不敏感、去除首尾空白与尾部冒号/标点）。
+# Only business_translator_agent may produce business recommendations. This maintains a blacklist
+# of section headings that must be stripped from non-BAT reports (case-insensitive, trims whitespace and trailing punctuation).
 _BUSINESS_HEADING_BLACKLIST: frozenset[str] = frozenset(
     {
         # 中文
@@ -39,7 +39,7 @@ _BUSINESS_HEADING_BLACKLIST: frozenset[str] = frozenset(
         "建模建议",
         "推荐模型",
         "类别不平衡处理",
-        # 英文（normalise 时去除尾部 s，且小写）
+        # English (When normalizing, remove the final "s" and convert to lowercase)
         "business recommendation",
         "business insight",
         "business action",
@@ -62,7 +62,7 @@ _BUSINESS_HEADING_BLACKLIST: frozenset[str] = frozenset(
 _HEADING_RE = re.compile(r"^(#{1,6})\s+(.+?)\s*$")
 _FENCE_RE = re.compile(r"^\s*```")
 _PUNCT_TAIL_RE = re.compile(r"[\s:：。，,\.！!?？]+$")
-# 章节前缀：emoji / 罗马数字 / 阿拉伯数字 / 中文数字 + 序号分隔符
+# Chapter prefix: emoji / Roman numerals / Arabic numerals / Chinese numerals + number separator
 _HEADING_PREFIX_RE = re.compile(
     r"^[\s\W\d_]*(?:[一二三四五六七八九十百千]+、)?[\s\W\d_]*"
 )
@@ -70,14 +70,14 @@ _HEADING_SUFFIX_RE = re.compile(r"[\s\W_]+$")
 
 
 def _normalise_heading(text: str) -> str:
-    """归一化 Markdown 标题用于黑名单匹配。
+    """Normalise a Markdown heading for blacklist matching.
 
-    流程：
-    1. 小写、剥两端 markdown emphasis（``*_` ``）；
-    2. 剥前缀：emoji、序号（阿拉伯/罗马/中文「一、二、…」）、空白/标点；
-    3. 取冒号 / 中文冒号前的主标题（"下一步：特征工程与建模" → "下一步"）；
-    4. 剥尾部空白/标点/emoji；
-    5. 若以英文复数 s 结尾且去 s 命中黑名单，则归一化为单数。
+    Steps:
+    1. Lowercase, strip markdown emphasis (``*_` ``) from both ends;
+    2. Strip prefix: emoji, numbering (Arabic/Roman/Chinese e.g. 一、二、…), whitespace/punctuation;
+    3. Take the main heading before a colon (e.g. "Next step: feature engineering" → "next step");
+    4. Strip trailing whitespace/punctuation/emoji;
+    5. If ends with plural 's' and the de-pluralised form is in the blacklist, normalise to singular.
     """
     t = text.strip().lower()
     t = t.strip("*_`")
@@ -94,13 +94,13 @@ def _normalise_heading(text: str) -> str:
 
 
 def _strip_non_bat_recommendations(content: str) -> str:
-    """从非 BAT 报告中剥离业务建议类章节。
+    """Strip business-recommendation sections from non-BAT reports.
 
-    扫描 Markdown 文本：
-    - 跳过 fenced code block（``` ... ```）内的内容；
-    - 当遇到 ``# ... ###### Heading`` 且标题在黑名单时，删除从该标题行开始到
-      下一个**同级或更高级**标题（或 EOF）之间的全部行；
-    - 清理删除后可能遗留的孤立 ``---`` 分隔线及 3 行以上连续空行。
+    Scans Markdown text:
+    - Skips content inside fenced code blocks (``` ... ```);
+    - When a ``# ... ######`` heading matches the blacklist, removes all lines from that
+      heading up to the next heading of the same or higher level (or EOF);
+    - Cleans up orphaned ``---`` dividers and runs of 3+ blank lines left after removal.
     """
     if not content:
         return content
@@ -108,7 +108,7 @@ def _strip_non_bat_recommendations(content: str) -> str:
     lines = content.split("\n")
     out: list[str] = []
     in_code = False
-    skip_until_level: int | None = None  # 当前正在跳过的章节起始级别
+    skip_until_level: int | None = None  # heading level of the section currently being skipped
 
     for line in lines:
         if _FENCE_RE.match(line):
@@ -127,15 +127,15 @@ def _strip_non_bat_recommendations(content: str) -> str:
             level = len(m.group(1))
             heading = _normalise_heading(m.group(2))
             if skip_until_level is not None:
-                # 已经处于跳过状态：只要遇到同级或更高级标题就停止跳过
+                # currently skipping: stop when we hit a heading at the same or higher level
                 if level <= skip_until_level:
                     skip_until_level = None
-                    # 当前标题本身是否也命中黑名单？继续跳过
+                    # if this heading also matches the blacklist, keep skipping
                     if heading in _BUSINESS_HEADING_BLACKLIST:
                         skip_until_level = level
                         continue
                     out.append(line)
-                # 否则仍在 skip 区间内的子标题，不输出
+                # sub-headings still inside the skip range, do not output
                 continue
             if heading in _BUSINESS_HEADING_BLACKLIST:
                 skip_until_level = level
@@ -146,7 +146,7 @@ def _strip_non_bat_recommendations(content: str) -> str:
         if skip_until_level is None:
             out.append(line)
 
-    # 清理：移除孤立的 `---`（前后无内容）以及多余空行
+    # cleanup: remove orphaned `---` dividers (nothing before/after) and excess blank lines
     cleaned: list[str] = []
     for i, line in enumerate(out):
         stripped = line.strip()
@@ -166,14 +166,14 @@ def _strip_non_bat_recommendations(content: str) -> str:
 
 
 def save_agent_report(agent_name: str, message: Any, model: str = "", run_dir: str = "") -> str:
-    """将 agent 最后一条消息追加写入 {run_dir}/reports/{agent_name}_report.md。
+    """Append the agent's last message to {run_dir}/reports/{agent_name}_report.md.
 
-    对 feature_agent / model_agent 这类循环 agent，传入 model 参数以标注是哪一轮。
-    返回写入的文件路径。
+    For loop agents like feature_agent / model_agent, pass the model parameter to label the round.
+    Returns the path of the written file.
 
-    业务建议（Business Recommendation/Next Steps 等同义章节）只允许出现在
-    ``business_translator_agent`` 产出的 ``business_insight_report.md`` 中；
-    其他 agent 的报告会在落盘前经 ``_strip_non_bat_recommendations`` 过滤。
+    Business recommendations (Business Recommendation/Next Steps and equivalent sections) are only
+    permitted in ``business_insight_report.md`` produced by ``business_translator_agent``;
+    other agents' reports are filtered through ``_strip_non_bat_recommendations`` before being saved.
     """
     reports_dir = Path(run_dir) / "reports" if run_dir else _DEFAULT_REPORTS_DIR
     reports_dir.mkdir(parents=True, exist_ok=True)
@@ -184,7 +184,7 @@ def save_agent_report(agent_name: str, message: Any, model: str = "", run_dir: s
     if agent_name != "business_translator":
         filtered = _strip_non_bat_recommendations(content)
         if not filtered.strip():
-            filtered = "_(Business recommendation sections were filtered; this agent is not responsible for business insights.)_"
+            filtered = "_(Business recommendation sections have been filtered; this agent is not responsible for business recommendations.)_"
         content = filtered
 
     timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
@@ -199,7 +199,7 @@ def save_agent_report(agent_name: str, message: Any, model: str = "", run_dir: s
 
 
 def append_manager_rap_midlayer_to_report(state: dict[str, Any]) -> str | None:
-    """在 agent_manager 报告末尾追加精简 RAP 中层检测（依赖 state 中的 RAP 字段）。"""
+    """Append a concise RAP mid-layer diagnostics section to the agent_manager report (reads RAP fields from state)."""
     meta = state.get("manager_rap_meta") if isinstance(state.get("manager_rap_meta"), dict) else {}
     summary = str(state.get("user_requirement_summary") or "")
     context = str(state.get("manager_rap_context") or "")
@@ -216,14 +216,14 @@ def append_manager_rap_midlayer_to_report(state: dict[str, Any]) -> str | None:
         text = text.strip()
         if len(text) <= n:
             return text
-        return text[:n] + f"\n\n... (truncated, {len(text)} chars total)"
+        return text[:n] + f"\n\n… (truncated, total {len(text)} characters)"
 
     queries = meta.get("queries_used") or []
     queries_s = ", ".join(str(q) for q in queries) if queries else "(none)"
     err_list = meta.get("errors") or []
 
     lines = [
-        f"## Manager RAP · Mid-layer Audit `{ts}`",
+        f"## Manager RAP · Mid-layer Diagnostics `{ts}`",
         "",
         "### Metrics (`manager_rap_meta`)",
         "",
@@ -234,7 +234,7 @@ def append_manager_rap_midlayer_to_report(state: dict[str, Any]) -> str | None:
         f"- **retrieval_bundle_empty_rate**: {meta.get('retrieval_bundle_empty_rate', '')}",
         f"- **arxiv_raw_chars / web_raw_chars**: {meta.get('arxiv_raw_chars', '')} / {meta.get('web_raw_chars', '')}",
         f"- **queries_used**: {queries_s}",
-        f"- **fusion_empty_rate** (1.0 when no retrieval fragments available): {meta.get('fusion_empty_rate', '')}",
+        f"- **fusion_empty_rate** (1.0 when no retrieval chunks available for fusion): {meta.get('fusion_empty_rate', '')}",
         f"- **fusion_fallback_used**: {meta.get('fallback_used', '')}",
         f"- **fusion_text_empty_rate**: {meta.get('fusion_text_empty_rate', '')}",
         f"- **fusion_line_repetition_rate**: {meta.get('fusion_line_repetition_rate', '')}",
@@ -272,10 +272,10 @@ def append_manager_rap_midlayer_to_report(state: dict[str, Any]) -> str | None:
 
 
 def save_state_snapshot(state: dict[str, Any]) -> str:
-    """将全局 state 快照（去除 messages）保存为带时间戳的 JSON 文件。
+    """Save a timestamped JSON snapshot of the global state (excluding messages).
 
-    文件名格式：YYYY-MM-DD_HHMMSS_state.json，保存在 {run_dir}/reports/ 下。
-    返回写入的文件路径。
+    Filename format: YYYY-MM-DD_HHMMSS_state.json, saved under {run_dir}/reports/.
+    Returns the path of the written file.
     """
     run_dir = state.get("run_dir") or ""
     reports_dir = Path(run_dir) / "reports" if run_dir else _DEFAULT_REPORTS_DIR
@@ -293,7 +293,7 @@ def save_state_snapshot(state: dict[str, Any]) -> str:
 
 
 def log_node(node_name: str, success: bool, detail: str = "") -> None:
-    """纯函数节点的成功/失败日志，直接 print 到控制台。"""
+    """Log success/failure for a pure-function node, printing directly to the console."""
     status = "✓" if success else "✗"
     msg = f"[{node_name}] {status}"
     if detail:

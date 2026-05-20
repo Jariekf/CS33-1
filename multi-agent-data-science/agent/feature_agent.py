@@ -51,10 +51,10 @@ def _get_current_model(state: GlobalState) -> str | None:
 
 
 def _trim_messages_to_current_round(messages: list[Any]) -> list[Any]:
-    """裁剪历史 messages，只保留本轮 feature 子图相关的工具调用/响应链。
-
-    避免上游 (EDA / data_clean) 阶段输出的长篇 Markdown 报告污染上下文，
-    导致 LLM 走神变成「复读机」。
+    """
+    Filter out historical messages, retaining only the tool invocation/response chains
+    relevant to the current feature subgraph.This prevents lengthy Markdown reports generated
+    in upstream stages (EDA / data_clean) from cluttering the context,which could cause the LLM to lose focus and turn into a "parrot."
     """
     if not messages:
         return []
@@ -97,20 +97,20 @@ def _feature_node(state: GlobalState) -> GlobalState:
     candidate_models = state.get("candidate_models") or []
     feature_dataset_ids = state.get("feature_dataset_ids") or {}
 
-    # ── 空转检测：若上一轮 LLM 没调用工具，但当前模型仍未保存特征，累计计数 ──
+    # ── Idle detection: If the previous LLM did not call any tools, but the current model has not yet saved features, the cumulative count ──
     no_tool_rounds = dict(state.get("feature_no_tool_rounds") or {})
     if current_model and messages:
         last_msg = messages[-1]
         if isinstance(last_msg, AIMessage) and not getattr(last_msg, "tool_calls", None):
             no_tool_rounds[current_model] = no_tool_rounds.get(current_model, 0) + 1
 
-    # ── 达到上限：强制把当前模型标 skipped，避免无限循环 ──────────────────────
+    # ── Reached limit: Force the current model to be marked as "skipped" to prevent an infinite loop ───
     if current_model and no_tool_rounds.get(current_model, 0) >= _MAX_NO_TOOL_ROUNDS:
         ids = dict(feature_dataset_ids)
         ids[current_model] = "skipped"
         print(
-            f"[feature_agent] {current_model} 空转 "
-            f"{no_tool_rounds[current_model]} 次未调用工具，强制标记 skipped"
+            f"[feature_agent] {current_model} Idling "
+            f"{no_tool_rounds[current_model]} times the tool was not called; force marking as skipped "
         )
         return {
             "feature_dataset_ids": ids,
@@ -118,70 +118,72 @@ def _feature_node(state: GlobalState) -> GlobalState:
             "messages": [
                 AIMessage(
                     content=(
-                        f"[forced skip] 模型 {current_model} 连续 "
-                        f"{no_tool_rounds[current_model]} 轮未调用工具，已标记为 skipped。"
+                        f"[forced skip] Model {current_model} continuous "
+                        f"{no_tool_rounds[current_model]} The tool has not been called yet and has been marked as skipped. "
                     )
                 )
             ],
         }
 
     model_plan = feature_engineering_plan.get(current_model, {}) if current_model else {}
-    plan_text = json.dumps(model_plan, ensure_ascii=False, indent=2) if model_plan else "无特定计划，按需处理。"
+    plan_text = json.dumps(model_plan, ensure_ascii=False, indent=2) if model_plan else "No specific plan; we'll handle it as needed."
     run_dir = state.get("run_dir") or ""
     output_dir = run_dir + "/features" if run_dir else ""
 
     has_test = bool(testing_data_path)
     test_load_step = (
-        f"   然后调用 load_dataset_to_store 将测试集（{testing_data_path}）加载到内存，获取 test_id；\n"
+        f" Then call `load_dataset_to_store` to load the test set ({testing_data_path}) into memory and retrieve `test_id`\n"
         if has_test else ""
     )
-    test_id_arg = "test_dataset_id=test_id（从步骤 1b 获取）" if has_test else "test_dataset_id 不传（无测试集）"
+    test_id_arg = "test_dataset_id=test_id(Retrieved from Step 1b)" if has_test else "test_dataset_id is not provided (no test set)"
     test_save_step = (
-        f"5. 调用 save_featured_dataset(dataset_id=test_id, model_name=当前模型名, "
-        f"output_dir=\"{output_dir}\", split=\"test\") 保存预处理后的测试集。\n"
+        f"5. Call `save_featured_dataset(dataset_id=test_id, model_name=current_model_name, "
+        f"output_dir=\"{output_dir}\", split=\"test\")` to save the preprocessed test set.\n"
         if has_test else ""
     )
 
     supervisor_hint = (state.get("supervisor_hints") or {}).get(f"feature:{current_model}", "").strip()
     hint_line = (
-        f"[Supervisor 反馈] 上一轮检查未通过：{supervisor_hint}\n请仅针对此问题修复，不要重新执行已完成的步骤。\n"
+        f"[Supervisor Feedback] Failed the previous round of checks: {supervisor_hint} \nPlease fix only this issue; do not repeat steps that have already been completed.\n"
         if supervisor_hint else ""
     )
 
     system_content = (
-        f"你是特征工程 Agent，当前任务是为模型 [{current_model}] 同步处理训练集和测试集特征。\n"
-        f"训练集路径：{training_data_path or '未提供'}。\n"
-        f"测试集路径：{testing_data_path or '未提供（跳过测试集步骤）'}。\n"
-        f"任务类型：{task_type}。目标列：{target_column or '未提供'}。\n"
-        f"全部候选模型：{candidate_models}，已完成：{list(feature_dataset_ids.keys())}。\n"
-        f"本次运行工作目录：{run_dir or '未设置'}。\n"
+        "You are the Feature Engineering Agent. "
+        f"Your current task is to synchronize the features of the training and test sets for the model [{current_model}].\n"
+        f"Training set path: {training_data_path or 'Not provided'}.\n"
+        f"Test set path: {testing_data_path or 'Not provided (skip test set step)'}.\n"
+        f"Task type: {task_type}. Target column: {target_column or 'Not provided'}.\n"
+        f"All candidate models: {candidate_models}, completed: {list(feature_dataset_ids.keys())}.\n"
+        f"Working directory for this run: {run_dir or 'Not set'}.\n"
         + hint_line
-        + f"\n当前模型 [{current_model}] 的特征工程计划：\n{plan_text}\n"
-        "工作流程（按顺序执行）：\n"
-        f"1. 调用 load_dataset_to_store 将训练集（{training_data_path}）加载到内存，获取 train_id；\n"
+        + f"\nFeature engineering plan for the current model [{current_model}]:\n{plan_text}\n"
+        "Workflow (executed in sequence):\n"
+        f"1. Call `load_dataset_to_store` to load the training dataset ({training_data_path}) into memory and retrieve `train_id`;\n"
         f"{test_load_step}"
-        "2. 调用 encode_target_column，传入：\n"
+        "2. Call `encode_target_column`, passing in: \n"
         f"   dataset_id=train_id, target_column={target_column}, model_name={current_model},\n"
-        f"   task_type={task_type}, run_dir=\"{run_dir}\", {test_id_arg}；\n"
-        "   - XGBoost、XGBoostRegressor 需要 0/1 整数标签，工具自动编码并同步处理测试集；\n"
-        "   - 其他模型返回 status=skipped，测试集目标列不变；\n"
-        "3. 根据上方计划，按需调用 scale_features 和 encode_categorical，均传入：\n"
-        f"   dataset_id=train_id, run_dir=\"{run_dir}\", {test_id_arg}；\n"
-        "   - 目标列不参与特征缩放和类别编码；\n"
-        "   - 树模型（XGBoost、RandomForest）通常不需要 scale_features；\n"
-        "   - 线性模型（LogisticRegression、LinearRegression、Ridge）通常需要 scale_features；\n"
-        "   - scale_features 和 encode_categorical 均在训练集上 fit，同步 transform 测试集；\n"
-        f"4. 调用 save_featured_dataset(dataset_id=train_id, model_name=当前模型名, "
-        f"output_dir=\"{output_dir}\", split=\"train\") 保存预处理后的训练集；\n"
+        f"   task_type={task_type}, run_dir=\"{run_dir}\", {test_id_arg};\n"
+        "   - XGBoost and XGBoostRegressor require 0/1 integer labels; the tool automatically encodes the data and processes the test set accordingly;\n"
+        "   - Other models return `status=skipped`, and the target column in the test set remains unchanged;\n"
+        "3. Based on the plan above, call `scale_features` and `encode_categorical` as needed, passing the following arguments to both:\n"
+        f"   dataset_id=train_id, run_dir=\"{run_dir}\", {test_id_arg};\n"
+        "   - Target columns are not included in feature scaling or one-hot encoding;\n"
+        "   - Tree-based models (XGBoost, RandomForest) typically do not require `scale_features`;\n"
+        "   - Linear models (LogisticRegression, LinearRegression, Ridge) typically require `scale_features`;\n"
+        "   - Both `scale_features` and `encode_categorical` are fitted on the training set, and the test set is transformed accordingly;\n"
+        f"4. Call `save_featured_dataset(dataset_id=train_id, model_name=current_model_name, "
+        f"output_dir=\"{output_dir}\", split=\"train\")` to save the preprocessed training dataset;\n"
         f"{test_save_step}"
-        "重要约束：你必须通过 tool_call 调用工具完成上述步骤，禁止只输出文字描述假装已完成。\n"
-        "完成后停止，不要处理其他模型。\n"
-        "最终文字回复只汇报当前模型的特征工程处理步骤与结果（编码方式、缩放情况、保存路径），"
-        "不要描述模型训练评估或其他候选模型的处理细节，并且不要说与数据清洗和EDA相关内容，只需要汇报特征工程处理步骤与结果。"
+        "Important requirement: You must complete the above steps by calling the tool via `tool_call`; simply outputting a text description to pretend the task is complete is not allowed. \n"
+        "Stop when finished; do not process any other models.\n"
+        "The final written response should only report the feature engineering steps and results for the current model (encoding method, scaling, and save path),"
+        "Do not describe the training and evaluation of the model or the processing details of other candidate models,"
+        "and do not mention anything related to data cleaning or EDA; simply report the feature engineering steps and results."
     )
 
-    # ── 关键修复：只把本轮 feature 工具调用链送给 LLM ─────────────────────────
-    # 这样可避免上游 EDA/data_clean 阶段输出的长篇 Markdown 干扰当前轮决策
+    # ── Key Fix: Send only the current round's feature processing chain to the LLM ──────
+    # This prevents lengthy Markdown output from the upstream EDA/data_clean stages from interfering with the current round's decision-making
     trimmed_history = _trim_messages_to_current_round(messages)
     if trimmed_history:
         llm_input = [SystemMessage(content=system_content), *trimmed_history]
@@ -190,8 +192,8 @@ def _feature_node(state: GlobalState) -> GlobalState:
             SystemMessage(content=system_content),
             HumanMessage(
                 content=(
-                    f"请开始处理模型 [{current_model}] 的特征工程，"
-                    "严格按上述系统提示词第 1~5 步逐个调用工具，禁止只输出文字描述。"
+                    f"Please begin feature engineering for model [{current_model}],"
+                    "Strictly follow steps 1 through 5 of the system prompts above to invoke each tool in sequence; do not output only text descriptions."
                 )
             ),
         ]
@@ -244,7 +246,7 @@ def _parse_payload(tool_message: ToolMessage) -> dict[str, Any]:
     try:
         return json.loads(str(tool_message.content))
     except json.JSONDecodeError:
-        return {"error": {"type": "JSONDecodeError", "message": "工具输出不是合法 JSON"}}
+        return {"error": {"type": "JSONDecodeError", "message": "The tool's output is not valid JSON"}}
 
 
 def _handle_load(state: GlobalState, tool_message: ToolMessage) -> GlobalState:
@@ -388,18 +390,18 @@ def _show_graph_if_needed(agent_graph, show_graph: bool) -> None:
         output_dir.mkdir(parents=True, exist_ok=True)
         mmd_path = output_dir / "feature_agent_graph.mmd"
         mmd_path.write_text(agent_graph.get_graph().draw_mermaid(), encoding="utf-8")
-        print(f"Mermaid 源码已保存: {mmd_path}")
+        print(f"The Mermaid source code has been saved:{mmd_path}")
         image_path = output_dir / "feature_agent_graph.png"
         image_bytes = agent_graph.get_graph().draw_mermaid_png()
         image_path.write_bytes(image_bytes)
-        print(f"Graph 图片已保存: {image_path}")
+        print(f"Graph image saved: {image_path}")
         try:
             from IPython.display import Image, display
             display(Image(filename=str(image_path)))
         except Exception:
             pass
     except Exception as exc:
-        print(f"图渲染失败: {exc}")
+        print(f"Image rendering failed: {exc}")
 
 
 def _pretty_print_message(message) -> None:
@@ -439,16 +441,16 @@ if __name__ == "__main__":
     feature_agent = build_feature_agent(show_graph=True)
     events = feature_agent.stream(
         {
-            "messages": [HumanMessage(content="开始特征工程")],
+            "messages": [HumanMessage(content="Start feature engineering")],
             "training_data_path": str(PROJECT_ROOT / "artifacts" / "workspace" / "Financials_cleaned_train.csv"),
             "task_type": "regression",
             "target_column": "Profit",
             "candidate_models": ["XGBoost", "RandomForest", "Ridge"],
             "feature_dataset_ids": {},
             "feature_engineering_plan": {
-                "XGBoost": {"scaling": False, "encoding": "label", "notes": "树模型无需缩放"},
-                "RandomForest": {"scaling": False, "encoding": "label", "notes": "树模型无需缩放"},
-                "Ridge": {"scaling": True, "encoding": "onehot", "notes": "线性模型需标准化"},
+                "XGBoost": {"scaling": False, "encoding": "label", "notes": "No scaling is required for the tree model"},
+                "RandomForest": {"scaling": False, "encoding": "label", "notes": "No scaling is required for the tree model"},
+                "Ridge": {"scaling": True, "encoding": "onehot", "notes": "Linear models require standardization"},
             },
         },
         stream_mode="values",

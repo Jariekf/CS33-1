@@ -102,7 +102,7 @@ def _get_model(model_name: str, model_params: dict[str, Any] | None = None) -> A
         from sklearn.neural_network import MLPRegressor
         return MLPRegressor(**{"hidden_layer_sizes": (100,), "max_iter": 500, "random_state": 331, **params})
 
-    raise ValueError(f"未知模型名称: {model_name}")
+    raise ValueError(f"Unknown model name: {model_name}")
 
 
 @tool
@@ -114,23 +114,23 @@ def train_model(
     output_dir: str = "",
     model_params: dict[str, Any] | None = None,
 ) -> str:
-    """tune_and_select_model 选出最佳模型后，使用全量训练集和最佳参数完成最终训练，并保存模型文件。
+    """After tune_and_select_model selects the best model, complete the final training using the full training set and best parameters, then save the model file.
 
-    工作流位置：tune_and_select_model（CV 调参选型）→ **train_model（全量重训）** → evaluate_model（测试集评估）
+    Pipeline position: tune_and_select_model (CV tuning and selection) -> **train_model (full retrain)** -> evaluate_model (test-set evaluation)
 
-    参数：
-      featured_train_path (str)：特征工程后的全量训练集 CSV 路径（feature_dataset_ids[best_model_name]）。
-      model_name (str)：tune_and_select_model 选出的最佳模型名称（如 XGBoost、Ridge）。
-      task_type (str)："classification" 或 "regression"。
-      target_column (str)：目标列名，训练时会从特征中排除。
-      output_dir (str)：模型保存目录，默认 artifacts/models/。
-      model_params (dict)：tune_and_select_model 返回的 best_params，留空则使用模型默认参数。
+    Args:
+      featured_train_path (str): path to the full training-set CSV after feature engineering (feature_dataset_ids[best_model_name]).
+      model_name (str): name of the best model selected by tune_and_select_model (e.g. XGBoost, Ridge).
+      task_type (str): "classification" or "regression".
+      target_column (str): target column name; excluded from features during training.
+      output_dir (str): directory in which to save the model; defaults to artifacts/models/.
+      model_params (dict): best_params returned by tune_and_select_model; leave empty to use the model's default parameters.
 
-    返回 JSON，包含：
-      model_path：保存的模型 pkl 路径，供 evaluate_model 加载使用。
-      feature_columns_path：训练特征列名 JSON 路径，供 evaluate_model 对齐测试集列序使用。
-      model_name：模型名称。
-      rows_trained：训练样本数。
+    Returns JSON containing:
+      model_path: path to the saved model pkl, for evaluate_model to load.
+      feature_columns_path: path to the training feature-column-names JSON, for evaluate_model to align test-set column order.
+      model_name: name of the model.
+      rows_trained: number of training samples.
     """
     tool_inputs = {
         "featured_train_path": featured_train_path,
@@ -142,7 +142,7 @@ def train_model(
     try:
         df = pd.read_csv(featured_train_path)
         if target_column not in df.columns:
-            raise ValueError(f"目标列 '{target_column}' 不在训练集中。")
+            raise ValueError(f"Target column '{target_column}' not found in training set.")
 
         feature_cols = [c for c in df.columns if c != target_column]
 

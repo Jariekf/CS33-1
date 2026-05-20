@@ -9,16 +9,16 @@ from tools.tool_trace import trace_tool_call
 
 @tool
 def plot_distributions(file_path: str, output_dir: str = "") -> str:
-    """为训练集数值列绘制分布直方图，保存为 PNG 文件。
+    """Plot distribution histograms for numeric columns in the training set and save them as PNG files.
 
-    参数：
-      file_path (str)：训练集 CSV 文件路径。
-      output_dir (str)：图片保存目录。默认为训练集同级目录下的 eda_plots/ 子目录。
+    Args:
+      file_path (str): path to the training-set CSV file.
+      output_dir (str): directory in which to save the images. Defaults to the eda_plots/ subdirectory in the same directory as the training set.
 
-    返回 JSON，包含：
-      output_dir：图片保存目录路径。
-      plot_count：生成图片数量。
-      plot_paths：每张图片的完整路径列表。
+    Returns JSON containing:
+      output_dir: path to the image save directory.
+      plot_count: number of images generated.
+      plot_paths: list of full paths to each image.
     """
     tool_inputs = {"file_path": file_path, "output_dir": output_dir}
     try:
@@ -29,7 +29,7 @@ def plot_distributions(file_path: str, output_dir: str = "") -> str:
         df = pd.read_csv(file_path)
         numeric_cols = df.select_dtypes(include="number").columns.tolist()
         if not numeric_cols:
-            raise ValueError("训练集中没有数值列，无法绘制分布图。")
+            raise ValueError("No numeric columns in the training set; cannot plot distributions.")
 
         out = Path(output_dir) if output_dir else Path(file_path).parent / "eda_plots"
         out.mkdir(parents=True, exist_ok=True)

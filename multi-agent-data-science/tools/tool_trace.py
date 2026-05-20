@@ -25,7 +25,7 @@ def trace_tool_call(
     tool_output: Any,
     max_chars: int = 4000,
 ) -> None:
-    """统一打印 tool 调用名称、入参和返回值摘要。"""
+    """Uniformly print the tool call name, input parameters, and output summary."""
     if os.getenv("TRACE_TOOLS", "false").lower() != "true":
         return
 
