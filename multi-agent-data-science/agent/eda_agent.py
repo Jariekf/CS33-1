@@ -47,10 +47,10 @@ _MAX_NO_TOOL_ROUNDS = 2
 
 
 def _trim_messages_to_current_round(messages: list[Any]) -> list[Any]:
-    """裁剪历史 messages，只保留本轮 EDA 子图相关的工具调用/响应链。
+    """Trim message history to only the current EDA subgraph tool-call/response chain.
 
-    避免上游 (data_clean) 阶段输出的长篇 Markdown 报告污染上下文，
-    导致 LLM 走神变成「复读机」。
+    Prevents long Markdown reports from upstream stages (data_clean) from
+    polluting the context and causing the LLM to repeat prior output.
     """
     if not messages:
         return []
@@ -102,17 +102,17 @@ def _eda_node(state: GlobalState) -> GlobalState:
     testing_data_path = state.get("testing_data_path") or ""
     description_file_path = state.get("description_file_path") or ""
 
-    # ── 空转检测：若上一轮 LLM 没调用工具，累计计数 ──
+    # Idle-round detection: count consecutive rounds where LLM called no tools.
     no_tool_rounds = state.get("eda_no_tool_rounds", 0)
     if messages:
         last_msg = messages[-1]
         if isinstance(last_msg, AIMessage) and not getattr(last_msg, "tool_calls", None):
             no_tool_rounds += 1
 
-    # ── 达到上限：强制终止，避免死循环 ──────────────────────
+    # Force-terminate when idle limit reached to prevent infinite loops.
     if no_tool_rounds >= _MAX_NO_TOOL_ROUNDS:
-        print(f"[eda_agent] EDA 连续 {no_tool_rounds} 轮未调用任何工具，pipeline 强制终止")
-        # 直接把 supervisor_retry 置为一个极大值，让主图判定放弃
+        print(f"[eda_agent] No tool called for {no_tool_rounds} consecutive rounds — forcing termination")
+        # Set supervisor_retry to a sentinel value so the main graph skips EDA.
         retries = dict(state.get("supervisor_retry") or {})
         retries["eda"] = 999
         return {
@@ -121,7 +121,7 @@ def _eda_node(state: GlobalState) -> GlobalState:
             "messages": [
                 AIMessage(
                     content=(
-                        f"[forced terminate] EDA agent 连续 {no_tool_rounds} 轮未调用工具，pipeline 已强制终止。"
+                        f"[forced terminate] EDA agent called no tools for {no_tool_rounds} consecutive rounds — pipeline forcibly terminated."
                     )
                 )
             ],
@@ -212,10 +212,12 @@ def _eda_node(state: GlobalState) -> GlobalState:
         "    若你违规输出上述章节，落盘前会被 save_agent_report 的过滤器自动剥离。"
     )
 
-    # ── 关键修复：只把本轮 EDA 工具调用链送给 LLM ─────────────────────────
-    # 首轮裁剪结果为空时，必须彻底丢弃整个 messages 历史（特别是 user_request
-    # HumanMessage 与 agent_manager 的 RAP wrap-up AIMessage），仅以 SystemMessage
-    # + 一条强约束 HumanMessage 启动 EDA，避免业务语境渗入。
+    # Only send the current-round EDA tool-call chain to the LLM.
+    # On the first round the trimmed result is empty, so we discard the entire
+    # message history (including the user_request HumanMessage and the
+    # agent_manager RAP wrap-up AIMessage) and start EDA with just a
+    # SystemMessage + a single directive HumanMessage to prevent business
+    # context from leaking into EDA.
     trimmed_history = _trim_messages_to_current_round(messages)
     if trimmed_history:
         llm_input = [SystemMessage(content=system_content), *trimmed_history]
@@ -257,7 +259,7 @@ def _parse_tool_payload(tool_message: ToolMessage) -> dict[str, Any]:
     try:
         return json.loads(str(tool_message.content))
     except json.JSONDecodeError:
-        return {"error": {"type": "JSONDecodeError", "message": "工具输出不是合法 JSON"}}
+        return {"error": {"type": "JSONDecodeError", "message": "Tool output is not valid JSON"}}
 
 
 def _handle_eda_step(state: GlobalState, tool_message: ToolMessage) -> GlobalState:
@@ -319,18 +321,18 @@ def _show_graph_if_needed(agent_graph, show_graph: bool) -> None:
         output_dir.mkdir(parents=True, exist_ok=True)
         mmd_path = output_dir / "eda_agent_graph.mmd"
         mmd_path.write_text(agent_graph.get_graph().draw_mermaid(), encoding="utf-8")
-        print(f"Mermaid 源码已保存: {mmd_path}")
+        print(f"Mermaid source saved: {mmd_path}")
         image_path = output_dir / "eda_agent_graph.png"
         image_bytes = agent_graph.get_graph().draw_mermaid_png()
         image_path.write_bytes(image_bytes)
-        print(f"Graph 图片已保存: {image_path}")
+        print(f"Graph image saved: {image_path}")
         try:
             from IPython.display import Image, display
             display(Image(filename=str(image_path)))
         except Exception:
             pass
     except Exception as exc:
-        print(f"图渲染失败: {exc}")
+        print(f"Graph render failed: {exc}")
 
 
 def _pretty_print_message(message) -> None:
@@ -368,7 +370,7 @@ eda_agent = build_eda_agent()
 
 if __name__ == "__main__":
     eda_agent = build_eda_agent(show_graph=True)
-    user_input = input("请输入：")
+    user_input = input("Enter: ")
     events = eda_agent.stream(
         {
             "messages": [HumanMessage(content=user_input)],
