@@ -38,13 +38,13 @@ def _check_split(state: GlobalState) -> list[str]:
     train = (state.get("training_data_path") or "").strip()
     test = (state.get("testing_data_path") or "").strip()
     if not train:
-        issues.append("training_data_path 未写入 state")
+        issues.append("training_data_path was not written in state")
     elif not Path(train).exists():
-        issues.append(f"训练集文件不存在：{train}")
+        issues.append(f"The training set file does not exist: {train}")
     if not test:
-        issues.append("testing_data_path 未写入 state")
+        issues.append("testing_data_path was not written in state")
     elif not Path(test).exists():
-        issues.append(f"测试集文件不存在：{test}")
+        issues.append(f"The test set file does not exist:{test}")
     return issues
 
 
@@ -53,16 +53,16 @@ def _check_clean_train(state: GlobalState) -> list[str]:
     path = (state.get("train_cleaned_data_path") or "").strip()
     passed = bool(state.get("train_cleaning_passed"))
     if not passed:
-        issues.append("train_cleaning_passed 为 False 或未写入")
+        issues.append("train_cleaning_passed Set to False or not written")
     if not path:
-        issues.append("train_cleaned_data_path 未写入 state")
+        issues.append("train_cleaned_data_path was not written in state")
     elif not Path(path).exists():
-        issues.append(f"清洗后训练集文件不存在：{path}")
+        issues.append(f"The training set file does not exist after cleaning: {path}")
     report = state.get("train_cleaning_report") or {}
     steps = report.get("steps", [])
     saved = any(s.get("tool") == "save_dataset_from_store" for s in steps)
     if steps and not saved:
-        issues.append("train_cleaning_report 中未记录 save_dataset_from_store 调用")
+        issues.append("The call to `save_dataset_from_store` is not logged in `train_cleaning_report`")
     return issues
 
 
@@ -71,16 +71,16 @@ def _check_clean_test(state: GlobalState) -> list[str]:
     path = (state.get("test_cleaned_data_path") or "").strip()
     passed = bool(state.get("test_cleaning_passed"))
     if not passed:
-        issues.append("test_cleaning_passed 为 False 或未写入")
+        issues.append("test_cleaning_passed Set to False or not written")
     if not path:
-        issues.append("test_cleaned_data_path 未写入 state")
+        issues.append("test_cleaned_data_path was not written in state")
     elif not Path(path).exists():
-        issues.append(f"清洗后测试集文件不存在：{path}")
+        issues.append(f"The test set file does not exist after cleaning: {path}")
     report = state.get("test_cleaning_report") or {}
     steps = report.get("steps", [])
     saved = any(s.get("tool") == "save_dataset_from_store" for s in steps)
     if steps and not saved:
-        issues.append("test_cleaning_report 中未记录 save_dataset_from_store 调用")
+        issues.append("The call to `save_dataset_from_store` is not logged in `test_cleaning_report`")
     return issues
 
 
@@ -89,10 +89,10 @@ def _check_eda(state: GlobalState) -> list[str]:
     candidate_models = state.get("candidate_models") or []
     if not candidate_models:
         issues.append(
-            "candidate_models 未写入，EDA 未完成 select_candidate_models_and_metrics 工具调用"
+            "candidate_models has not been written; EDA is incomplete; the select_candidate_models_and_metrics tool has not been called"
         )
     if not (state.get("primary_metric") or "").strip():
-        issues.append("primary_metric 未写入，EDA 未完成指标选择")
+        issues.append("primary_metric not written; EDA metric selection incomplete")
     return issues
 
 
@@ -110,16 +110,16 @@ def _failed_feature_models(state: GlobalState) -> list[tuple[str, list[str]]]:
             
         problems = []
         if not train_path:
-            problems.append("训练集特征文件未写入 state")
+            problems.append("The training set feature file was not written to state")
         elif not Path(train_path).exists():
-            problems.append(f"训练集特征文件不存在：{train_path}")
+            problems.append(f"The training set feature file does not exist: {train_path}")
             
         if has_test:
             test_path = test_ids.get(model, "")
             if not test_path:
-                problems.append("测试集特征文件未写入 state")
+                problems.append("The test set feature file was not written state")
             elif not Path(test_path).exists():
-                problems.append(f"测试集特征文件不存在：{test_path}")
+                problems.append(f"The test set feature file does not exist: {test_path}")
                 
         if problems:
             failed.append((model, problems))
@@ -144,19 +144,19 @@ _RULE_CHECKERS: dict[str, Callable[[GlobalState], list[str]]] = {
 }
 
 _STAGE_LABELS: dict[str, str] = {
-    "split": "数据集切分",
-    "clean_train": "训练集数据清洗",
-    "clean_test": "测试集数据清洗",
-    "eda": "EDA 探索性数据分析",
-    "feature": "特征工程",
+    "split": "Dataset Split",
+    "clean_train": "Training Set Data Cleaning",
+    "clean_test": "Test Set Data Cleaning",
+    "eda": "EDA Exploratory Data Analysis",
+    "feature": "Feature Engineering",
 }
 
-# EDA 阶段 hint 中必须提及的 4 个工具，以防 LLM 跳过工具调用
+# 4 Tools That Must Be Mentioned in EDA Phase Hints to Prevent LLMs from Skipping Tool Calls
 _EDA_TOOLS_REMINDER = (
-    "EDA Agent 必须依次调用以下 4 个工具（缺一不可）："
+    "The EDA Agent must call the following four tools in sequence (all are required):"
     "profile_training_data → compute_correlation_matrix → "
-    "generate_eda_charts → select_candidate_models_and_metrics。"
-    "请在建议中明确要求完成全部 4 个工具调用。"
+    "generate_eda_charts → select_candidate_models_and_metrics."
+    "Please explicitly require that all four tools be called in the recommendation."
 )
 
 
@@ -165,7 +165,7 @@ _EDA_TOOLS_REMINDER = (
 # ---------------------------------------------------------------------------
 
 def _llm_generate_hint(stage: str, state: GlobalState, issues: list[str]) -> str:
-    issues_text = "；".join(issues)
+    issues_text = "; ".join(issues)
     label = _STAGE_LABELS.get(stage, stage)
 
     model_ctx = ""
@@ -173,26 +173,26 @@ def _llm_generate_hint(stage: str, state: GlobalState, issues: list[str]) -> str
     run_dir = state.get("run_dir") or ""
     source_ctx = ""
     if stage == "split":
-        source_ctx = f"原始数据路径：{state.get('data_path') or '未知'}。"
+        source_ctx = f"Original data path: {state.get('data_path') or 'unknown'}. "
     elif stage == "clean_train":
-        source_ctx = f"原始训练集路径：{state.get('raw_training_data_path') or state.get('training_data_path') or '未知'}。"
+        source_ctx = f"Original training set path: {state.get('raw_training_data_path') or state.get('training_data_path') or 'unknown'}. "
     elif stage == "clean_test":
-        source_ctx = f"原始测试集路径：{state.get('raw_testing_data_path') or state.get('testing_data_path') or '未知'}。"
+        source_ctx = f"Original test set path: {state.get('raw_testing_data_path') or state.get('testing_data_path') or 'unknown'}. "
     elif stage == "eda":
         source_ctx = _EDA_TOOLS_REMINDER
 
     system = (
-        "你是一个数据科学流水线的 Supervisor，负责将校验失败的信息简明转化为对上游 Agent 的修复建议。"
-        "要求：\n"
-        "1. 只输出 1-2 句话的中文建议，面向上游 Agent；\n"
-        "2. 告诉 Agent 具体哪里不对（文件不存在、保存步骤未执行等）；\n"
-        "3. 告诉 Agent 只补做缺失的那一步，不要重新执行已完成的步骤；\n"
-        "4. 不要输出任何分析或解释，直接输出建议文本。"
+        "You are a Supervisor of a data science pipeline, responsible for concisely converting validation failure information into fix recommendations for upstream agents. "
+        "Requirements:\n"
+        "1. Output only 1-2 sentences of recommendations directed at the upstream agent;\n"
+        "2. Tell the agent specifically what is wrong (file does not exist, save step not executed, etc.);\n"
+        "3. Tell the agent to only redo the missing step, not re-execute already completed steps;\n"
+        "4. Do not output any analysis or explanation, output only the recommendation text."
     )
     user = (
-        f"阶段：{label}。{model_ctx}{source_ctx}运行目录：{run_dir or '未知'}。\n"
-        f"检测到的问题：{issues_text}。\n"
-        "请输出针对上述问题的修复建议（1-2 句）："
+        f"Stage: {label}. {model_ctx}{source_ctx}Run directory: {run_dir or 'unknown'}.\n"
+        f"Detected issues: {issues_text}.\n"
+        "Please output fix recommendations for the above issues (1-2 sentences):"
     )
     try:
         llm = llm_for("supervisor")
@@ -200,7 +200,7 @@ def _llm_generate_hint(stage: str, state: GlobalState, issues: list[str]) -> str
         hint = (getattr(resp, "content", None) or "").strip()
         return hint if hint else issues_text
     except Exception as exc:
-        return f"{issues_text}（hint 生成失败：{exc}）"
+        return f"{issues_text} (hint generation failed: {exc})"
 
 
 # ---------------------------------------------------------------------------
@@ -229,13 +229,13 @@ def _append_supervisor_report(
         "",
     ]
     if status == "pass":
-        lines.append("所有检查通过，继续下游节点。")
+        lines.append("All checks passed, proceeding to downstream node.")
     else:
-        lines.append(f"**问题列表：**")
+        lines.append("**Issue list:**")
         for issue in issues:
             lines.append(f"- {issue}")
         lines.append("")
-        lines.append(f"**生成的 hint：** {hint}")
+        lines.append(f"**Generated hint:** {hint}")
     lines.extend(["", "---", ""])
 
     with open(path, "a", encoding="utf-8") as f:
