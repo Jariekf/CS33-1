@@ -12,7 +12,7 @@ import sys
 from pathlib import Path
 from typing import Any
 
-# 单次 BAT 子图内「LLM→Tools→更新」循环上限，防止模型反复 tool_calls 耗尽全图 recursion_limit
+# Upper limit on the "LLM→Tools→Update" loop within a single BAT subgraph, to prevent repeated tool_calls from exhausting the entire graph's recursion_limit
 BAT_MAX_TOOL_ROUNDS = int(os.getenv("BAT_MAX_TOOL_ROUNDS", "15"))
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
@@ -741,24 +741,24 @@ def _business_translator_node(state: GlobalState) -> GlobalState:
     best = state.get("best_model") or {}
     best_name = best.get("model_name", "n/a")
     top_features = _extract_top_features(state)
-    top_feat_str = ", ".join(top_features[:12]) if top_features else "(暂无 — 将仅用目标与指标检索)"
+    top_feat_str = ", ".join(top_features[:12]) if top_features else "(None for now — Search will be based solely on goals and metrics)"
 
     system_content = (
-        "你是业务分析翻译（Business Translator）Agent：把上游数据分析与模型结果转化为 **英文** McKinsey 风格的业务战略报告。\n"
-        f"用户目标：{user_goal or '未提供'}\n"
-        f"任务类型：{task_type}；目标列：{target_column or '未提供'}\n"
-        f"当前最优模型：{best_name}\n"
-        f"本次运行目录：{run_dir or '未设置'}\n"
-        f"用于检索的优先特征（来自 EDA 相关排名 / 元数据）：{top_feat_str}\n\n"
-        "工作流程（按顺序，可重复检索）：\n"
-        "1. 调用 **retrieve_mckinsey_knowledge**，传入 2–4 条英文检索查询（结合用户目标与上述特征）。\n"
-        "2. 若 McKinsey 知识库命中偏少，可调用 **search_arxiv_papers** 补充学术文献（1–3 条查询）。\n"
-        "3. 调用 **load_report_style_skeletons** 加载写作结构参考（可选但推荐）。\n"
-        "4. 调用 **generate_business_report** 生成最终报告；该步骤会汇总 GlobalState 中的指标、EDA、RAG 结果并落盘到 "
+        "You are a Business Translator Agent: You translate upstream data analysis and model results into **English** business strategy reports in the McKinsey style.\n"
+        f"User goal: {user_goal or 'Not provided'}\n"
+        f"Task type: {task_type}; Target column: {target_column or 'Not provided'}\n"
+        f"Current best model: {best_name}\n"
+        f"Current working directory: {run_dir or 'Not set'}\n"
+        f"Priority features for retrieval (from EDA-related rankings / metadata): {top_feat_str}\n\n"
+       "Workflow (in order, can be retrieved repeatedly):\n"
+        "1. Call **retrieve_mckinsey_knowledge**, passing in 2–4 English search queries (based on the user's objectives and the characteristics listed above).\n"
+        "2. If the McKinsey knowledge base returns few results, you can call **search_arxiv_papers** to supplement the search with academic literature (1–3 results).\n"
+        "3. Call **load_report_style_skeletons** to load writing structure templates (optional but recommended).\n"
+        "4. Call **generate_business_report** to generate the final report; this step aggregates the metrics, EDA, and RAG results from GlobalState and saves them to disk."
         f"{run_dir + '/reports/business_insight_report.md' if run_dir else 'run_dir/reports/business_insight_report.md'}。\n"
-        "**务必控制轮次**：完成检索与可选 arXiv / skeleton 后，立即调用 **generate_business_report**，"
-        "不要重复检索；若无更多信息，也应直接调用 generate_business_report。\n"
-        "除上述工具外不要编造外部数据来源。"
+       "**Be sure to control the number of iterations**: After completing the search and any optional arXiv / skeleton steps, immediately call **generate_business_report**,"
+        "Do not perform duplicate searches; if no further information is available, call `generate_business_report` directly. \n"
+        "Do not invent external data sources other than the tools listed above."
     )
 
     messages = [SystemMessage(content=system_content), *messages]
@@ -819,7 +819,7 @@ def _route_after_business_translator(state: GlobalState) -> str:
 
 
 def _bat_finalize_node(state: GlobalState) -> GlobalState:
-    """LLM 未调用 generate_business_report 时自动起草并落盘。"""
+    """The LLM automatically drafts and saves the document without being prompted to call `generate_business_report`."""
     if state.get("business_report"):
         return {}
     try:
@@ -861,11 +861,11 @@ def _show_graph_if_needed(compiled: Any, show_graph: bool) -> None:
         output_dir.mkdir(parents=True, exist_ok=True)
         mmd_path = output_dir / "business_translator_graph.mmd"
         mmd_path.write_text(compiled.get_graph().draw_mermaid(), encoding="utf-8")
-        print(f"Mermaid 源码已保存: {mmd_path}")
+        print(f"The Mermaid source code has been saved: {mmd_path}")
         image_path = output_dir / "business_translator_graph.png"
         image_bytes = compiled.get_graph().draw_mermaid_png()
         image_path.write_bytes(image_bytes)
-        print(f"Graph 图片已保存: {image_path}")
+        print(f"The image has been saved: {image_path}")
         try:
             from IPython.display import Image, display
 
@@ -873,7 +873,7 @@ def _show_graph_if_needed(compiled: Any, show_graph: bool) -> None:
         except Exception:
             pass
     except Exception as exc:
-        print(f"图渲染失败: {exc}")
+        print(f"Image rendering failed: {exc}")
 
 
 def _pretty_print_message(message: Any) -> None:
@@ -917,7 +917,7 @@ business_translator = build_business_translator_agent()
 
 if __name__ == "__main__":
     agent = build_business_translator_agent(show_graph=True)
-    user_input = input("请输入：")
+    user_input = input("Please enter:")
     demo_run = PROJECT_ROOT / "artifacts" / "workspace" / "bat_standalone_demo"
     demo_run.mkdir(parents=True, exist_ok=True)
     events = agent.stream(
