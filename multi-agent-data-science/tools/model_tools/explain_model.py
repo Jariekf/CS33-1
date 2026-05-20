@@ -14,6 +14,7 @@ Results are stored in best_model["shap_explanation"] by model_agent._handle_expl
 from __future__ import annotations
 
 import json
+import os
 import pickle
 from pathlib import Path
 from typing import Any
@@ -77,6 +78,8 @@ def explain_model(
         "top_n_features": top_n_features,
     }
     try:
+        # Avoid tqdm progress lines interleaving with downstream benchmark prints on Windows.
+        os.environ.setdefault("TQDM_DISABLE", "1")
         import shap
     except ImportError:
         output = json.dumps(
