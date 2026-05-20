@@ -1,5 +1,8 @@
 import os
+import threading
 
+from langchain_core.callbacks.base import BaseCallbackHandler
+from langchain_core.outputs import LLMResult
 from langchain_openai import ChatOpenAI
 
 from core.env_utils import (
@@ -9,6 +12,7 @@ from core.env_utils import (
     OPENAI_API_KEY,
     OPENAI_BASEURL,
     OPENAI_MODEL,
+    OPENAI_STRONG_MODEL,
     ZHIPU_API_KEY,
     ZHIPU_BASEURL,
     ZHIPU_MODEL,
@@ -29,18 +33,81 @@ from core.env_utils import (
     KIMI_MODEL,
 )
 
+# ── Token accumulator ────────────────────────────────────────────────────────
+
+class _TokenAccumulator(BaseCallbackHandler):
+    """Process-level singleton that counts tokens across all LLM calls.
+
+    Works for any OpenAI-compatible provider (DeepSeek, Qwen, Kimi, Gemini via
+    OpenAI proxy, etc.) because they all surface usage in ``llm_output`` or in
+    ``usage_metadata`` on the AIMessage.  Both paths are tried so coverage is
+    maximised even when one provider omits one format.
+    """
+
+    def __init__(self) -> None:
+        self._lock       = threading.Lock()
+        self.prompt      = 0
+        self.completion  = 0
+        self.total       = 0
+
+    def reset(self) -> None:
+        with self._lock:
+            self.prompt = self.completion = self.total = 0
+
+    def on_llm_end(self, response: LLMResult, **kwargs) -> None:  # type: ignore[override]
+        p = c = t = 0
+
+        # Path A: llm_output dict — most OpenAI-compatible providers
+        usage = (response.llm_output or {}).get("token_usage") or {}
+        p += int(usage.get("prompt_tokens",     0))
+        c += int(usage.get("completion_tokens", 0))
+        t += int(usage.get("total_tokens",      0))
+
+        # Path B: usage_metadata on each AIMessage — newer LangChain / Gemini
+        if t == 0:
+            for gen_list in response.generations:
+                for gen in gen_list:
+                    meta = getattr(
+                        getattr(gen, "message", None), "usage_metadata", None
+                    ) or {}
+                    p += int(meta.get("input_tokens",  0))
+                    c += int(meta.get("output_tokens", 0))
+                    t += int(meta.get("total_tokens",  0))
+
+        with self._lock:
+            self.prompt     += p
+            self.completion += c
+            self.total      += t
+
+
+TOKEN_COUNTER = _TokenAccumulator()
+
+# ── LLM instances ─────────────────────────────────────────────────────────────
+
+_CB = [TOKEN_COUNTER]  # shared callback list for all instances
+
 llm_deepseek = ChatOpenAI(
     model=DEEPSEEK_MODEL or "deepseek-chat",
     temperature=0.7,
     api_key=DEEPSEEK_API_KEY,
     base_url=DEEPSEEK_BASEURL,
+    callbacks=_CB,
 )
 
 llm_openai = ChatOpenAI(
-    model=OPENAI_MODEL or "gpt-4o",
-    temperature=0.7,
+    model=OPENAI_MODEL or "gpt-4o-mini",
+    temperature=0.5,
     api_key=OPENAI_API_KEY,
     base_url=OPENAI_BASEURL,
+    callbacks=_CB,
+)
+
+llm_openai_strong = ChatOpenAI(
+    model=OPENAI_STRONG_MODEL or "gpt-4o",
+    temperature=0.3,
+    api_key=OPENAI_API_KEY,
+    base_url=OPENAI_BASEURL,
+    callbacks=_CB,
 )
 
 llm_zhipu = ChatOpenAI(
@@ -48,6 +115,7 @@ llm_zhipu = ChatOpenAI(
     temperature=0.7,
     api_key=ZHIPU_API_KEY,
     base_url=ZHIPU_BASEURL,
+    callbacks=_CB,
 )
 
 llm_gemini = ChatOpenAI(
@@ -55,6 +123,7 @@ llm_gemini = ChatOpenAI(
     temperature=0.7,
     api_key=GEMINI_API_KEY,
     base_url=GEMINI_BASEURL,
+    callbacks=_CB,
 )
 
 llm_gemini_flash = ChatOpenAI(
@@ -62,6 +131,7 @@ llm_gemini_flash = ChatOpenAI(
     temperature=0.7,
     api_key=GEMINI_FLASH_API_KEY or GEMINI_API_KEY,
     base_url=GEMINI_FLASH_BASEURL or GEMINI_BASEURL,
+    callbacks=_CB,
 )
 
 llm_qwen = ChatOpenAI(
@@ -69,6 +139,7 @@ llm_qwen = ChatOpenAI(
     temperature=0.7,
     api_key=QWEN_API_KEY,
     base_url=QWEN_BASEURL,
+    callbacks=_CB,
 )
 
 llm_minimax = ChatOpenAI(
@@ -76,6 +147,7 @@ llm_minimax = ChatOpenAI(
     temperature=0.7,
     api_key=MINIMAX_API_KEY,
     base_url=MINIMAX_BASEURL,
+    callbacks=_CB,
 )
 
 llm_kimi = ChatOpenAI(
@@ -83,6 +155,7 @@ llm_kimi = ChatOpenAI(
     temperature=0.7,
     api_key=KIMI_API_KEY,
     base_url=KIMI_BASEURL,
+    callbacks=_CB,
 )
 
 
@@ -96,14 +169,15 @@ def _normalize_pipeline_choice(raw: str | None) -> str:
 # Set PIPELINE_LLM_SUPERVISOR env var to pick a cheaper/faster backend for the supervisor
 # (e.g. "gemini_flash"). Falls back to PIPELINE_LLM if not set.
 _PIPELINE_REGISTRY: dict[str, ChatOpenAI] = {
-    "deepseek": llm_deepseek,
-    "openai": llm_openai,
-    "zhipu": llm_zhipu,
-    "gemini": llm_gemini,
-    "gemini_flash": llm_gemini_flash,
-    "qwen": llm_qwen,
-    "minimax": llm_minimax,
-    "kimi": llm_kimi,
+    "deepseek":      llm_deepseek,
+    "openai":        llm_openai,         # OPENAI_MODEL        (default: gpt-4o-mini)
+    "openai_strong": llm_openai_strong,  # OPENAI_STRONG_MODEL (default: gpt-4o)
+    "zhipu":         llm_zhipu,
+    "gemini":        llm_gemini,
+    "gemini_flash":  llm_gemini_flash,
+    "qwen":          llm_qwen,
+    "minimax":       llm_minimax,
+    "kimi":          llm_kimi,
 }
 
 

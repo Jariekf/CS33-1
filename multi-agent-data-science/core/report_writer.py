@@ -19,7 +19,7 @@ _RAP_REPORT_CONTEXT_CHARS = int(os.getenv("MANAGER_RAP_REPORT_CONTEXT_CHARS", "1
 # of section headings that must be stripped from non-BAT reports (case-insensitive, trims whitespace and trailing punctuation).
 _BUSINESS_HEADING_BLACKLIST: frozenset[str] = frozenset(
     {
-        # Chinese
+        # 中文
         "业务建议",
         "业务影响",
         "业务洞察",
@@ -244,7 +244,7 @@ def append_manager_rap_midlayer_to_report(state: dict[str, Any]) -> str | None:
     if meta.get("summary_error"):
         lines.append(f"- **summary_error**: {meta.get('summary_error')}")
     if err_list:
-        lines.append("- **errors (first 3)**: " + " | ".join(str(e) for e in err_list[:3]))
+        lines.append("- **errors (top 3)**: " + " | ".join(str(e) for e in err_list[:3]))
     lines.extend(
         [
             "",

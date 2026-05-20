@@ -12,32 +12,32 @@ CLASSIFICATION_METRICS = {"accuracy", "f1_macro", "f1_weighted", "roc_auc", "pre
 REGRESSION_METRICS = {"r2", "rmse", "mae", "mape", "rmsle", "max_error"}
 
 CLASSIFICATION_POOL = [
-    "LogisticRegression",    # linear baseline; strong interpretability
-    "RandomForest",          # ensemble trees; stable and noise-resistant
-    "XGBoost",               # gradient boosting; competition-grade performance
-    "LightGBM",              # faster gradient boosting; preferred for large datasets
-    "GradientBoosting",      # sklearn native gradient boosting; no extra dependencies
-    "ExtraTrees",            # extremely randomized trees; fast with low variance
-    "AdaBoost",              # adaptive boosting; effective for imbalanced data
-    "SVM",                   # kernel method; performs well on small-to-medium datasets
-    "KNN",                   # instance-based learning; no parametric assumption
-    "GaussianNB",            # naive Bayes; extremely fast probabilistic baseline
-    "MLPClassifier",         # multilayer perceptron; advantageous when many numeric features or large sample size
+    "LogisticRegression",    # linear baseline, highly interpretable
+    "RandomForest",          # ensemble tree, stable and noise-resistant
+    "XGBoost",               # gradient boosting, competition-grade performance
+    "LightGBM",              # faster gradient boosting, preferred for large datasets
+    "GradientBoosting",      # sklearn native gradient boosting, no extra dependencies
+    "ExtraTrees",            # extremely randomized trees, fast with low variance
+    "AdaBoost",              # adaptive boosting, effective on imbalanced data
+    "SVM",                   # kernel method, strong on small-to-medium datasets
+    "KNN",                   # instance-based learning, no parametric assumptions
+    "GaussianNB",            # naive Bayes, very fast probabilistic baseline
+    "MLPClassifier",         # multi-layer perceptron, good when features are dense / samples are large
 ]
 
 REGRESSION_POOL = [
     "LinearRegression",          # linear baseline
-    "Ridge",                     # L2 regularization; guards against multicollinearity
-    "Lasso",                     # L1 regularization; built-in feature selection
-    "ElasticNet",                # L1+L2; balances sparsity and stability
-    "HuberRegressor",            # robust regression; insensitive to outliers
-    "RandomForestRegressor",     # ensemble trees
+    "Ridge",                     # L2 regularisation, handles multicollinearity
+    "Lasso",                     # L1 regularisation, built-in feature selection
+    "ElasticNet",                # L1+L2, balances sparsity and stability
+    "HuberRegressor",            # robust regression, insensitive to outliers
+    "RandomForestRegressor",     # ensemble tree
     "XGBoostRegressor",          # gradient boosting
     "LightGBMRegressor",         # faster gradient boosting
     "GradientBoostingRegressor", # sklearn native gradient boosting
     "ExtraTreesRegressor",       # extremely randomized trees
     "SVR",                       # support vector regression
-    "MLPRegressor",              # multilayer perceptron; optional for complex nonlinear relationships
+    "MLPRegressor",              # multi-layer perceptron, optional for complex non-linear relationships
 ]
 
 
@@ -121,7 +121,7 @@ def select_candidate_models_and_metrics(
         "metrics_rationale": metrics_rationale,
     }
     try:
-        # -- Model name validation --
+        # ── Model name validation ─────────────────────────────────────────────
         pool = CLASSIFICATION_POOL if task_type == "classification" else REGRESSION_POOL
         invalid_models = [m for m in selected_models if m not in pool]
         if invalid_models:
@@ -129,7 +129,7 @@ def select_candidate_models_and_metrics(
         if len(selected_models) != 3:
             raise ValueError(f"Exactly 3 models must be selected; received {len(selected_models)}.")
 
-        # -- Metrics validation --
+        # ── Metrics validation ────────────────────────────────────────────────
         allowed = CLASSIFICATION_METRICS if task_type == "classification" else REGRESSION_METRICS
         if primary_metric not in allowed:
             raise ValueError(

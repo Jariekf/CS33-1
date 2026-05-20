@@ -140,13 +140,13 @@ def _show_graph(compiled) -> None:
     out.mkdir(parents=True, exist_ok=True)
     mmd_path = out / "split_agent_graph.mmd"
     mmd_path.write_text(compiled.get_graph().draw_mermaid(), encoding="utf-8")
-    print(f"Split Agent Mermaid The source code has been saved: {mmd_path}")
+    print(f"Split Agent Mermaid source saved: {mmd_path}")
     try:
         path = out / "split_agent_graph.png"
         path.write_bytes(compiled.get_graph().draw_mermaid_png())
-        print(f"Split Agent Graph Saved: {path}")
+        print(f"Split Agent graph saved: {path}")
     except Exception as exc:
-        print(f"Image rendering failed: {exc}")
+        print(f"Graph render failed: {exc}")
 
 
 if __name__ == "__main__":

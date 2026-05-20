@@ -12,6 +12,7 @@ Usage (pre-split train / test provided, skips split_agent; recommended to also s
 """
 
 import argparse
+import json
 import sys
 import time
 from pathlib import Path
@@ -24,6 +25,8 @@ from langchain_core.messages import HumanMessage
 
 from agent.agent_manager import _pretty_print_message
 from core.graph import build_full_pipeline
+from core.my_llm import TOKEN_COUNTER
+from core.report_writer import save_state_snapshot
 
 _DIVIDER = "=" * 60
 _COL = 28
@@ -81,6 +84,7 @@ def run_pipeline(
     Returns:
         The complete GlobalState dict at pipeline completion.
     """
+    TOKEN_COUNTER.reset()
     pipeline = build_full_pipeline(show_graph=show_graph)
 
     print(f"\n{_DIVIDER}")
@@ -144,6 +148,11 @@ def run_pipeline(
 
     pipeline_end = time.time()
 
+    # Final snapshot includes business_translator timing; older snapshots
+    # (e.g. model_agent finalize) omit BAT and break benchmark phase totals.
+    if final_state.get("run_dir"):
+        save_state_snapshot(final_state)
+
     print(f"\n{_DIVIDER}")
     print("Pipeline complete")
     if run_dir := final_state.get("run_dir"):
@@ -156,8 +165,22 @@ def run_pipeline(
         print(f"Evaluation metrics: {bm.get('metrics')}")
 
     _print_timing_summary(final_state.get("timing") or {}, pipeline_end)
-    print(_DIVIDER)
 
+    # ── Save token usage ──────────────────────────────────────────────────
+    if run_dir := final_state.get("run_dir"):
+        token_data = {
+            "prompt":     TOKEN_COUNTER.prompt,
+            "completion": TOKEN_COUNTER.completion,
+            "total":      TOKEN_COUNTER.total,
+        }
+        token_path = Path(run_dir) / "reports" / "token_usage.json"
+        token_path.parent.mkdir(parents=True, exist_ok=True)
+        token_path.write_text(json.dumps(token_data, indent=2), encoding="utf-8")
+        print(f"[token_usage] prompt={TOKEN_COUNTER.prompt}  "
+              f"completion={TOKEN_COUNTER.completion}  "
+              f"total={TOKEN_COUNTER.total}")
+
+    print(_DIVIDER)
     return final_state
 
 
@@ -254,6 +277,37 @@ Examples:
         metavar="N",
         help="LangGraph maximum recursion steps (default: 200)",
     )
+    # ── Optional: run benchmark evaluation automatically after the pipeline ──
+    eval_grp = parser.add_argument_group(
+        "benchmark (optional)",
+        "Supply all three to auto-record metrics into experiment_records after the run.",
+    )
+    eval_grp.add_argument(
+        "--competition",
+        default="",
+        metavar="NAME",
+        choices=[
+            "", "bank_churn", "house_prices",
+            "obesity_risks",
+            "classification_with_an_academic_success_dataset",
+        ],
+        help="Competition key for benchmark evaluation",
+    )
+    eval_grp.add_argument(
+        "--eval-test",
+        default="",
+        dest="eval_test",
+        metavar="PATH",
+        help="Split test CSV with true labels. Optional when using --data: "
+             "split_agent's test split is used automatically.",
+    )
+    eval_grp.add_argument(
+        "--system-name",
+        default="MAC-ADS",
+        dest="system_name",
+        metavar="NAME",
+        help="System name written to experiment record (default: MAC-ADS)",
+    )
     return parser
 
 
@@ -308,6 +362,60 @@ def _description_from_cli_or_exit(args: argparse.Namespace) -> str:
     return str(raw).strip()
 
 
+def _run_benchmark_eval(final_state: dict, args: argparse.Namespace) -> None:
+    """Auto-call benchmark evaluate() when --competition is set.
+
+    eval_test resolution (first match wins):
+      1. --eval-test <path>  (explicit override)
+      2. final_state["testing_data_path"]  (auto, covers --data single-file mode
+         where split_agent creates the labeled test split on disk)
+    """
+    competition  = (getattr(args, "competition",  "") or "").strip()
+    system_name  = (getattr(args, "system_name",  "MAC-ADS") or "MAC-ADS").strip()
+    desc_file    = (getattr(args, "description_file", "") or "").strip()
+    run_dir      = (final_state.get("run_dir") or "").strip()
+
+    if not (competition and run_dir):
+        return  # --competition not supplied — skip silently
+
+    # Resolve test path
+    eval_test = (getattr(args, "eval_test", "") or "").strip()
+    if not eval_test:
+        eval_test = (final_state.get("testing_data_path") or "").strip()
+    if not eval_test:
+        print("[benchmark] Cannot resolve test path: supply --eval-test or use "
+              "--data mode so split_agent produces testing_data_path.", file=sys.stderr)
+        return
+
+    if not Path(eval_test).is_file():
+        print(f"[benchmark] test file not found: {eval_test}", file=sys.stderr)
+        return
+
+    # Import evaluate() from scripts/benchmark_eval_system.py
+    scripts_dir = PROJECT_ROOT / "scripts"
+    if str(scripts_dir) not in sys.path:
+        sys.path.insert(0, str(scripts_dir))
+
+    try:
+        from benchmark_eval_system import evaluate  # type: ignore[import]
+    except ImportError as exc:
+        print(f"[benchmark] Could not import benchmark_eval_system: {exc}", file=sys.stderr)
+        return
+
+    print(f"\n[benchmark] Running evaluate()  competition={competition}")
+    try:
+        evaluate(
+            run_dir=run_dir,
+            competition=competition,
+            test_path=eval_test,
+            description_file=desc_file,
+            system_name=system_name,
+            system_type="multi-agent DS pipeline",
+        )
+    except Exception as exc:
+        print(f"[benchmark] evaluate() failed: {exc}", file=sys.stderr)
+
+
 if __name__ == "__main__":
     args = _build_arg_parser().parse_args()
     tc_cli, tt_cli = _cli_task_meta_or_exit(args)
@@ -331,7 +439,7 @@ if __name__ == "__main__":
                 print(f"[!] {label} is not a valid file: {p}", file=sys.stderr)
                 sys.exit(2)
         data_path_eff = str(p_train)
-        run_pipeline(
+        final = run_pipeline(
             data_path=data_path_eff,
             description=desc_text,
             user_request=args.request,
@@ -351,7 +459,7 @@ if __name__ == "__main__":
         if not p_data.is_file():
             print(f"[!] --data is not a valid file: {p_data}", file=sys.stderr)
             sys.exit(2)
-        run_pipeline(
+        final = run_pipeline(
             data_path=str(p_data),
             description=desc_text,
             user_request=args.request,
@@ -361,3 +469,5 @@ if __name__ == "__main__":
             task_type=tt_cli,
             description_file_path=desc_file_path,
         )
+
+    _run_benchmark_eval(final, args)

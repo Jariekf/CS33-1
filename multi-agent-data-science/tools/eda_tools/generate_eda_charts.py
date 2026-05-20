@@ -162,7 +162,7 @@ def _top_categories(series: pd.Series, max_levels: int = MAX_CATEGORY_LEVELS) ->
 def _sample_rows(df: pd.DataFrame, max_rows: int = 5000) -> pd.DataFrame:
     if len(df) <= max_rows:
         return df
-    return df.sample(n=max_rows, random_state=42)
+    return df.sample(n=max_rows, random_state=331)
 
 
 def _wrap_axis_label(label: object, width: int = 11) -> str:
@@ -794,14 +794,14 @@ def generate_eda_charts(
                 if target_type == "regression" and pd.api.types.is_numeric_dtype(df[target_col]):
                     y_rf = pd.to_numeric(df[target_col], errors="coerce")
                     mask = y_rf.notna()
-                    model = RandomForestRegressor(n_estimators=50, max_depth=6, random_state=42, n_jobs=-1)
+                    model = RandomForestRegressor(n_estimators=50, max_depth=6, random_state=331, n_jobs=-1)
                     model.fit(x_all.loc[mask], y_rf.loc[mask])
                 else:
                     encoder = LabelEncoder()
                     y_rf = encoder.fit_transform(df[target_col].astype(str).fillna("__na__"))
                     if len(np.unique(y_rf)) < 2:
                         raise ValueError("Target column has only one class; cannot compute RF importance.")
-                    model = RandomForestClassifier(n_estimators=50, max_depth=6, random_state=42, n_jobs=-1)
+                    model = RandomForestClassifier(n_estimators=50, max_depth=6, random_state=331, n_jobs=-1)
                     model.fit(x_all, y_rf)
 
                 pairs = sorted(zip(x_all.columns.astype(str), model.feature_importances_), key=lambda item: -item[1])[:15]

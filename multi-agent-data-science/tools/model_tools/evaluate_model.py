@@ -122,6 +122,13 @@ def evaluate_model(
 
             # ── Compute y_proba once; reused by roc_auc / log_loss / top-k ──────
             n_classes_eval = int(y_test.nunique())
+
+            # sensitivity: binary → recall of positive class (TP / (TP+FN))
+            #              multi-class → macro recall (unweighted mean per-class recall)
+            if n_classes_eval == 2:
+                metrics["sensitivity"] = round(float(recall_score(y_test, y_pred, average="binary", zero_division=0)), 4)
+            else:
+                metrics["sensitivity"] = round(float(recall_score(y_test, y_pred, average="macro", zero_division=0)), 4)
             _proba_err: str = ""
             if hasattr(model, "predict_proba"):
                 try:

@@ -43,7 +43,7 @@ def perform_train_test_file_split(
     task_type: str,
     target_column: str | None,
     test_size: float = 0.2,
-    random_state: int = 42,
+    random_state: int = 331,
 ) -> dict[str, Any]:
     df = pd.read_csv(source_path, sep=None, engine="python")
     stratify = None
@@ -106,7 +106,7 @@ def perform_train_test_file_split(
     return report
 
 
-def split_dataset_node(state: GlobalState, *, test_size: float = 0.2, random_state: int = 42) -> GlobalState:
+def split_dataset_node(state: GlobalState, *, test_size: float = 0.2, random_state: int = 331) -> GlobalState:
     """LangGraph node: reads task_type, writes training_data_path / testing_data_path and split_report."""
     task_type = (state.get("task_type") or "unknown").strip().lower()
     target_column = (state.get("target_column") or "").strip() or None

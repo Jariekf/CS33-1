@@ -153,8 +153,8 @@ def _build_cv(cv_strategy: str, task_type: str, cv_folds: int) -> Any:
     if strategy == "timeseries":
         return TimeSeriesSplit(n_splits=cv_folds)
     if strategy == "stratified" or (strategy == "auto" and task_type == "classification"):
-        return StratifiedKFold(n_splits=cv_folds, shuffle=True, random_state=42)
-    return KFold(n_splits=cv_folds, shuffle=True, random_state=42)
+        return StratifiedKFold(n_splits=cv_folds, shuffle=True, random_state=331)
+    return KFold(n_splits=cv_folds, shuffle=True, random_state=331)
 
 
 def _get_param_space(model_name: str) -> dict[str, list[Any]]:
@@ -257,7 +257,7 @@ def tune_and_select_model(
     target_column: str,
     cv_folds: int = 5,
     max_iter_per_model: int = 12,
-    random_state: int = 42,
+    random_state: int = 331,
     scoring: str = "",
     cv_strategy: str = "auto",
     search_strategy: str = "random",
@@ -385,15 +385,22 @@ def tune_and_select_model(
             # -- Per-model fallback: a failure in one model does not affect the others --
             try:
                 featured_train_path = feature_dataset_ids.get(model_name, "")
-                if not featured_train_path:
-                    raise ValueError(f"Path for '{model_name}' is missing in feature_dataset_ids.")
+                if not featured_train_path or featured_train_path == "skipped":
+                    summary[model_name] = {"status": "skipped", "cv_best_score": None,
+                                           "error": "feature engineering was skipped for this model"}
+                    continue
 
                 df = pd.read_csv(featured_train_path)
                 if target_column not in df.columns:
                     raise ValueError(f"Target column '{target_column}' not found in training set.")
 
                 feature_cols = [c for c in df.columns if c != target_column]
-                X = df[feature_cols]
+
+                # Safety net: keep only numeric columns to guard against string
+                # columns (e.g. Geography='France') that feature_agent missed encoding.
+                # select_dtypes is more reliable than dtype==object comparisons.
+                X = df[feature_cols].select_dtypes(include="number")
+                feature_cols = list(X.columns)
                 y = df[target_column]
 
                 estimator = _get_model(model_name)

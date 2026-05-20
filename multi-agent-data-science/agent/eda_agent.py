@@ -212,10 +212,12 @@ def _eda_node(state: GlobalState) -> GlobalState:
         "    If you include the above sections in violation of these guidelines, they will be automatically removed by the save_agent_report filter before the report is saved."
     )
 
-    # ── Critical Fix: Send only the current round’s EDA tool call chain to the LLM ─────────────────────────
-    # When the first round of pruning yields no results, the entire message history must be completely discarded (especially the RAP wrap-up AIMessage for user_request
-    # HumanMessage and agent_manager), and EDA must be initiated using only SystemMessage
-    # + a single strictly constrained HumanMessage to prevent business context from leaking in.
+    # Only send the current-round EDA tool-call chain to the LLM.
+    # On the first round the trimmed result is empty, so we discard the entire
+    # message history (including the user_request HumanMessage and the
+    # agent_manager RAP wrap-up AIMessage) and start EDA with just a
+    # SystemMessage + a single directive HumanMessage to prevent business
+    # context from leaking into EDA.
     trimmed_history = _trim_messages_to_current_round(messages)
     if trimmed_history:
         llm_input = [SystemMessage(content=system_content), *trimmed_history]
@@ -330,7 +332,7 @@ def _show_graph_if_needed(agent_graph, show_graph: bool) -> None:
         except Exception:
             pass
     except Exception as exc:
-        print(f"Image rendering failed: {exc}")
+        print(f"Graph render failed: {exc}")
 
 
 def _pretty_print_message(message) -> None:
