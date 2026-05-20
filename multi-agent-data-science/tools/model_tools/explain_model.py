@@ -100,7 +100,7 @@ def explain_model(
 
         # ── 采样（针对慢速 explainer）──────────────────────────────────────
         if len(X) > max_samples:
-            X = X.sample(n=max_samples, random_state=42).reset_index(drop=True)
+            X = X.sample(n=max_samples, random_state=331).reset_index(drop=True)
         samples_explained = len(X)
 
         # ── 构建 SHAP Explainer（auto-dispatch）────────────────────────────
