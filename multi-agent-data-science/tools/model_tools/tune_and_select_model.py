@@ -396,15 +396,11 @@ def tune_and_select_model(
 
                 feature_cols = [c for c in df.columns if c != target_column]
 
-                # Safety net: drop any remaining object-dtype columns that the
-                # feature_agent missed encoding. Avoids sklearn ValueError without
-                # touching evaluate_model or changing column counts in feature_columns.json.
-                # (Primary fix is PIPELINE_LLM_FEATURE=openai_strong; this is last resort.)
-                object_cols = [c for c in feature_cols if df[c].dtype == object]
-                if object_cols:
-                    feature_cols = [c for c in feature_cols if c not in object_cols]
-
-                X = df[feature_cols]
+                # Safety net: keep only numeric columns to guard against string
+                # columns (e.g. Geography='France') that feature_agent missed encoding.
+                # select_dtypes is more reliable than dtype==object comparisons.
+                X = df[feature_cols].select_dtypes(include="number")
+                feature_cols = list(X.columns)
                 y = df[target_column]
 
                 estimator = _get_model(model_name)
