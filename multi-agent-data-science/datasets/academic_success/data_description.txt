@@ -2,7 +2,7 @@ Classification with an Academic Success Dataset
 
 
 ============================================================
-Overview
+1. Overview
 ============================================================
 
 Welcome to the 2024 Kaggle Playground Series!
@@ -14,14 +14,14 @@ The goal of this competition is to predict academic risk of students in higher e
 
 
 ============================================================
-Evaluation
+2. Evaluation
 ============================================================
 
 Submissions are evaluated using the accuracy score.
 
 
 ============================================================
-Submission File
+3. Submission File
 ============================================================
 
 For each id row in the test set, you must predict the class value of the Target, which is a categorical academic risk assessment.
@@ -36,7 +36,7 @@ etc.
 
 
 ============================================================
-About the Tabular Playground Series
+4. About the Tabular Playground Series
 ============================================================
 
 The goal of the Tabular Playground Series is to provide the Kaggle community with a variety of fairly light-weight challenges that can be used to learn and sharpen skills in different aspects of machine learning and data science.
@@ -47,7 +47,7 @@ The challenges will generally use fairly light-weight datasets that are syntheti
 
 
 ============================================================
-Synthetically-Generated Datasets
+5. Synthetically-Generated Datasets
 ============================================================
 
 Using synthetic data for Playground competitions allows us to strike a balance between having real-world data with named features and ensuring test labels are not publicly available.
@@ -60,7 +60,7 @@ Please feel free to give us feedback on the datasets for the different competiti
 
 
 ============================================================
-Citation
+6. Citation
 ============================================================
 
 Walter Reade and Ashley Chow.
@@ -73,7 +73,7 @@ Kaggle.
 ================
 
 ============================================================
-Column Descriptions
+7. Column Descriptions
 ============================================================
 
 id:
