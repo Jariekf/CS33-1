@@ -92,7 +92,7 @@ def _model_node(state: GlobalState) -> GlobalState:
     best_model = state.get("best_model") or {}
     current_stage = state.get("current_stage") or ""
 
-    # EDA Agent 决定的指标
+    # Metrics Determined by the EDA Agent
     primary_metric = state.get("primary_metric") or ""
     evaluation_metrics = state.get("evaluation_metrics") or []
     metrics_rationale = state.get("metrics_rationale") or ""
