@@ -110,7 +110,7 @@ def _model_node(state: GlobalState) -> GlobalState:
         f"Task type: {task_type}. Target column: {target_column or 'Not provided'}.\n"
         f"Candidate models: {candidate_models}.\n"
         f"Current stage: {current_stage or 'Not started'}. Existing model_results key:{list(model_results.keys())}。\n"
-        f"Working directory for this run: {run_dir or 'Not set'}}。\n"
+        f"Working directory for this run: {run_dir or 'Not set'}.\n"
         f"Paths to the preprocessed training sets for each candidate model:{json.dumps(feature_dataset_ids, ensure_ascii=False)}。\n"
         f"Paths to the test sets for each candidate model after preprocessing:{json.dumps(testing_feature_dataset_ids, ensure_ascii=False)}。\n"
         f"Selected best model:{chosen_model or 'Not selected yet'}。\n\n"
