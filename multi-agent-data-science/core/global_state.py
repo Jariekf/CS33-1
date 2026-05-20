@@ -5,10 +5,10 @@ from langgraph.graph.message import add_messages
 
 
 class GlobalState(TypedDict, total=False):
-    """全系统共享状态。
+    """Shared state across the entire pipeline.
 
-    这个 State 不应该作为模块级全局变量保存运行时数据，
-    而是作为 LangGraph 的 StateGraph schema。
+    This State should not be used as a module-level global variable to store runtime data;
+    it serves as the LangGraph StateGraph schema.
     """
 
     # conversation
@@ -19,7 +19,7 @@ class GlobalState(TypedDict, total=False):
     data_path: str
     dataset_name: str
     description: str
-    description_file_path: str  # CLI --description-file 的绝对路径；供 EDA 工具解析列说明
+    description_file_path: str  # absolute path from CLI --description-file; used by EDA tools to parse column descriptions
     target_column: str
     task_type: str
 
@@ -84,9 +84,9 @@ class GlobalState(TypedDict, total=False):
     model_report: dict[str, Any]
 
     # evaluation metrics (decided by EDA agent, used throughout modeling)
-    primary_metric: str           # CV 选型指标，如 "f1_weighted"、"roc_auc"、"r2"、"rmse"
-    evaluation_metrics: list[str] # 综合评估指标列表，如 ["accuracy", "f1_weighted", "roc_auc"]
-    metrics_rationale: str        # 选择这组 metrics 的理由
+    primary_metric: str           # CV model selection metric, e.g. "f1_weighted", "roc_auc", "r2", "rmse"
+    evaluation_metrics: list[str] # comprehensive evaluation metric list, e.g. ["accuracy", "f1_weighted", "roc_auc"]
+    metrics_rationale: str        # rationale for choosing this set of metrics
 
     # final report
     business_report: str
@@ -117,7 +117,7 @@ class GlobalState(TypedDict, total=False):
     supervisor_retry: dict[str, int]
     # internal self-check retry counts inside data_clean_agent: {"train": 0, "test": 0}
     clean_internal_retry: dict[str, int]
-    # feature_agent 空转检测：{model_name: 未调用工具的连续次数}
+    # feature_agent idle detection: {model_name: consecutive rounds with no tool call}
     feature_no_tool_rounds: dict[str, int]
-    # eda_agent 空转检测：未调用工具的连续次数
+    # eda_agent idle detection: consecutive rounds with no tool call
     eda_no_tool_rounds: int

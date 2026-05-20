@@ -1,4 +1,4 @@
-"""训练 / 测试集划分（无 LLM）：分类分层抽样，回归随机划分。"""
+"""Train/test split (no LLM): stratified sampling for classification, random split for regression."""
 
 from __future__ import annotations
 
@@ -53,7 +53,7 @@ def perform_train_test_file_split(
     if stratify_requested:
         if not target_column or target_column not in df.columns:
             raise ValueError(
-                "classification 划分需要有效的 target_column，且列须存在于 CSV。"
+                "classification split requires a valid target_column that must exist in the CSV."
             )
         y = df[target_column]
         try:
@@ -107,7 +107,7 @@ def perform_train_test_file_split(
 
 
 def split_dataset_node(state: GlobalState, *, test_size: float = 0.2, random_state: int = 42) -> GlobalState:
-    """LangGraph 节点：读取 task_type，写入 training_data_path / testing_data_path 与 split_report。"""
+    """LangGraph node: reads task_type, writes training_data_path / testing_data_path and split_report."""
     task_type = (state.get("task_type") or "unknown").strip().lower()
     target_column = (state.get("target_column") or "").strip() or None
 
@@ -119,7 +119,7 @@ def split_dataset_node(state: GlobalState, *, test_size: float = 0.2, random_sta
         err = {
             "stage": "split",
             "type": "FileNotFoundError",
-            "message": "未找到可用的数据集文件（优先 cleaned_data_path，其次 data_path）。",
+            "message": "No usable dataset file found (prefers cleaned_data_path, falls back to data_path).",
         }
         log_node("split", success=False, detail="source file not found")
         return {
@@ -149,7 +149,7 @@ def split_dataset_node(state: GlobalState, *, test_size: float = 0.2, random_sta
                 random_state=random_state,
             )
         else:
-            # regression / unknown：随机划分整表
+            # regression / unknown: random split of the full table
             report = perform_train_test_file_split(
                 source_path=source,
                 train_out=train_out,
