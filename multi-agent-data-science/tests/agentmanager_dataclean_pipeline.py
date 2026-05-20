@@ -1,4 +1,4 @@
-"""局部演示子图：agent_manager → data_clean_agent（用于快速验证清洗子图，非主仓库图）。"""
+"""Partial demo subgraph: agent_manager → data_clean_agent (for quick validation of the cleaning subgraph; not the main repository graph)."""
 
 from __future__ import annotations
 
@@ -18,7 +18,7 @@ from core.global_state import GlobalState
 
 
 def _route_after_agent_manager(state: GlobalState) -> str:
-    """Manager 子图结束后：若已有 train+test 清洗计划（或旧版 next_action），则进入 Data Clean。"""
+    """After the Manager subgraph: if train+test cleaning plans exist (or legacy next_action), enter Data Clean."""
     train_plan = state.get("train_cleaning_plan")
     test_plan = state.get("test_cleaning_plan")
     if (
@@ -48,7 +48,7 @@ def _show_pipeline_graph_if_needed(compiled, show_graph: bool) -> None:
         image_path.parent.mkdir(parents=True, exist_ok=True)
         image_bytes = compiled.get_graph().draw_mermaid_png()
         image_path.write_bytes(image_bytes)
-        print(f"Pipeline Graph 图片已保存: {image_path}")
+        print(f"Pipeline graph image saved: {image_path}")
         try:
             from IPython.display import Image, display
 
@@ -56,7 +56,7 @@ def _show_pipeline_graph_if_needed(compiled, show_graph: bool) -> None:
         except Exception:
             pass
     except Exception as exc:
-        print(f"Pipeline 图渲染失败: {exc}")
+        print(f"Pipeline graph rendering failed: {exc}")
 
 
 def build_agentmanager_dataclean_pipeline(show_graph: bool = False):
@@ -83,13 +83,13 @@ agentmanager_dataclean_pipeline = build_agentmanager_dataclean_pipeline()
 
 if __name__ == "__main__":
     pipeline = build_agentmanager_dataclean_pipeline(show_graph=True)
-    user_input = input("请输入：")
+    user_input = input("Enter input: ")
     events = pipeline.stream(
         {
             "messages": [HumanMessage(content=user_input)],
             "user_request": user_input,
             "data_path": "C:/Projects/multi-agent-data-science/datasets/Financials.csv",
-            "description": "这是一个金融行业销售数据集，包含销售、折扣、利润、国家、产品和时间字段。",
+            "description": "This is a financial industry sales dataset containing fields for sales, discounts, profit, country, product, and time.",
             "cleaned_data_path": "C:/Projects/multi-agent-data-science/artifacts/Financials_cleaned.csv",
         },
         stream_mode="values",

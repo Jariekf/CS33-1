@@ -1,4 +1,4 @@
-"""EDA Agent 结构、路由、工具和状态更新测试。"""
+"""EDA Agent structure, routing, tool, and state-update tests."""
 
 import json
 import sys
@@ -34,7 +34,7 @@ TESTENV = Path(__file__).resolve().parent / "testenv"
 TRAIN_CSV = TESTENV / "split" / "sample_train.csv"
 
 
-# ── 图结构 ──────────────────────────────────────────────────────────────────
+# ── Graph structure ──────────────────────────────────────────────────────────────────
 
 def test_eda_agent_graph_structure():
     agent = build_eda_agent(show_graph=False)
@@ -50,7 +50,7 @@ def test_eda_agent_graph_structure():
     assert ("tool_state_update", "eda_agent") in edges
 
 
-# ── select_candidate_models_and_metrics 工具校验 ────────────────────────────
+# ── select_candidate_models_and_metrics tool validation ────────────────────────────
 
 _VALID_CLF_INVOKE = {
     "task_type": "classification",
@@ -60,20 +60,20 @@ _VALID_CLF_INVOKE = {
         "RandomForest": {"scaling": False, "encoding": "label"},
         "XGBoost": {"scaling": False, "encoding": "label"},
     },
-    "model_selection_plan": "基于数据集规模和特征类型选择",
+    "model_selection_plan": "Selected based on dataset size and feature types",
     "primary_metric": "f1_weighted",
     "evaluation_metrics": ["accuracy", "f1_weighted", "roc_auc"],
-    "metrics_rationale": "类别基本均衡，f1_weighted 为主指标，roc_auc 辅助排序评估。",
+    "metrics_rationale": "Classes are roughly balanced; f1_weighted is the primary metric, roc_auc aids ranking evaluation.",
 }
 
 _VALID_REG_INVOKE = {
     "task_type": "regression",
     "selected_models": ["LinearRegression", "Ridge", "XGBoostRegressor"],
     "feature_engineering_plan": {},
-    "model_selection_plan": "回归任务，目标列连续分布",
+    "model_selection_plan": "Regression task with continuously distributed target column",
     "primary_metric": "r2",
     "evaluation_metrics": ["r2", "rmse", "mae"],
-    "metrics_rationale": "回归标准三件套，r2 为主指标。",
+    "metrics_rationale": "Standard regression trio; r2 is the primary metric.",
 }
 
 
@@ -127,44 +127,44 @@ def test_select_models_cross_pool_rejected():
     assert "error" in result
 
 
-# ── metrics 校验 ────────────────────────────────────────────────────────────
+# ── metrics validation ────────────────────────────────────────────────────────────
 
 def test_invalid_primary_metric_rejected():
-    """primary_metric 不在白名单内应返回 error。"""
+    """primary_metric not in the whitelist should return error."""
     result = json.loads(
         select_candidate_models_and_metrics.invoke({
             **_VALID_CLF_INVOKE,
-            "primary_metric": "neg_root_mean_squared_error",  # 不允许 sklearn 内部名
+            "primary_metric": "neg_root_mean_squared_error",  # sklearn internal names not allowed
         })
     )
     assert "error" in result
 
 
 def test_invalid_evaluation_metric_rejected():
-    """evaluation_metrics 含非法项应返回 error。"""
+    """evaluation_metrics containing invalid entries should return error."""
     result = json.loads(
         select_candidate_models_and_metrics.invoke({
             **_VALID_CLF_INVOKE,
-            "evaluation_metrics": ["f1_weighted", "rmse"],  # rmse 是回归专属
+            "evaluation_metrics": ["f1_weighted", "rmse"],  # rmse is regression-only
         })
     )
     assert "error" in result
 
 
 def test_primary_metric_not_in_evaluation_metrics_rejected():
-    """primary_metric 不包含在 evaluation_metrics 中应返回 error。"""
+    """primary_metric not included in evaluation_metrics should return error."""
     result = json.loads(
         select_candidate_models_and_metrics.invoke({
             **_VALID_CLF_INVOKE,
             "primary_metric": "roc_auc",
-            "evaluation_metrics": ["accuracy", "f1_weighted"],  # 缺少 roc_auc
+            "evaluation_metrics": ["accuracy", "f1_weighted"],  # roc_auc missing
         })
     )
     assert "error" in result
 
 
 def test_empty_evaluation_metrics_rejected():
-    """evaluation_metrics 为空列表应返回 error。"""
+    """evaluation_metrics as an empty list should return error."""
     result = json.loads(
         select_candidate_models_and_metrics.invoke({
             **_VALID_CLF_INVOKE,
@@ -174,16 +174,16 @@ def test_empty_evaluation_metrics_rejected():
     assert "error" in result
 
 
-# ── tool_state_update 状态写入 ──────────────────────────────────────────────
+# ── tool_state_update state writes ──────────────────────────────────────────────
 
 def test_handle_select_models_writes_state():
     payload = {
         "selected_models": ["XGBoost", "RandomForest", "LogisticRegression"],
         "feature_engineering_plan": {"XGBoost": {"scaling": False}},
-        "model_selection_plan": "XGBoost 在表格数据上表现好",
+        "model_selection_plan": "XGBoost performs well on tabular data",
         "primary_metric": "roc_auc",
         "evaluation_metrics": ["roc_auc", "f1_weighted", "accuracy"],
-        "metrics_rationale": "类别不平衡，优先 roc_auc。",
+        "metrics_rationale": "Class imbalance present; roc_auc is prioritized.",
     }
     update = _tool_state_update_node({
         "messages": [
@@ -199,7 +199,7 @@ def test_handle_select_models_writes_state():
     assert update["model_selection_plan"] == payload["model_selection_plan"]
     assert update["primary_metric"] == "roc_auc"
     assert update["evaluation_metrics"] == ["roc_auc", "f1_weighted", "accuracy"]
-    assert update["metrics_rationale"] == "类别不平衡，优先 roc_auc。"
+    assert update["metrics_rationale"] == "Class imbalance present; roc_auc is prioritized."
     assert update["current_stage"] == "eda_done"
     assert update["next_action"] == "run_feature_engineering"
 
@@ -249,7 +249,7 @@ def test_handle_generate_eda_charts_writes_chart_state():
 
 
 def test_handle_eda_step_records_error():
-    payload = {"error": {"type": "FileNotFoundError", "message": "文件不存在"}}
+    payload = {"error": {"type": "FileNotFoundError", "message": "file not found"}}
     update = _tool_state_update_node({
         "messages": [
             ToolMessage(
@@ -263,7 +263,7 @@ def test_handle_eda_step_records_error():
     assert update["errors"]
 
 
-# ── 工具实际计算 ─────────────────────────────────────────────────────────────
+# ── Actual tool computation ─────────────────────────────────────────────────────────────
 
 def test_profile_training_data_tool(tmp_path):
     csv_path = tmp_path / "train.csv"
@@ -358,44 +358,44 @@ def test_generate_eda_charts_uses_explicit_task_type_over_heuristic(tmp_path):
     assert "class_balance.png" not in chart_names
 
 
-# ── 候选池常量 ──────────────────────────────────────────────────────────────
+# ── Candidate pool constants ──────────────────────────────────────────────────────────────
 
 def test_candidate_pools_have_five_each():
     assert len(CLASSIFICATION_POOL) == 5
     assert len(REGRESSION_POOL) == 5
 
 
-# ── LLM invoke 测试（需要 API Key）────────────────────────────────────────────
+# ── LLM invoke tests (requires API Key)────────────────────────────────────────────
 
-@pytest.mark.skipif(not DEEPSEEK_API_KEY, reason="需要配置 DEEPSEEK_API_KEY")
+@pytest.mark.skipif(not DEEPSEEK_API_KEY, reason="DEEPSEEK_API_KEY must be configured")
 def test_eda_agent_invoke(tmp_path):
     agent = build_eda_agent(show_graph=False)
     result = agent.invoke(
         {
-            "messages": [HumanMessage(content="请分析训练集并选出候选模型。")],
-            "user_request": "请分析训练集并选出候选模型。",
+            "messages": [HumanMessage(content="Analyze the training set and select candidate models.")],
+            "user_request": "Analyze the training set and select candidate models.",
             "training_data_path": str(TRAIN_CSV),
             "task_type": "classification",
             "target_column": "subscribed",
-            "description": "二分类数据集：预测客户是否订阅银行定期存款。",
+            "description": "Binary classification dataset: predict whether a customer subscribes to a bank term deposit.",
             "run_dir": str(tmp_path),
         },
         config={"recursion_limit": 60},
     )
-    assert result.get("candidate_models"), "应当选出候选模型"
-    assert len(result["candidate_models"]) == 3, "恰好选出3个候选模型"
-    assert result.get("feature_engineering_plan"), "应当输出特征工程计划"
+    assert result.get("candidate_models"), "Expected candidate models to be selected"
+    assert len(result["candidate_models"]) == 3, "Exactly 3 candidate models should be selected"
+    assert result.get("feature_engineering_plan"), "Expected feature engineering plan to be output"
     for m in result["candidate_models"]:
-        assert m in CLASSIFICATION_POOL, f"{m} 不在分类模型候选池中"
+        assert m in CLASSIFICATION_POOL, f"{m} is not in the classification model candidate pool"
 
 
-# ── 手动集成运行（pytest 不执行）─────────────────────────────────────────────
+# ── Manual integration run (not executed by pytest) ─────────────────────────────────────────────
 
 def _run_eda_agent():
     from agent.eda_agent import _pretty_print_message
 
     agent = build_eda_agent(show_graph=True)
-    user_input = input("请输入：")
+    user_input = input("Enter input: ")
     events = agent.stream(
         {
             "messages": [HumanMessage(content=user_input)],
@@ -403,7 +403,7 @@ def _run_eda_agent():
             "training_data_path": str(TRAIN_CSV),
             "task_type": "classification",
             "target_column": "subscribed",
-            "description": "二分类数据集：预测客户是否订阅银行定期存款。",
+            "description": "Binary classification dataset: predict whether a customer subscribes to a bank term deposit.",
         },
         stream_mode="values",
     )

@@ -14,9 +14,9 @@ demo_run.mkdir(parents=True, exist_ok=True)
 
 events = agent.stream(
     {
-        "messages": [HumanMessage(content="提升用户留存率并给出相应的营销策略")],
-        "user_request": "提升用户留存率并给出相应的营销策略",
-        "description": "这是关于用户留存的数据集，包含营销和技术手段的特征。",
+        "messages": [HumanMessage(content="Improve user retention and propose corresponding marketing strategies")],
+        "user_request": "Improve user retention and propose corresponding marketing strategies",
+        "description": "This is a dataset on user retention that includes features related to marketing and technical approaches.",
         "task_type": "classification",
         "target_column": "retained",
         "run_dir": str(demo_run),

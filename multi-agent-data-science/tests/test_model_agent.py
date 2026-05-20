@@ -1,4 +1,4 @@
-"""Model Agent 结构、路由、工具和状态更新测试。"""
+"""Model Agent structure, routing, tool, and state-update tests."""
 
 import json
 import sys
@@ -26,12 +26,12 @@ from tools.model_tools.tune_and_select_model import tune_and_select_model
 
 TESTENV = Path(__file__).resolve().parent / "testenv"
 FEATURE_DIR = TESTENV / "feature"
-# 已数值化的特征工程后数据，model agent 可直接 train + evaluate
+# Feature-engineered data already numeric; model agent can train + evaluate directly
 FEATURE_TRAIN = {m: FEATURE_DIR / f"{m}_train_featured.csv" for m in ["LogisticRegression", "RandomForest", "XGBoost"]}
 FEATURE_TEST  = {m: FEATURE_DIR / f"{m}_test_featured.csv"  for m in ["LogisticRegression", "RandomForest", "XGBoost"]}
 
 
-# ── 图结构 ──────────────────────────────────────────────────────────────────
+# ── Graph structure ──────────────────────────────────────────────────────────────────
 
 def test_model_agent_graph_structure():
     agent = build_model_agent(show_graph=False)
@@ -64,7 +64,7 @@ def test_get_current_model_returns_none_when_all_done():
     assert _get_current_model(state) is None
 
 
-# ── tool_state_update：evaluate_model ────────────────────────────────────────
+# ── tool_state_update: evaluate_model ────────────────────────────────────────
 
 def test_handle_evaluate_merges_model_results():
     payload = {
@@ -96,7 +96,7 @@ def test_handle_evaluate_error_recorded():
     assert update["errors"]
 
 
-# ── train_model 工具 ─────────────────────────────────────────────────────────
+# ── train_model tool ─────────────────────────────────────────────────────────
 
 def test_train_model_regression(tmp_path):
     csv_path = tmp_path / "train.csv"
@@ -191,7 +191,7 @@ def test_tune_and_select_model_regression(tmp_path):
     assert "per_model_summary" in result
 
 
-# ── evaluate_model 工具 ──────────────────────────────────────────────────────
+# ── evaluate_model tool ──────────────────────────────────────────────────────
 
 def test_evaluate_model_regression(tmp_path):
     train_csv = tmp_path / "train.csv"
@@ -247,16 +247,16 @@ def test_evaluate_model_classification(tmp_path):
     assert "f1_weighted" in eval_result["metrics"]
 
 
-# ── LLM invoke 测试（需要 API Key）────────────────────────────────────────────
+# ── LLM invoke tests (requires API Key)────────────────────────────────────────────
 
-@pytest.mark.skipif(not DEEPSEEK_API_KEY, reason="需要配置 DEEPSEEK_API_KEY")
+@pytest.mark.skipif(not DEEPSEEK_API_KEY, reason="DEEPSEEK_API_KEY must be configured")
 def test_model_agent_invoke_single_model(tmp_path):
-    """单模型训练+评估（只处理第一个模型）。testenv 特征数据已数值化，无需预处理参数。"""
+    """Single-model train+evaluate (processes only first model). testenv feature data is already numeric; no preprocessor args needed."""
     agent = build_model_agent(show_graph=False)
-    # 用同一个已数值化的测试集，无需传入 preprocessors
+    # Use the same already-numeric test set; no preprocessors needed
     result = agent.invoke(
         {
-            "messages": [HumanMessage(content="请训练并评估模型")],
+            "messages": [HumanMessage(content="Please train and evaluate the model.")],
             "task_type": "classification",
             "target_column": "subscribed",
             "candidate_models": ["LogisticRegression", "RandomForest", "XGBoost"],
@@ -269,13 +269,13 @@ def test_model_agent_invoke_single_model(tmp_path):
         config={"recursion_limit": 60},
     )
     model_results = result.get("model_results") or {}
-    assert model_results, "应当至少完成一个模型的训练和评估"
+    assert model_results, "Expected at least one model's training and evaluation to complete"
     for model, info in model_results.items():
-        assert Path(info["model_path"]).exists(), f"{model} 模型文件应已保存"
+        assert Path(info["model_path"]).exists(), f"Model file for {model} should have been saved"
         assert "accuracy" in info["metrics"] or "f1_weighted" in info["metrics"]
 
 
-# ── 外部循环路由 ─────────────────────────────────────────────────────────────
+# ── External loop routing ─────────────────────────────────────────────────────────────
 
 def test_full_pipeline_model_routing():
     from core.graph import _route_after_model, _route_after_feature

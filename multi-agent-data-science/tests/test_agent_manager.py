@@ -22,8 +22,8 @@ from tools.agentmanager_tools.create_cleaning_plan import create_cleaning_plan
 TESTENV = Path(__file__).resolve().parent / "testenv"
 RAW_CSV = TESTENV / "raw" / "sample.csv"
 SAMPLE_DESCRIPTION = (
-    "二分类数据集：预测客户是否订阅银行定期存款（subscribed: yes/no）。"
-    "特征：age、job、education、balance。"
+    "Binary classification dataset: predict whether a customer subscribes to a bank term deposit (subscribed: yes/no). "
+    "Features: age, job, education, balance."
 )
 
 
@@ -112,7 +112,7 @@ def test_infer_task_tool_message_updates_global_state():
         "task_type": "regression",
         "target_column": " Profit ",
         "confidence": 0.9,
-        "reason": "用户希望预测利润，利润是连续型业务指标。",
+        "reason": "The user wants to predict profit, which is a continuous business metric.",
     }
     state_update = _tool_state_update_node(
         {
@@ -189,7 +189,7 @@ def test_manager_rap_tool_appends_report_when_run_dir(tmp_path):
     report_path = tmp_path / "reports" / "agent_manager_report.md"
     assert report_path.is_file()
     text = report_path.read_text(encoding="utf-8")
-    assert "Manager RAP · 中层检测" in text
+    assert "Manager RAP · Mid-layer Diagnostics" in text
     assert "user_requirement_summary" in text
     assert "manager_rap_context" in text
     assert "Summary line for preview." in text
@@ -205,25 +205,25 @@ def test_append_manager_rap_midlayer_skips_when_no_rap_fields():
 def test_create_cleaning_plan_train_updates_state():
     cleaning_plan = {
         "target": "train",
-        "summary": "清理列名空格，转换日期字段，并准备金额字段清洗。",
+        "summary": "Strip column name whitespace, convert date fields, and prepare amount fields for cleaning.",
         "column_name_actions": [
             {
                 "column": " Product ",
                 "action": "strip",
-                "reason": "列名前后存在空格。",
+                "reason": "Column name has leading/trailing whitespace.",
             }
         ],
         "type_conversions": [
             {
                 "column": "Date",
                 "target_type": "datetime",
-                "reason": "Date 是日期字符串。",
+                "reason": "Date is a date string.",
             }
         ],
         "missing_value_actions": [],
         "outlier_actions": [],
         "drop_columns": [],
-        "notes": ["Financials 数据集暂无缺失值。"],
+        "notes": ["Financials dataset has no missing values."],
     }
     state_update = _tool_state_update_node(
         {
@@ -245,7 +245,7 @@ def test_create_cleaning_plan_train_updates_state():
 def test_create_cleaning_plan_test_updates_state():
     cleaning_plan = {
         "target": "test",
-        "summary": "与 train 同构清洗。",
+        "summary": "Same structure cleaning as train.",
         "column_name_actions": [],
         "type_conversions": [],
         "missing_value_actions": [],
@@ -333,15 +333,15 @@ def _print_state_snapshot(state: dict):
     print(json.dumps(snapshot, ensure_ascii=False, indent=2))
 
 
-# ── LLM invoke 测试（需要 API Key）────────────────────────────────────────────
+# ── LLM invoke tests (requires API Key) ──────────────────────────────────────
 
-@pytest.mark.skipif(not DEEPSEEK_API_KEY, reason="需要配置 DEEPSEEK_API_KEY")
+@pytest.mark.skipif(not DEEPSEEK_API_KEY, reason="DEEPSEEK_API_KEY must be configured")
 def test_agent_manager_invoke(tmp_path):
     agent = build_agent_manager(show_graph=False)
     result = agent.invoke(
         {
-            "messages": [HumanMessage(content="请分析数据集并给出清洗计划")],
-            "user_request": "请分析数据集并给出清洗计划",
+            "messages": [HumanMessage(content="Please analyze the dataset and produce a cleaning plan.")],
+            "user_request": "Please analyze the dataset and produce a cleaning plan.",
             "training_data_path": str(RAW_CSV),
             "data_path": str(RAW_CSV),
             "testing_data_path": str(RAW_CSV),
@@ -355,13 +355,13 @@ def test_agent_manager_invoke(tmp_path):
         result.get("train_cleaning_plan")
         or result.get("test_cleaning_plan")
         or result.get("cleaning_plan")
-    ), "预期在完成 profile 后继续产出 train/test 清洗计划（若递归用尽可能失败，可调大 recursion_limit）"
+    ), "Expected train/test cleaning plan after profile completes (increase recursion_limit if recursion is exhausted)"
 
 
-# ── 手动集成运行（pytest 不执行）─────────────────────────────────────────────
+# ── Manual integration run (not executed by pytest) ──────────────────────────
 
 def run_agent_manager_test():
-    user_input = input("请输入：")
+    user_input = input("Enter input: ")
     events = agent_manager.stream(
         {
             "messages": [HumanMessage(content=user_input)],

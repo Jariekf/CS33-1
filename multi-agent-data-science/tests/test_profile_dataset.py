@@ -24,7 +24,7 @@ def test_profile_dataset_basic_shape():
 
 def test_profile_dataset_detects_missing_values():
     profile = json.loads(profile_dataset.invoke({"file_path": str(RAW_CSV)}))
-    # balance 有2个缺失值
+    # balance has 2 missing values
     assert profile["missing_values"]["total_missing_cells"] == 2
     assert profile["missing_values"]["columns"]["balance"]["missing_count"] == 2
 
@@ -32,7 +32,7 @@ def test_profile_dataset_detects_missing_values():
 def test_profile_dataset_detects_category_columns():
     profile = json.loads(profile_dataset.invoke({"file_path": str(RAW_CSV)}))
     category_cols = profile["type_issues"]["category_columns"]
-    # job、education、subscribed 应被识别为类别列
+    # job, education, subscribed should be identified as categorical columns
     assert "job" in category_cols or "education" in category_cols
 
 
