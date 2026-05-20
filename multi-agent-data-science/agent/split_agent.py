@@ -151,7 +151,7 @@ def _show_graph(compiled) -> None:
 
 if __name__ == "__main__":
     agent = build_split_agent(show_graph=True)
-    user_input = input("Please enter：")
+    user_input = input("Please enter: ")
     events = agent.stream(
         {
             "messages": [HumanMessage(content=user_input)],

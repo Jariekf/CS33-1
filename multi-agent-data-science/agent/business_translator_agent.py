@@ -1,4 +1,4 @@
-"""Business Action Translator — LangGraph Tool-Loop + McKinsey RAG + arXiv → Markdown 业务报告."""
+"""Business Action Translator — LangGraph Tool-Loop + McKinsey RAG + arXiv → Markdown Business Report."""
 
 from __future__ import annotations
 
@@ -617,7 +617,7 @@ def _parse_tool_payload(tool_message: ToolMessage) -> dict[str, Any]:
     try:
         return json.loads(str(tool_message.content))
     except json.JSONDecodeError:
-        return {"error": {"type": "JSONDecodeError", "message": "工具输出不是合法 JSON"}}
+        return {"error": {"type": "JSONDecodeError", "message": "Tool output is not valid JSON"}}
 
 
 def _merge_arxiv(existing: list[dict[str, Any]], new_papers: list[dict[str, Any]]) -> list[dict[str, Any]]:
@@ -651,7 +651,7 @@ def _handle_retrieve_mckinsey(state: GlobalState, tool_message: ToolMessage) -> 
                 {
                     "stage": "bat_rag",
                     "type": "InvalidPayload",
-                    "message": "retrieve_mckinsey_knowledge 返回缺少 buckets",
+                    "message": "retrieve_mckinsey_knowledge returned missing buckets",
                 }
             ],
         }
@@ -755,7 +755,7 @@ def _business_translator_node(state: GlobalState) -> GlobalState:
         "2. If the McKinsey knowledge base returns few results, you can call **search_arxiv_papers** to supplement the search with academic literature (1–3 results).\n"
         "3. Call **load_report_style_skeletons** to load writing structure templates (optional but recommended).\n"
         "4. Call **generate_business_report** to generate the final report; this step aggregates the metrics, EDA, and RAG results from GlobalState and saves them to disk."
-        f"{run_dir + '/reports/business_insight_report.md' if run_dir else 'run_dir/reports/business_insight_report.md'}。\n"
+        f"{run_dir + '/reports/business_insight_report.md' if run_dir else 'run_dir/reports/business_insight_report.md'}\n"
        "**Be sure to control the number of iterations**: After completing the search and any optional arXiv / skeleton steps, immediately call **generate_business_report**,"
         "Do not perform duplicate searches; if no further information is available, call `generate_business_report` directly. \n"
         "Do not invent external data sources other than the tools listed above."

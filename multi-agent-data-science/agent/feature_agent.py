@@ -167,7 +167,7 @@ def _feature_node(state: GlobalState) -> GlobalState:
         "   - XGBoost and XGBoostRegressor require 0/1 integer labels; the tool automatically encodes the data and processes the test set accordingly;\n"
         "   - Other models return `status=skipped`, and the target column in the test set remains unchanged;\n"
         "3. Based on the plan above, call `scale_features` and `encode_categorical` as needed, passing the following arguments to both:\n"
-        f"   dataset_id=train_id, run_dir=\"{run_dir}\", {test_id_arg}；\n"
+        f"   dataset_id=train_id, run_dir=\"{run_dir}\", {test_id_arg};\n"
         "   - Target columns are not included in feature scaling or one-hot encoding;\n"
         "   - Tree-based models (XGBoost, RandomForest) typically do not require `scale_features`;\n"
         "   - Linear models (LogisticRegression, LinearRegression, Ridge) typically require `scale_features`;\n"

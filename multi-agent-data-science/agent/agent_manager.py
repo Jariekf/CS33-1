@@ -48,11 +48,11 @@ def _manager_node(state: GlobalState) -> GlobalState:
         f"RAP Recommendations:{rap_context or 'Not yet generated'}\n"
     )
     cleaning_plan_contract = (
-        "\ncreate_cleaning_plan contract（These fields must be passed explicitly）：\n"
+        "\ncreate_cleaning_plan contract (these fields must be passed explicitly):\n"
         "target, summary, column_name_actions, type_conversions, missing_value_actions, "
-        "outlier_actions, drop_columns, notes。\n"
+        "outlier_actions, drop_columns, notes.\n"
         "If a field has no action, pass an empty list [], but do not omit the parameter.\n"
-        "Example：create_cleaning_plan(target='train', summary='...', column_name_actions=[], "
+        "Example: create_cleaning_plan(target='train', summary='...', column_name_actions=[], "
         "type_conversions=[], missing_value_actions=[], outlier_actions=[], drop_columns=[], notes=[])\n"
     )
 
@@ -76,7 +76,7 @@ def _manager_node(state: GlobalState) -> GlobalState:
         )
     else:
         rap_step = (
-            "3. Call build_manager_rap_context(user_request, description, task_type, target_column) generate Manager RAP context；\n"
+            "3. Call build_manager_rap_context(user_request, description, task_type, target_column) generate Manager RAP context;\n"
             if not has_rap_context
             else "3. The current state already has a Manager RAP context; do not call `build_manager_rap_context` again;\n"
         )

@@ -109,17 +109,17 @@ def _model_node(state: GlobalState) -> GlobalState:
         "[Task Information]\n"
         f"Task type: {task_type}. Target column: {target_column or 'Not provided'}.\n"
         f"Candidate models: {candidate_models}.\n"
-        f"Current stage: {current_stage or 'Not started'}. Existing model_results key:{list(model_results.keys())}。\n"
+        f"Current stage: {current_stage or 'Not started'}. Existing model_results key: {list(model_results.keys())}\n"
         f"Working directory for this run: {run_dir or 'Not set'}.\n"
-        f"Paths to the preprocessed training sets for each candidate model:{json.dumps(feature_dataset_ids, ensure_ascii=False)}。\n"
-        f"Paths to the test sets for each candidate model after preprocessing:{json.dumps(testing_feature_dataset_ids, ensure_ascii=False)}。\n"
-        f"Selected best model:{chosen_model or 'Not selected yet'}。\n\n"
+        f"Paths to the preprocessed training sets for each candidate model: {json.dumps(feature_dataset_ids, ensure_ascii=False)}\n"
+        f"Paths to the test sets for each candidate model after preprocessing: {json.dumps(testing_feature_dataset_ids, ensure_ascii=False)}\n"
+        f"Selected best model: {chosen_model or 'Not selected yet'}\n\n"
         "[EDA Agent: Predefined Evaluation Metrics (Use as is; no need to re-evaluate)]\n"
-        f"primary_metric (CV tuning metric):{primary_metric or 'Not set, please use the task default'}。\n"
-        f"evaluation_metrics (List of Comprehensive Evaluation Indicators):{evaluation_metrics or 'Not set, please use the default task metrics'}.\n"
-        f"Reasons for choosing metrics: {metrics_rationale or 'Not provided'}。\n\n"
+        f"primary_metric (CV tuning metric): {primary_metric or 'Not set, please use the task default'}\n"
+        f"evaluation_metrics (List of Comprehensive Evaluation Indicators): {evaluation_metrics or 'Not set, please use the default task metrics'}.\n"
+        f"Reasons for choosing metrics: {metrics_rationale or 'Not provided'}\n\n"
         "[Follow these steps in order; do not skip any steps or repeat any steps.]\n\n"
-        "Step 1 — If current_stage is not model_selected / model_trained / model_evaluated，\n"
+        "Step 1 — If current_stage is not model_selected / model_trained / model_evaluated,\n"
         "When calling `tune_and_select_model`, you must define the following HPO strategies yourself:\n"
         f"· scoring [Required] = '{primary_metric or ''}' — This is the primary_metric already determined by the EDA Agent,"
         "Pass directly; do not substitute with other metrics, and do not leave blank.\n"
@@ -132,7 +132,7 @@ def _model_node(state: GlobalState) -> GlobalState:
         "    - Other equilibrium scenarios → random\n"
         "    - When combining multiple candidate models, the strategy is determined based on the model with the largest parameter space.\n"
         "  · max_iter_per_model: For models with ≤ 2 dimensions → 12; for models with 3–4 dimensions → 20; for models with ≥ 5 dimensions → 30\n"
-        "    （Ignore this parameter when `search_strategy=grid`）\n"
+        "    (Ignore this parameter when `search_strategy=grid`)\n"
         "  · extra_param_overrides (optional): Injects or overrides specific hyperparameters by model name; "
         "    all other parameters remain in the default search space.\n"
         "    Pass a value only when there is clear data evidence; otherwise, leave it as `None`. Common scenarios:\n"
@@ -140,13 +140,13 @@ def _model_node(state: GlobalState) -> GlobalState:
         '      {"LogisticRegression": {"class_weight": ["balanced", null]},\n'
         '       "RandomForest": {"class_weight": ["balanced", null]},\n'
         '       "SVM": {"class_weight": ["balanced", null]}}\n'
-        "      （Models that support only `class_weight`: LogisticRegression, RandomForest, SVM, LightGBM\n"
+        "      (Models that support only `class_weight`: LogisticRegression, RandomForest, SVM, LightGBM)\n"
         "    - Training set > 50,000 rows; increase the upper limit of `n_estimators` for the tree model →\n"
         '      {"RandomForest": {"n_estimators": [200, 300, 500]},\n'
         '       "XGBoost": {"n_estimators": [200, 300, 500]}}\n'
         "    - Number of feature dimensions > 100; RandomForest increases the max_features range →\n"
         '      {"RandomForest": {"max_features": ["sqrt", "log2", 0.3, 0.5]}}\n'
-        "  · feature_dataset_ids、candidate_models、task_type、target_column Retrieved from the task information above\n\n"
+        "  · feature_dataset_ids, candidate_models, task_type, target_column Retrieved from the task information above\n\n"
         "  [Self-healing Strategy — If a tool fails, retry using the following priority order; do not abandon the entire modeling phase]\n\n"
         "  ① tune_and_select_model returns error (All candidate models failed)\n"
         "    → Retry 1: Keep the original parameters, but change `search_strategy=random` and `max_iter_per_model=8` to determine if the issue is related to HPO configuration.\n"
@@ -172,20 +172,20 @@ def _model_node(state: GlobalState) -> GlobalState:
         "  · If the difference between the highest and second-highest scores is less than 0.01, the basis for the selection must be explained.\n"
         "  · If a model's cv_score_std is greater than 0.03, it should be noted that the CV is unstable.\n"
         "  · Provide a conclusion on which model to use, and then immediately call `train_model`:\n"
-        "  featured_train_path = feature_dataset_ids[best_model_name]，\n"
-        "  model_name = best_model_name，model_params = best_model_params，\n"
-        f"  output_dir = {output_dir!r}。\n\n"
+        "  featured_train_path = feature_dataset_ids[best_model_name],\n"
+        "  model_name = best_model_name, model_params = best_model_params,\n"
+        f"  output_dir = {output_dir!r}\n\n"
         "Step 3 — If `current_stage` is `model_trained`, call `evaluate_model`:\n"
-        "  featured_test_data_path = testing_feature_dataset_ids[best_model_name]，\n"
+        "  featured_test_data_path = testing_feature_dataset_ids[best_model_name],\n"
         "  model_path and feature_columns_path are returned by train_model, \n"
-        "  model_name、task_type、target_column Based on the task information provided above,\n"
-        f"  evaluation_metrics={evaluation_metrics}，primary_metric='{primary_metric}'。\n\n"
+        "  model_name, task_type, target_column Based on the task information provided above,\n"
+        f"  evaluation_metrics={evaluation_metrics}, primary_metric='{primary_metric}'\n\n"
         "Step 3.5 — If `current_stage` is `model_evaluated`, call `explain_model` to perform SHAP analysis:\n"
         "  model_path comes from best_model.model_path,\n"
-        "  featured_test_path = testing_feature_dataset_ids[best_model_name]，\n"
+        "  featured_test_path = testing_feature_dataset_ids[best_model_name],\n"
         "  target_column, model_name, and task_type are passed in from the task information above,\n"
         f" output_dir = '{run_dir + '/plots' if run_dir else ''}',\n"
-        "  max_samples=500，top_n_features=20。\n"
+        "  max_samples=500, top_n_features=20\n"
         "  If `explain_model` returns an error, log the cause and proceed to step 4 (SHAP failure does not interrupt the pipeline).\n\n"
         "Step 4 — When `current_stage` is `model_explained`, the tool is no longer called,\n"
         "  Brief summary: Final model name, comparison of metrics between cv_best_score and final_test_metrics,\n"
@@ -196,7 +196,7 @@ def _model_node(state: GlobalState) -> GlobalState:
         "  - The following chapter titles (in both Chinese and English) are strictly prohibited:\n"
         "    · 中文：业务建议 / 业务影响 / 业务洞察 / 业务推荐 / 业务价值 / 业务意义 /\n"
         "      行动建议 / 推荐操作 / 策略建议 / 战略建议 / 下一步 / 下一步行动 / 下一步操作 / 后续行动\n"
-        "    · English：Business Recommendation(s) / Business Insight(s) / Business Action(s) /\n"
+        "    · English: Business Recommendation(s) / Business Insight(s) / Business Action(s) /\n"
         "      Business Implication(s) / Business Value / Recommendation(s) / Recommended Action(s) /\n"
         "      Next Step(s) / Action Item(s) / Strategic Implication(s) / Strategic Recommendation(s)\n"
         "  - Do not discuss business-related topics such as marketing strategies, ROI, customer screening, thresholds, and business trade-offs\n"
@@ -406,14 +406,14 @@ def _build_model_report(state: GlobalState, llm_summary: str) -> str:
         rows_trained = sel.get("rows_trained", "")
 
         if status == "failed":
-            lines.append(f"**{name}** — ❌ Skip（{sel.get('error', 'Unknown error')}）\n")
+            lines.append(f"**{name}** — ❌ Skip ({sel.get('error', 'Unknown error')})\n")
         else:
             is_best = "✅ **Final choice**" if name == model_name else ""
             lines.append(f"**{name}** {is_best}")
-            lines.append(f"- CV {primary_metric or 'Score'}：**{cv_score}**（std={cv_std}）")
-            lines.append(f"- Search Strategy: {search_strategy}　Number of training samples: {rows_trained}")
+            lines.append(f"- CV {primary_metric or 'Score'}: **{cv_score}** (std={cv_std})")
+            lines.append(f"- Search Strategy: {search_strategy}  Number of training samples: {rows_trained}")
             if best_params:
-                params_str = "、".join(f"`{k}={v}`" for k, v in best_params.items())
+                params_str = ", ".join(f"`{k}={v}`" for k, v in best_params.items())
                 lines.append(f"- Optimal parameters: {params_str}")
             lines.append("")
             has_cv = True
@@ -453,8 +453,8 @@ def _build_model_report(state: GlobalState, llm_summary: str) -> str:
     shap = best_model.get("shap_explanation") or {}
     if shap and "error" not in shap:
         lines.append("### SHAP Feature Importance (Global)\n")
-        lines.append(f"Explainer：{shap.get('explainer_type', '')}　"
-                     f"Sample size：{shap.get('samples_explained', '')}\n")
+        lines.append(f"Explainer: {shap.get('explainer_type', '')}  "
+                     f"Sample size: {shap.get('samples_explained', '')}\n")
         fi = shap.get("feature_importance") or []
         if fi:
             lines.append("| Rank | Feature | mean\\|SHAP\\| | Direction |")
@@ -470,7 +470,7 @@ def _build_model_report(state: GlobalState, llm_summary: str) -> str:
             lines.append("")
         plot_path = shap.get("shap_summary_plot_path")
         if plot_path:
-            lines.append(f"SHAP Chart：`{plot_path}`\n")
+            lines.append(f"SHAP Chart: `{plot_path}`\n")
     elif shap.get("error"):
         lines.append(f"_SHAP parsing failed: {shap['error']}(Does not affect model metrics)_\n")
 
@@ -486,7 +486,7 @@ def _build_model_report(state: GlobalState, llm_summary: str) -> str:
             parts.append(f"Model size {size_kb} KB")
         if parts:
             lines.append("### Resource Metrics\n")
-            lines.append("　".join(parts) + "\n")
+            lines.append(" ".join(parts) + "\n")
 
     # ── 5. Predict file paths ─────────────────────────────────────────────────────
     pred_path = best_model.get("test_predictions_path")

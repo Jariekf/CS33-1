@@ -510,7 +510,7 @@ def _parse_tool_payload(tool_message: ToolMessage) -> dict[str, Any]:
         return {
             "error": {
                 "type": exc.__class__.__name__,
-                "message": "工具输出不是合法 JSON",
+                "message": "The tool's output is not valid JSON",
                 "raw_content_preview": raw_preview,
             }
         }
