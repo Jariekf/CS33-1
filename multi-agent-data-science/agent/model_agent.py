@@ -349,7 +349,7 @@ def _handle_tune_and_select(state: GlobalState, tool_message: ToolMessage) -> Gl
     per_model_summary = payload.get("per_model_summary") or {}
     existing = dict(state.get("model_results") or {})
     for model_name, summary in per_model_summary.items():
-        cv_best = float(summary.get("cv_best_score", -1))
+        cv_best = float(summary.get("cv_best_score") or -1)
         merged = dict(existing.get(model_name) or {})
         merged["metrics"] = {selection_metric: cv_best}
         merged["selection_metric"] = selection_metric

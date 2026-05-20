@@ -385,14 +385,25 @@ def tune_and_select_model(
             # ── Per-model fallback：单个模型失败不影响其他模型 ──────────────────
             try:
                 featured_train_path = feature_dataset_ids.get(model_name, "")
-                if not featured_train_path:
-                    raise ValueError(f"feature_dataset_ids 中缺少 '{model_name}' 的路径。")
+                if not featured_train_path or featured_train_path == "skipped":
+                    summary[model_name] = {"status": "skipped", "cv_best_score": None,
+                                           "error": "feature engineering was skipped for this model"}
+                    continue
 
                 df = pd.read_csv(featured_train_path)
                 if target_column not in df.columns:
                     raise ValueError(f"目标列 '{target_column}' 不在训练集中。")
 
                 feature_cols = [c for c in df.columns if c != target_column]
+
+                # Safety net: drop any remaining object-dtype columns that the
+                # feature_agent missed encoding. Avoids sklearn ValueError without
+                # touching evaluate_model or changing column counts in feature_columns.json.
+                # (Primary fix is PIPELINE_LLM_FEATURE=openai_strong; this is last resort.)
+                object_cols = [c for c in feature_cols if df[c].dtype == object]
+                if object_cols:
+                    feature_cols = [c for c in feature_cols if c not in object_cols]
+
                 X = df[feature_cols]
                 y = df[target_column]
 
