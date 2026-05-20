@@ -153,8 +153,8 @@ def _build_cv(cv_strategy: str, task_type: str, cv_folds: int) -> Any:
     if strategy == "timeseries":
         return TimeSeriesSplit(n_splits=cv_folds)
     if strategy == "stratified" or (strategy == "auto" and task_type == "classification"):
-        return StratifiedKFold(n_splits=cv_folds, shuffle=True, random_state=42)
-    return KFold(n_splits=cv_folds, shuffle=True, random_state=42)
+        return StratifiedKFold(n_splits=cv_folds, shuffle=True, random_state=331)
+    return KFold(n_splits=cv_folds, shuffle=True, random_state=331)
 
 
 def _get_param_space(model_name: str) -> dict[str, list[Any]]:
@@ -257,7 +257,7 @@ def tune_and_select_model(
     target_column: str,
     cv_folds: int = 5,
     max_iter_per_model: int = 12,
-    random_state: int = 42,
+    random_state: int = 331,
     scoring: str = "",
     cv_strategy: str = "auto",
     search_strategy: str = "random",
@@ -278,7 +278,7 @@ def tune_and_select_model(
       max_iter_per_model (int)：search_strategy="random"/"halving" 时每模型的采样次数上限，默认 12。
         search_strategy="grid" 时忽略此参数（穷举全部组合）。
         建议：参数维度 ≤ 2 → 8~12；维度 3~4 → 15~25；维度 ≥ 5 → 25~40。
-      random_state (int)：随机种子，默认 42。
+      random_state (int)：随机种子，默认 331。
       scoring (str)：评分指标，留空时使用任务默认值。
         分类可选：f1_weighted（默认）、f1_macro、roc_auc、accuracy、recall、precision、log_loss
           f1_macro   - 等权 per-class 平均，对少数类更敏感，适合类别不平衡场景
@@ -396,15 +396,11 @@ def tune_and_select_model(
 
                 feature_cols = [c for c in df.columns if c != target_column]
 
-                # Safety net: drop any remaining object-dtype columns that the
-                # feature_agent missed encoding. Avoids sklearn ValueError without
-                # touching evaluate_model or changing column counts in feature_columns.json.
-                # (Primary fix is PIPELINE_LLM_FEATURE=openai_strong; this is last resort.)
-                object_cols = [c for c in feature_cols if df[c].dtype == object]
-                if object_cols:
-                    feature_cols = [c for c in feature_cols if c not in object_cols]
-
-                X = df[feature_cols]
+                # Safety net: keep only numeric columns to guard against string
+                # columns (e.g. Geography='France') that feature_agent missed encoding.
+                # select_dtypes is more reliable than dtype==object comparisons.
+                X = df[feature_cols].select_dtypes(include="number")
+                feature_cols = list(X.columns)
                 y = df[target_column]
 
                 estimator = _get_model(model_name)

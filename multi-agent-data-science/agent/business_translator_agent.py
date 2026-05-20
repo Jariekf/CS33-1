@@ -161,6 +161,17 @@ def _resolve_chart_rel_paths(state: GlobalState) -> list[dict[str, str]]:
     if not raw_charts:
         eda = state.get("eda_report") or {}
         raw_charts = list(eda.get("charts") or [])
+    # Fallback: scan plots/ directory directly when state keys are missing
+    # (e.g. after supervisor retry overwrites eda_report without re-saving eda_charts)
+    if not raw_charts:
+        run_dir = state.get("run_dir") or ""
+        if run_dir:
+            plots_dir = Path(run_dir) / "plots"
+            if plots_dir.exists():
+                raw_charts = [
+                    {"name": p.name, "path": str(p), "desc": p.stem.replace("_", " ")}
+                    for p in sorted(plots_dir.glob("*.png"))
+                ]
     if not raw_charts:
         return []
 

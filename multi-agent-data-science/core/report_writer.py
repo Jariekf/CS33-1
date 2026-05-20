@@ -184,7 +184,7 @@ def save_agent_report(agent_name: str, message: Any, model: str = "", run_dir: s
     if agent_name != "business_translator":
         filtered = _strip_non_bat_recommendations(content)
         if not filtered.strip():
-            filtered = "_（业务建议章节已被过滤；该 agent 不负责业务建议。）_"
+            filtered = "_(Business recommendation sections were filtered; this agent is not responsible for business insights.)_"
         content = filtered
 
     timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
@@ -216,16 +216,16 @@ def append_manager_rap_midlayer_to_report(state: dict[str, Any]) -> str | None:
         text = text.strip()
         if len(text) <= n:
             return text
-        return text[:n] + f"\n\n…（已截断，共 {len(text)} 字符）"
+        return text[:n] + f"\n\n... (truncated, {len(text)} chars total)"
 
     queries = meta.get("queries_used") or []
     queries_s = ", ".join(str(q) for q in queries) if queries else "(none)"
     err_list = meta.get("errors") or []
 
     lines = [
-        f"## Manager RAP · 中层检测 `{ts}`",
+        f"## Manager RAP · Mid-layer Audit `{ts}`",
         "",
-        "### 指标（`manager_rap_meta`）",
+        "### Metrics (`manager_rap_meta`)",
         "",
         f"- **rap_enabled**: {meta.get('rap_enabled', '')}",
         f"- **summary_json_parse_ok**: {meta.get('summary_json_parse_ok', '')}",
@@ -234,7 +234,7 @@ def append_manager_rap_midlayer_to_report(state: dict[str, Any]) -> str | None:
         f"- **retrieval_bundle_empty_rate**: {meta.get('retrieval_bundle_empty_rate', '')}",
         f"- **arxiv_raw_chars / web_raw_chars**: {meta.get('arxiv_raw_chars', '')} / {meta.get('web_raw_chars', '')}",
         f"- **queries_used**: {queries_s}",
-        f"- **fusion_empty_rate**（无检索片段可供融合时为 1.0）: {meta.get('fusion_empty_rate', '')}",
+        f"- **fusion_empty_rate** (1.0 when no retrieval fragments available): {meta.get('fusion_empty_rate', '')}",
         f"- **fusion_fallback_used**: {meta.get('fallback_used', '')}",
         f"- **fusion_text_empty_rate**: {meta.get('fusion_text_empty_rate', '')}",
         f"- **fusion_line_repetition_rate**: {meta.get('fusion_line_repetition_rate', '')}",
@@ -244,7 +244,7 @@ def append_manager_rap_midlayer_to_report(state: dict[str, Any]) -> str | None:
     if meta.get("summary_error"):
         lines.append(f"- **summary_error**: {meta.get('summary_error')}")
     if err_list:
-        lines.append("- **errors（前 3 条）**: " + " | ".join(str(e) for e in err_list[:3]))
+        lines.append("- **errors (top 3)**: " + " | ".join(str(e) for e in err_list[:3]))
     lines.extend(
         [
             "",

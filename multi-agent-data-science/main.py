@@ -26,6 +26,7 @@ from langchain_core.messages import HumanMessage
 from agent.agent_manager import _pretty_print_message
 from core.graph import build_full_pipeline
 from core.my_llm import TOKEN_COUNTER
+from core.report_writer import save_state_snapshot
 
 _DIVIDER = "=" * 60
 _COL = 28
@@ -146,6 +147,11 @@ def run_pipeline(
             print(f"\n[best_model] {bm.get('model_name')}  metrics={bm.get('metrics')}")
 
     pipeline_end = time.time()
+
+    # Final snapshot includes business_translator timing; older snapshots
+    # (e.g. model_agent finalize) omit BAT and break benchmark phase totals.
+    if final_state.get("run_dir"):
+        save_state_snapshot(final_state)
 
     print(f"\n{_DIVIDER}")
     print("流水线运行完毕")

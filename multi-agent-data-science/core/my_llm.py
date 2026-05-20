@@ -96,7 +96,7 @@ llm_deepseek = ChatOpenAI(
 
 llm_openai = ChatOpenAI(
     model=OPENAI_MODEL or "gpt-4o-mini",
-    temperature=0.7,
+    temperature=0.5,
     api_key=OPENAI_API_KEY,
     base_url=OPENAI_BASEURL,
     callbacks=_CB,

@@ -14,6 +14,7 @@ Results are stored in best_model["shap_explanation"] by model_agent._handle_expl
 from __future__ import annotations
 
 import json
+import os
 import pickle
 from pathlib import Path
 from typing import Any
@@ -77,6 +78,8 @@ def explain_model(
         "top_n_features": top_n_features,
     }
     try:
+        # Avoid tqdm progress lines interleaving with downstream benchmark prints on Windows.
+        os.environ.setdefault("TQDM_DISABLE", "1")
         import shap
     except ImportError:
         output = json.dumps(
@@ -87,6 +90,9 @@ def explain_model(
         return output
 
     try:
+        max_samples = int(max_samples)
+        top_n_features = int(top_n_features)
+
         # ── 加载模型和特征数据 ──────────────────────────────────────────────
         with open(model_path, "rb") as f:
             model = pickle.load(f)
@@ -95,12 +101,40 @@ def explain_model(
         if target_column not in test_df.columns:
             raise ValueError(f"目标列 '{target_column}' 不在测试集中。")
 
-        feature_cols = [c for c in test_df.columns if c != target_column]
-        X = test_df[feature_cols]
+        # Align X with train_model / evaluate_model using feature_columns JSON
+        # (same directory as the .pkl). Avoids passing stray string columns into
+        # sklearn + SHAP (can raise confusing TypeErrors inside shap).
+        feat_path = Path(model_path).parent / f"{model_name}_feature_columns.json"
+        if feat_path.is_file():
+            feature_cols = json.loads(
+                feat_path.read_text(encoding="utf-8")
+            )
+            X = pd.DataFrame(index=test_df.index)
+            for col in feature_cols:
+                s = (
+                    test_df[col]
+                    if col in test_df.columns
+                    else pd.Series(0, index=test_df.index, dtype=float)
+                )
+                X[col] = pd.to_numeric(s, errors="coerce")
+            X = X.fillna(0.0)
+        else:
+            feature_cols = [c for c in test_df.columns if c != target_column]
+            X = test_df[feature_cols]
+            for col in X.columns:
+                X[col] = pd.to_numeric(X[col], errors="coerce")
+            X = X.fillna(0.0)
+
+        feature_cols = list(X.columns)
+        if X.shape[1] == 0:
+            raise ValueError(
+                "No feature columns left for SHAP after alignment; "
+                "check featured test CSV and feature_columns.json."
+            )
 
         # ── 采样（针对慢速 explainer）──────────────────────────────────────
         if len(X) > max_samples:
-            X = X.sample(n=max_samples, random_state=42).reset_index(drop=True)
+            X = X.sample(n=max_samples, random_state=331).reset_index(drop=True)
         samples_explained = len(X)
 
         # ── 构建 SHAP Explainer（auto-dispatch）────────────────────────────

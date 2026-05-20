@@ -5,39 +5,39 @@ from langchain_core.tools import tool
 
 from tools.tool_trace import trace_tool_call
 
-# ── Metrics 白名单 ────────────────────────────────────────────────────────────
-# primary_metric / evaluation_metrics 均使用人类可读名（rmse/mae 而非 neg_* 前缀）
-# tune_and_select_model 内部会做 rmse→neg_root_mean_squared_error 的映射
+# ── Metrics whitelist ─────────────────────────────────────────────────────────
+# primary_metric / evaluation_metrics use human-readable names (rmse/mae, not neg_* prefixes).
+# tune_and_select_model maps rmse → neg_root_mean_squared_error internally.
 CLASSIFICATION_METRICS = {"accuracy", "f1_macro", "f1_weighted", "roc_auc", "precision", "recall", "log_loss"}
 REGRESSION_METRICS = {"r2", "rmse", "mae", "mape", "rmsle", "max_error"}
 
 CLASSIFICATION_POOL = [
-    "LogisticRegression",    # 线性基线，可解释性强
-    "RandomForest",          # 集成树，稳定、抗噪
-    "XGBoost",               # 梯度提升，竞赛级性能
-    "LightGBM",              # 更快的梯度提升，大数据集优先
-    "GradientBoosting",      # sklearn 原生梯度提升，无需额外依赖
-    "ExtraTrees",            # 极端随机树，速度快、方差低
-    "AdaBoost",              # 自适应提升，对不平衡数据有效
-    "SVM",                   # 核方法，中小数据集表现好
-    "KNN",                   # 实例学习，无参数假设
-    "GaussianNB",            # 朴素贝叶斯，极快的概率基线
-    "MLPClassifier",         # 多层感知机，数值特征多/样本量大时有优势
+    "LogisticRegression",    # linear baseline, highly interpretable
+    "RandomForest",          # ensemble tree, stable and noise-resistant
+    "XGBoost",               # gradient boosting, competition-grade performance
+    "LightGBM",              # faster gradient boosting, preferred for large datasets
+    "GradientBoosting",      # sklearn native gradient boosting, no extra dependencies
+    "ExtraTrees",            # extremely randomized trees, fast with low variance
+    "AdaBoost",              # adaptive boosting, effective on imbalanced data
+    "SVM",                   # kernel method, strong on small-to-medium datasets
+    "KNN",                   # instance-based learning, no parametric assumptions
+    "GaussianNB",            # naive Bayes, very fast probabilistic baseline
+    "MLPClassifier",         # multi-layer perceptron, good when features are dense / samples are large
 ]
 
 REGRESSION_POOL = [
-    "LinearRegression",          # 线性基线
-    "Ridge",                     # L2 正则，防共线性
-    "Lasso",                     # L1 正则，内置特征选择
-    "ElasticNet",                # L1+L2，兼顾稀疏与稳定
-    "HuberRegressor",            # 鲁棒回归，对异常值不敏感
-    "RandomForestRegressor",     # 集成树
-    "XGBoostRegressor",          # 梯度提升
-    "LightGBMRegressor",         # 更快的梯度提升
-    "GradientBoostingRegressor", # sklearn 原生梯度提升
-    "ExtraTreesRegressor",       # 极端随机树
-    "SVR",                       # 支持向量回归
-    "MLPRegressor",              # 多层感知机，复杂非线性关系时可选
+    "LinearRegression",          # linear baseline
+    "Ridge",                     # L2 regularisation, handles multicollinearity
+    "Lasso",                     # L1 regularisation, built-in feature selection
+    "ElasticNet",                # L1+L2, balances sparsity and stability
+    "HuberRegressor",            # robust regression, insensitive to outliers
+    "RandomForestRegressor",     # ensemble tree
+    "XGBoostRegressor",          # gradient boosting
+    "LightGBMRegressor",         # faster gradient boosting
+    "GradientBoostingRegressor", # sklearn native gradient boosting
+    "ExtraTreesRegressor",       # extremely randomized trees
+    "SVR",                       # support vector regression
+    "MLPRegressor",              # multi-layer perceptron, optional for complex non-linear relationships
 ]
 
 
@@ -121,7 +121,7 @@ def select_candidate_models_and_metrics(
         "metrics_rationale": metrics_rationale,
     }
     try:
-        # ── 模型名校验 ────────────────────────────────────────────────────────
+        # ── Model name validation ─────────────────────────────────────────────
         pool = CLASSIFICATION_POOL if task_type == "classification" else REGRESSION_POOL
         invalid_models = [m for m in selected_models if m not in pool]
         if invalid_models:
@@ -129,7 +129,7 @@ def select_candidate_models_and_metrics(
         if len(selected_models) != 3:
             raise ValueError(f"必须选择恰好 3 个模型，收到 {len(selected_models)} 个。")
 
-        # ── Metrics 校验 ──────────────────────────────────────────────────────
+        # ── Metrics validation ────────────────────────────────────────────────
         allowed = CLASSIFICATION_METRICS if task_type == "classification" else REGRESSION_METRICS
         if primary_metric not in allowed:
             raise ValueError(

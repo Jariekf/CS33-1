@@ -1,4 +1,4 @@
-"""Split Agent：先推断任务类型，再切分数据集。"""
+"""Split Agent: infer task type then split the dataset."""
 
 from __future__ import annotations
 
@@ -140,18 +140,18 @@ def _show_graph(compiled) -> None:
     out.mkdir(parents=True, exist_ok=True)
     mmd_path = out / "split_agent_graph.mmd"
     mmd_path.write_text(compiled.get_graph().draw_mermaid(), encoding="utf-8")
-    print(f"Split Agent Mermaid 源码已保存: {mmd_path}")
+    print(f"Split Agent Mermaid source saved: {mmd_path}")
     try:
         path = out / "split_agent_graph.png"
         path.write_bytes(compiled.get_graph().draw_mermaid_png())
-        print(f"Split Agent Graph 已保存: {path}")
+        print(f"Split Agent graph saved: {path}")
     except Exception as exc:
-        print(f"图渲染失败: {exc}")
+        print(f"Graph render failed: {exc}")
 
 
 if __name__ == "__main__":
     agent = build_split_agent(show_graph=True)
-    user_input = input("请输入：")
+    user_input = input("Enter: ")
     events = agent.stream(
         {
             "messages": [HumanMessage(content=user_input)],
