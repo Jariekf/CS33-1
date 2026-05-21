@@ -1,0 +1,1 @@
+Retail bank direct marketing team running telephone campaigns to sell term deposit products. Predict which clients are likely to subscribe to optimise call-centre resource allocation and campaign targeting. Highlight the client profile segments and contact behaviour features most predictive of subscription, and recommend prioritisation criteria for future outreach.
