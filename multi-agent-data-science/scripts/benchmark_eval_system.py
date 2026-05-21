@@ -1,30 +1,13 @@
 """Our System Benchmark Evaluation Script
 ------------------------------------------
 Reads a completed pipeline run-dir, extracts all metrics from the state
-snapshot, computes interpretability scores from run artifacts, and **upserts**
-a structured record into the shared experiment log (JSONL + CSV): the same
-``run_dir`` + competition + system_name overwrites the previous row instead of
-duplicating.
+snapshot (*_state.json), computes ACS and BAT Report Maturity scores from
+run artifacts, and upserts a structured record into the shared experiment
+log (JSONL + CSV).  The same (run_dir, competition, system_name) triple
+overwrites the previous row instead of duplicating.
 
-Usage:
-    python benchmark_eval_system.py \\
-        --run-dir  artifacts/workspace/2026-05-16-00-39 \\
-        --competition house_prices \\
-        --test  path/to/split_test_with_labels.csv \\
-        [--description-file datasets/house_prices/data_description.txt] \\
-        [--system-name "OurSystem"] \\
-        [--system-type "multi-agent DS pipeline"]
-
-Required:
-    --run-dir        Run output directory created by main.py
-    --competition    One of: bank_churn | house_prices | obesity_risks |
-                     classification_with_an_academic_success_dataset
-    --test           Split test CSV that includes the true label column
-
-Optional:
-    --description-file   Data description .txt (for Semantic Alignment Score)
-    --system-name        Label stored in experiment record (default: OurSystem)
-    --system-type        Label stored in experiment record
+All metrics are read from the state snapshot; no separate test-label CSV
+is required.  Run ``python benchmark_eval_system.py --help`` for CLI usage.
 """
 
 import argparse
@@ -396,60 +379,186 @@ def _semantic_alignment(state: dict, run_dir: str, description_file: str) -> dic
 
 
 # 3) BAT Report Maturity ─────────────────────────────────────────────────────
+# Weighted three-layer score: L1 Evidence=0.3, L2 Interpretation=0.3, L3 Action=0.4
+# Each layer has N binary sub-checks; layer_score = passed_in_layer / N.
+# Final: brm_score = L1*0.3 + L2*0.3 + L3*0.4
 
 _MCKINSEY_SECTION_PATTERNS = [
     r"executive\s+summary", r"key\s+finding", r"strategic\s+(implication|recommendation)",
     r"business\s+(insight|implication|recommendation)", r"action\s+(item|plan|recommendation)",
     r"next\s+step", r"conclusion",
-    r"执行摘要", r"核心发现", r"关键发现", r"战略建议", r"业务洞察",
-    r"行动建议", r"下一步", r"结论", r"结语",
 ]
 _MCKINSEY_RE = re.compile("|".join(_MCKINSEY_SECTION_PATTERNS), re.IGNORECASE)
 
+# L1 — Evidence layer regexes (l1_external_evidence is state-based, not text-based)
+_L1_EDA_CHART_RE   = re.compile(r"plots[\\/][\w\-]+\.png", re.IGNORECASE)
+_L1_MODEL_CHART_RE = re.compile(
+    r"explain[\\/][\w\-]+\.png|shap[\w\-]*\.png|importance[\w\-]*\.png|rf_[\w\-]+\.png",
+    re.IGNORECASE,
+)
 
-def _bat_report_maturity(state: dict, run_dir: str) -> dict:
+# L2 — Interpretation layer regexes
+_L2_IMPLICATION_RE = re.compile(r"\*{0,2}Implication\*{0,2}\s*:", re.IGNORECASE)
+
+# SAS pass threshold: semantic alignment score ≥ this value counts as l2_semantic_alignment
+_L2_SAS_THRESHOLD = 0.5
+
+# L3 — Action layer regexes
+_L3_SCQA_EXEC_RE   = re.compile(r"executive\s+summary", re.IGNORECASE)
+_L3_SCQA_SIT_RE    = re.compile(r"situation|complication", re.IGNORECASE)
+_L3_ACTION_SEC_RE  = re.compile(r"recommended\s+action|action\s+plan", re.IGNORECASE)
+_L3_SPECIFICITY_RE = re.compile(r"owner\s*:|metric\s*:|timeframe\s*:", re.IGNORECASE)
+
+
+def _bat_report_maturity(
+    state: dict,
+    run_dir: str,
+    pa_score: float | None = None,
+    sas_score: float | None = None,
+) -> dict:
     """
-    3-component score (each 0 or 1 → total / 3):
-      1. RAG loaded      – bat_rag_buckets in state is non-empty
-      2. McKinsey struct  – business_insight_report.md contains ≥2 McKinsey-style headings
-      3. Chart refs       – business_insight_report.md references ≥1 image
+    BAT Report Maturity — weighted four-component score (replaces [INTERPRETABILITY]).
+
+    PA   Plan Adherence   (weight 0.1): pass-through of pre-computed pa_score
+    L1   Evidence         (weight 0.2, 3 checks):
+      l1_chart_eda        — ≥1 EDA chart (plots/*.png) embedded in report
+      l1_chart_model      — ≥1 model-explanation chart (explain/*.png / shap / rf_)
+      l1_external_evidence— RAP succeeded: bat_rag_buckets non-empty OR bat_arxiv_papers
+                            non-empty (state-level check; independent of report text)
+    L2   Interpretation   (weight 0.3, 2 checks):
+      l2_implication_presence — ≥2 'Implication:' paragraphs in Key Findings
+      l2_semantic_alignment   — pre-computed SAS score ≥ _L2_SAS_THRESHOLD (0.5)
+    L3   Action           (weight 0.4, 4 checks):
+      l3_mckinsey_structure — ≥2 McKinsey-style section headings
+      l3_scqa_structure     — both Executive Summary AND Situation/Complication headings
+      l3_action_section     — Recommended Actions heading present
+      l3_action_specificity — ≥1 action with Owner + Metric + Timeframe triple
+
+    Final: brm_score = pa_score*0.1 + l1_score*0.2 + l2_score*0.3 + l3_score*0.4
     """
     detail: dict = {}
 
-    bats = state.get("bat_rag_buckets")
-    rag_loaded = bool(
-        bats and isinstance(bats, dict) and
-        any(len(v) > 0 for v in bats.values() if isinstance(v, list))
+    # ── L1 external_evidence: state-level RAP check ───────────────────────────
+    # Succeeds if either the vector-DB RAG buckets OR the ArXiv fallback returned results.
+    rag_buckets = state.get("bat_rag_buckets") or {}
+    rag_hit = bool(
+        rag_buckets and any(
+            isinstance(v, list) and len(v) > 0 for v in rag_buckets.values()
+        )
     )
-    detail["rag_loaded"] = rag_loaded
+    arxiv_papers = state.get("bat_arxiv_papers") or []
+    arxiv_hit    = bool(arxiv_papers)
+    rap_success  = rag_hit or arxiv_hit
+
+    detail["l1_external_evidence"]  = rap_success
+    detail["l1_ext_rag_hit"]        = rag_hit
+    detail["l1_ext_arxiv_hit"]      = arxiv_hit
+
+    # ── PA pass-through ───────────────────────────────────────────────────────
+    pa_val = pa_score if pa_score is not None else 0.0
+    detail["pa_score"] = pa_val
 
     bat_path = Path(run_dir) / "reports" / "business_insight_report.md"
     if not bat_path.exists():
-        detail["mckinsey_structure"] = False
-        detail["chart_references"]   = False
-        detail["note"]               = "business_insight_report.md not found"
-        return {"score": round((1 if rag_loaded else 0) / 3, 4),
-                "passed": 1 if rag_loaded else 0, "total": 3, "detail": detail}
+        for k in (
+            "l1_chart_eda", "l1_chart_model",
+            "l2_implication_presence", "l2_semantic_alignment",
+            "l3_mckinsey_structure", "l3_scqa_structure",
+            "l3_action_section", "l3_action_specificity",
+        ):
+            detail[k] = False
+        detail["note"] = "business_insight_report.md not found"
+        l1_passed = int(rap_success)
+        sas_pass  = sas_score is not None and sas_score >= _L2_SAS_THRESHOLD
+        detail["l2_semantic_alignment"] = sas_pass
+        detail["l2_sas_score"]          = sas_score
+        l2_passed = int(sas_pass)
+        brm_score = round(pa_val * 0.1 + l1_passed / 3 * 0.2 + l2_passed / 2 * 0.3, 4)
+        return {
+            "score":    brm_score,
+            "pa_score": pa_val,
+            "l1_score": round(l1_passed / 3, 4), "l2_score": round(l2_passed / 2, 4), "l3_score": 0.0,
+            "l1_passed": l1_passed, "l1_total": 3,
+            "l2_passed": l2_passed, "l2_total": 2,
+            "l3_passed": 0, "l3_total": 4,
+            "detail": detail,
+        }
 
     report_text = bat_path.read_text(encoding="utf-8", errors="ignore")
 
-    mckinsey_hits = _MCKINSEY_RE.findall(report_text)
-    detail["mckinsey_structure"]  = len(mckinsey_hits) >= 2
-    detail["mckinsey_hits_count"] = len(mckinsey_hits)
+    # ── L1 Evidence (chart checks; external_evidence already set above) ───────
+    eda_hits   = _L1_EDA_CHART_RE.findall(report_text)
+    model_hits = _L1_MODEL_CHART_RE.findall(report_text)
 
-    chart_refs = re.findall(
-        r"!\[.*?\]\(.*?\)|plots[\\/][\w\-]+\.png|explain[\\/][\w\-]+\.png|\.png",
-        report_text, re.IGNORECASE,
-    )
-    detail["chart_references"] = len(chart_refs) >= 1
-    detail["chart_ref_count"]  = len(chart_refs)
+    detail["l1_chart_eda"]         = len(eda_hits) >= 1
+    detail["l1_chart_eda_count"]   = len(eda_hits)
+    detail["l1_chart_model"]       = len(model_hits) >= 1
+    detail["l1_chart_model_count"] = len(model_hits)
 
-    passed = sum([
-        1 if rag_loaded else 0,
-        1 if detail["mckinsey_structure"] else 0,
-        1 if detail["chart_references"] else 0,
-    ])
-    return {"score": round(passed / 3, 4), "passed": passed, "total": 3, "detail": detail}
+    l1_passed = sum(int(detail[k]) for k in ("l1_chart_eda", "l1_chart_model", "l1_external_evidence"))
+    l1_score  = round(l1_passed / 3, 4)
+
+    # ── L2 Interpretation ────────────────────────────────────────────────────
+    impl_hits = _L2_IMPLICATION_RE.findall(report_text)
+    sas_pass  = sas_score is not None and sas_score >= _L2_SAS_THRESHOLD
+
+    detail["l2_implication_presence"] = len(impl_hits) >= 2
+    detail["l2_implication_count"]    = len(impl_hits)
+    detail["l2_semantic_alignment"]   = sas_pass
+    detail["l2_sas_score"]            = sas_score
+
+    l2_passed = sum(int(detail[k]) for k in ("l2_implication_presence", "l2_semantic_alignment"))
+    l2_score  = round(l2_passed / 2, 4)
+
+    # ── L3 Action ────────────────────────────────────────────────────────────
+    mck_hits    = _MCKINSEY_RE.findall(report_text)
+    has_exec    = bool(_L3_SCQA_EXEC_RE.search(report_text))
+    has_sit     = bool(_L3_SCQA_SIT_RE.search(report_text))
+    has_action  = bool(_L3_ACTION_SEC_RE.search(report_text))
+
+    # action specificity: scan only the Recommended Actions section for the triple
+    action_block = ""
+    action_match = _L3_ACTION_SEC_RE.search(report_text)
+    if action_match:
+        action_block = report_text[action_match.start():]
+    spec_hits = _L3_SPECIFICITY_RE.findall(action_block)
+    # need owner+metric+timeframe — check each specifier type independently
+    spec_types  = {h.rstrip(": ").lower() for h in spec_hits}
+    owner_ok    = "owner" in spec_types
+    metric_ok   = "metric" in spec_types
+    time_ok     = "timeframe" in spec_types
+    specificity = owner_ok and metric_ok and time_ok
+
+    detail["l3_mckinsey_structure"]     = len(mck_hits) >= 2
+    detail["l3_mckinsey_hits_count"]    = len(mck_hits)
+    detail["l3_scqa_structure"]         = has_exec and has_sit
+    detail["l3_scqa_has_exec"]          = has_exec
+    detail["l3_scqa_has_situation"]     = has_sit
+    detail["l3_action_section"]         = has_action
+    detail["l3_action_specificity"]     = specificity
+    detail["l3_specificity_owner"]      = owner_ok
+    detail["l3_specificity_metric"]     = metric_ok
+    detail["l3_specificity_timeframe"]  = time_ok
+
+    l3_passed = sum(int(detail[k]) for k in (
+        "l3_mckinsey_structure", "l3_scqa_structure",
+        "l3_action_section", "l3_action_specificity",
+    ))
+    l3_score = round(l3_passed / 4, 4)
+
+    brm_score = round(pa_val * 0.1 + l1_score * 0.2 + l2_score * 0.3 + l3_score * 0.4, 4)
+
+    return {
+        "score":    brm_score,
+        "pa_score": pa_val,
+        "l1_score": l1_score,
+        "l2_score": l2_score,
+        "l3_score": l3_score,
+        "l1_passed": l1_passed, "l1_total": 3,
+        "l2_passed": l2_passed, "l2_total": 2,
+        "l3_passed": l3_passed, "l3_total": 4,
+        "detail":   detail,
+    }
 
 
 # ── CSV helpers ───────────────────────────────────────────────────────────────
@@ -495,9 +604,21 @@ def _flatten_record(record: dict) -> dict:
         r[f"rt_{abbrev}_s"] = by_rt.get(phase)
 
     interp = results.get("interpretability", {})
-    r["pa_score"]  = (interp.get("plan_adherence") or {}).get("score")
-    r["sas_score"] = (interp.get("semantic_alignment") or {}).get("score")
-    r["brm_score"] = (interp.get("bat_report_maturity") or {}).get("score")
+    brm = interp.get("bat_report_maturity") or {}
+    r["brm_score"]    = brm.get("score")
+    r["brm_pa_score"] = brm.get("pa_score")
+    r["brm_l1_score"] = brm.get("l1_score")
+    r["brm_l2_score"] = brm.get("l2_score")
+    r["brm_l3_score"] = brm.get("l3_score")
+    brm_detail = brm.get("detail") or {}
+    for key in (
+        "l1_chart_eda", "l1_chart_model", "l1_external_evidence",
+        "l2_implication_presence", "l2_semantic_alignment",
+        "l3_mckinsey_structure", "l3_scqa_structure",
+        "l3_action_section", "l3_action_specificity",
+    ):
+        r[f"brm_{key}"] = int(brm_detail[key]) if isinstance(brm_detail.get(key), bool) else brm_detail.get(key)
+    r["brm_l2_sas_score"] = brm_detail.get("l2_sas_score")
 
     return r
 
@@ -582,7 +703,6 @@ def _upsert_csv(record: dict) -> None:
 def evaluate(
     run_dir: str,
     competition: str,
-    test_path: str,
     description_file: str = "",
     system_name: str = "MAC-ADS",
     system_type: str = "multi-agent DS pipeline",
@@ -604,7 +724,11 @@ def evaluate(
 
     pa  = _plan_adherence(state, run_dir_key)
     sas = _semantic_alignment(state, run_dir_key, description_file)
-    brm = _bat_report_maturity(state, run_dir_key)
+    brm = _bat_report_maturity(
+        state, run_dir_key,
+        pa_score=pa["score"],
+        sas_score=sas.get("score"),
+    )
     interpretability = {
         "plan_adherence":      pa,
         "semantic_alignment":  sas,
@@ -659,13 +783,39 @@ def evaluate(
     else:
         lines.append("    (token_usage.json not found -- run with updated main.py)")
 
-    lines.append("  [INTERPRETABILITY]")
-    lines.append(f"    Plan Adherence         : {pa['score']}  "
-                 f"({pa['passed']}/{pa['total']} checks passed)")
-    lines.append(f"    Semantic Alignment     : {sas.get('score')}  "
-                 f"({sas.get('columns_found', 0)}/{sas.get('columns_total', 0)} columns)")
-    lines.append(f"    BAT Report Maturity    : {brm['score']}  "
-                 f"({brm.get('passed', '?')}/{brm.get('total', 3)} components ok)")
+    def _ck(v: bool) -> str:
+        return "✓" if v else "✗"
+
+    brm_d = brm.get("detail") or {}
+    lines.append("  [BAT REPORT MATURITY]")
+    lines.append(f"    BRM Score : {brm['score']}  "
+                 f"(PA×0.1 + L1×0.2 + L2×0.3 + L3×0.4)")
+    lines.append(
+        f"    Plan Adherence      (PA): {brm.get('pa_score', 0.0):.4f}"
+        f"  ({pa['passed']}/{pa['total']} pipeline checks)"
+    )
+    lines.append(
+        f"    Evidence            (L1): {brm.get('l1_score', 0.0):.4f}"
+        f"  {brm.get('l1_passed', '?')}/{brm.get('l1_total', 3)}"
+        f"  EDA-chart{_ck(brm_d.get('l1_chart_eda', False))}"
+        f"  Model-chart{_ck(brm_d.get('l1_chart_model', False))}"
+        f"  RAP{_ck(brm_d.get('l1_external_evidence', False))}"
+    )
+    lines.append(
+        f"    Interpretation      (L2): {brm.get('l2_score', 0.0):.4f}"
+        f"  {brm.get('l2_passed', '?')}/{brm.get('l2_total', 2)}"
+        f"  Implication{_ck(brm_d.get('l2_implication_presence', False))}"
+        f"  SAS{_ck(brm_d.get('l2_semantic_alignment', False))}"
+        f"(score={brm_d.get('l2_sas_score')})"
+    )
+    lines.append(
+        f"    Action              (L3): {brm.get('l3_score', 0.0):.4f}"
+        f"  {brm.get('l3_passed', '?')}/{brm.get('l3_total', 4)}"
+        f"  McKinsey{_ck(brm_d.get('l3_mckinsey_structure', False))}"
+        f"  SCQA{_ck(brm_d.get('l3_scqa_structure', False))}"
+        f"  Actions{_ck(brm_d.get('l3_action_section', False))}"
+        f"  Specificity{_ck(brm_d.get('l3_action_specificity', False))}"
+    )
     lines.append(SEP)
 
     # Flush pending progress bars / logging so this block does not interleave.
@@ -714,13 +864,11 @@ Examples:
   python benchmark_eval_system.py \\
       --run-dir  artifacts/workspace/2026-05-16-00-39 \\
       --competition house_prices \\
-      --test  datasets/house_prices/split_test_with_labels.csv \\
       --description-file datasets/house_prices/data_description.txt
 
   python benchmark_eval_system.py \\
       --run-dir  artifacts/workspace/2026-05-16-01-00 \\
       --competition bank_churn \\
-      --test  datasets/bank_churn/split_test_with_labels.csv \\
       --description-file datasets/bank_churn/data_description.txt \\
       --system-name "OurSystem-v1"
 """,
@@ -729,10 +877,8 @@ Examples:
                         help="Run output directory (contains reports/*_state.json)")
     parser.add_argument("--competition", required=True,
                         choices=list(COMPETITION_CONFIG.keys()))
-    parser.add_argument("--test",        required=True,
-                        help="Split test CSV with true label column")
     parser.add_argument("--description-file", default="", dest="description_file",
-                        help="Data description .txt for Semantic Alignment Score")
+                        help="Data description .txt; enables the SAS check inside BAT Report Maturity (L2)")
     parser.add_argument("--system-name", default="MAC-ADS")
     parser.add_argument("--system-type", default="multi-agent DS pipeline")
     args = parser.parse_args()
@@ -740,7 +886,6 @@ Examples:
     evaluate(
         run_dir=args.run_dir,
         competition=args.competition,
-        test_path=args.test,
         description_file=args.description_file,
         system_name=args.system_name,
         system_type=args.system_type,
