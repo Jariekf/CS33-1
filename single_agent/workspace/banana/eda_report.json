@@ -1,0 +1,181 @@
+{
+  "stage": "eda_analysis",
+  "status": "completed",
+  "leakage_policy": {
+    "data_quality_scope": "cleaned_data",
+    "feature_target_analysis_scope": "train_data_only",
+    "test_data_used_for_feature_target_analysis": false
+  },
+  "dataset_overview": {
+    "rows": 1000,
+    "columns": 16,
+    "numeric_columns": [
+      "sample_id",
+      "quality_score",
+      "ripeness_index",
+      "sugar_content_brix",
+      "firmness_kgf",
+      "length_cm",
+      "weight_g",
+      "tree_age_years",
+      "altitude_m",
+      "rainfall_mm",
+      "soil_nitrogen_ppm"
+    ],
+    "categorical_columns": [
+      "variety",
+      "region",
+      "quality_category",
+      "ripeness_category",
+      "harvest_date"
+    ],
+    "missing_ratio": {
+      "sample_id": 0.0,
+      "variety": 0.0,
+      "region": 0.0,
+      "quality_score": 0.0,
+      "quality_category": 0.0,
+      "ripeness_index": 0.0,
+      "ripeness_category": 0.0,
+      "sugar_content_brix": 0.0,
+      "firmness_kgf": 0.0,
+      "length_cm": 0.0,
+      "weight_g": 0.0,
+      "harvest_date": 0.0,
+      "tree_age_years": 0.0,
+      "altitude_m": 0.0,
+      "rainfall_mm": 0.0,
+      "soil_nitrogen_ppm": 0.0
+    },
+    "dtypes": {
+      "sample_id": "int64",
+      "variety": "object",
+      "region": "object",
+      "quality_score": "float64",
+      "quality_category": "object",
+      "ripeness_index": "float64",
+      "ripeness_category": "object",
+      "sugar_content_brix": "float64",
+      "firmness_kgf": "float64",
+      "length_cm": "float64",
+      "weight_g": "float64",
+      "harvest_date": "object",
+      "tree_age_years": "float64",
+      "altitude_m": "float64",
+      "rainfall_mm": "float64",
+      "soil_nitrogen_ppm": "float64"
+    },
+    "duplicate_rows": 0
+  },
+  "feature_quality": {
+    "high_missing_columns": [],
+    "high_cardinality_columns": [
+      "harvest_date"
+    ],
+    "id_like_columns": [
+      "sample_id",
+      "weight_g",
+      "altitude_m",
+      "rainfall_mm"
+    ],
+    "constant_columns": []
+  },
+  "target_analysis": {
+    "target_column": "quality_score",
+    "task_type": "regression",
+    "mean": 2.4742499999999996,
+    "median": 2.44,
+    "std": 0.5385624377676349,
+    "min": 0.92,
+    "max": 3.89,
+    "skew": 0.002074688431018631,
+    "summary": "mean=2.474, median=2.440, skew=0.002"
+  },
+  "feature_target_relationships": {
+    "top_numeric_relationships": [
+      {
+        "feature": "ripeness_index",
+        "score_name": "abs_corr",
+        "score": 0.679
+      },
+      {
+        "feature": "sugar_content_brix",
+        "score_name": "abs_corr",
+        "score": 0.6005
+      },
+      {
+        "feature": "length_cm",
+        "score_name": "abs_corr",
+        "score": 0.447
+      },
+      {
+        "feature": "soil_nitrogen_ppm",
+        "score_name": "abs_corr",
+        "score": 0.0733
+      },
+      {
+        "feature": "firmness_kgf",
+        "score_name": "abs_corr",
+        "score": 0.0511
+      },
+      {
+        "feature": "weight_g",
+        "score_name": "abs_corr",
+        "score": 0.0318
+      },
+      {
+        "feature": "rainfall_mm",
+        "score_name": "abs_corr",
+        "score": 0.0173
+      },
+      {
+        "feature": "altitude_m",
+        "score_name": "abs_corr",
+        "score": 0.0126
+      },
+      {
+        "feature": "tree_age_years",
+        "score_name": "abs_corr",
+        "score": 0.0115
+      },
+      {
+        "feature": "sample_id",
+        "score_name": "abs_corr",
+        "score": 0.0043
+      }
+    ],
+    "top_categorical_relationships": [
+      {
+        "feature": "quality_category",
+        "score_name": "target_mean_spread",
+        "score": 4.2844
+      },
+      {
+        "feature": "ripeness_category",
+        "score_name": "target_mean_spread",
+        "score": 1.9743
+      },
+      {
+        "feature": "harvest_date",
+        "score_name": "target_mean_spread",
+        "score": 1.5814
+      },
+      {
+        "feature": "variety",
+        "score_name": "target_mean_spread",
+        "score": 0.3664
+      },
+      {
+        "feature": "region",
+        "score_name": "target_mean_spread",
+        "score": 0.244
+      }
+    ]
+  },
+  "feature_engineering_recommendations": [
+    "Use frequency encoding or drop high-cardinality categorical columns instead of wide one-hot encoding.",
+    "Drop ID-like columns from model features to reduce memorization risk."
+  ],
+  "data_description_used": true,
+  "data_description": "Banana Quality Dataset\n\n\n============================================================\n1. About Dataset\n============================================================\n\nThis comprehensive banana dataset captures important information about banana samples from different regions and varieties.\n\nThe dataset includes attributes related to:\n- banana variety\n- geographic region\n- quality level\n- ripeness level\n- sugar content\n- firmness\n- physical size\n\n\n============================================================\n2. Key Attributes\n============================================================\n\nample_id: A unique identifier assigned to each banana sample in the dataset. This allows the samples to be tracked and referenced uniquely.\n\nvariety: The cultivar or breed of banana, such as Cavendish, Red Dacca, or Lady Finger. Knowing the specific banana variety provides context about the sample's physical characteristics and growing conditions.\n\nregion: The geographic origin of the banana, such as Ecuador, Philippines, or Costa Rica. The region can influence factors like climate, soil, and growing practices that impact the banana's qualities.\n\nquality_score: A numerical score, likely on a scale of 1-4 that rates the overall quality of the banana sample. This could encompass factors like appearance, texture, and lack of defects.\n\nquality_category: A text label that categorizes the quality score into broader groupings like \"Excellent\" etc\nThis provides an easier-to-understand quality assessment.\n\nripeness_index: A numerical index representing the ripeness level of the banana, potentially ranging from 1 (green/unripe) to 10 (overripe). This quantifies the maturity of the fruit.\n\nripeness_category: A text label like \"Green\", \"Yellow\", \"Ripe\", or \"Overripe\" that corresponds to the ripeness index. This gives a clear, qualitative ripeness classification.\n\nsugar_content_brix: The sugar content of the banana measured in degrees Brix. This is a common way to assess the sweetness and quality of the fruit.\n\nfirmness_kgf: The firmness of the banana measured in kilograms-force. This indicates the texture and maturity of the sample.\n\nlength_cm: The physical length of the banana in centimeters. This size metric can vary by variety and growing conditions.\n\n\n============================================================\n3. Dataset Usability\n============================================================\n\nUsability Score:\n10.00\n\n\n============================================================\n4. License\n============================================================\n\nLicense:\nApache 2.0\n\n\n============================================================\n5. Tags\n============================================================\n\nTags:\n- Food\n- Nutrition\n- Europe\n- Asia\n- People\n\n\n============================================================\n6. Data Explorer\n============================================================\n\nVersion:\nVersion 1\n\nDataset Size:\n105.32 kB\n\nFile Name:\nbanana_quality_dataset.csv\n\n\n============================================================\n7. Metadata\n============================================================\n\nCollaborators:\nMars_1010\n\nRole:\nOwner\n\n\nAuthors:\n\nAuthor Name:\nvishal\n\nBio:\nstudent\n\n\n============================================================\n8. Coverage\n============================================================\n\nTemporal Coverage Start Date:\nNot provided\n\nTemporal Coverage End Date:\nNot provided\n\nGeospatial Coverage:\nNot provided\n\n\n============================================================\n9. Provenance\n============================================================\n\nSources:\nFrom various agriculture blogs\n\nCollection Methodology:\nNot provided"
+}

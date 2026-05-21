@@ -1,0 +1,501 @@
+{
+  "dataset_intake": {
+    "source_path": "data/academic_success/train.csv",
+    "data_reading_options": {
+      "sep": ",",
+      "encoding": "utf-8"
+    },
+    "encoding_detection": {
+      "encoding": "utf-8",
+      "confidence": "high"
+    },
+    "delimiter_detection": {
+      "delimiter": ",",
+      "confidence": "high"
+    },
+    "sample_size_bytes": 65536,
+    "preview_metadata": {
+      "source_file_size_bytes": 9486541,
+      "preview_rows": 200,
+      "preview_columns": 38,
+      "column_names": [
+        "id",
+        "marital_status",
+        "application_mode",
+        "application_order",
+        "course",
+        "daytime/evening_attendance",
+        "previous_qualification",
+        "previous_qualification_(grade)",
+        "nacionality",
+        "mother's_qualification",
+        "father's_qualification",
+        "mother's_occupation",
+        "father's_occupation",
+        "admission_grade",
+        "displaced",
+        "educational_special_needs",
+        "debtor",
+        "tuition_fees_up_to_date",
+        "gender",
+        "scholarship_holder",
+        "age_at_enrollment",
+        "international",
+        "curricular_units_1st_sem_(credited)",
+        "curricular_units_1st_sem_(enrolled)",
+        "curricular_units_1st_sem_(evaluations)",
+        "curricular_units_1st_sem_(approved)",
+        "curricular_units_1st_sem_(grade)",
+        "curricular_units_1st_sem_(without_evaluations)",
+        "curricular_units_2nd_sem_(credited)",
+        "curricular_units_2nd_sem_(enrolled)",
+        "curricular_units_2nd_sem_(evaluations)",
+        "curricular_units_2nd_sem_(approved)",
+        "curricular_units_2nd_sem_(grade)",
+        "curricular_units_2nd_sem_(without_evaluations)",
+        "unemployment_rate",
+        "inflation_rate",
+        "gdp",
+        "target"
+      ],
+      "dtypes": {
+        "id": "int64",
+        "marital_status": "int64",
+        "application_mode": "int64",
+        "application_order": "int64",
+        "course": "int64",
+        "daytime/evening_attendance": "int64",
+        "previous_qualification": "int64",
+        "previous_qualification_(grade)": "float64",
+        "nacionality": "int64",
+        "mother's_qualification": "int64",
+        "father's_qualification": "int64",
+        "mother's_occupation": "int64",
+        "father's_occupation": "int64",
+        "admission_grade": "float64",
+        "displaced": "int64",
+        "educational_special_needs": "int64",
+        "debtor": "int64",
+        "tuition_fees_up_to_date": "int64",
+        "gender": "int64",
+        "scholarship_holder": "int64",
+        "age_at_enrollment": "int64",
+        "international": "int64",
+        "curricular_units_1st_sem_(credited)": "int64",
+        "curricular_units_1st_sem_(enrolled)": "int64",
+        "curricular_units_1st_sem_(evaluations)": "int64",
+        "curricular_units_1st_sem_(approved)": "int64",
+        "curricular_units_1st_sem_(grade)": "float64",
+        "curricular_units_1st_sem_(without_evaluations)": "int64",
+        "curricular_units_2nd_sem_(credited)": "int64",
+        "curricular_units_2nd_sem_(enrolled)": "int64",
+        "curricular_units_2nd_sem_(evaluations)": "int64",
+        "curricular_units_2nd_sem_(approved)": "int64",
+        "curricular_units_2nd_sem_(grade)": "float64",
+        "curricular_units_2nd_sem_(without_evaluations)": "int64",
+        "unemployment_rate": "float64",
+        "inflation_rate": "float64",
+        "gdp": "float64",
+        "target": "object"
+      },
+      "missing_ratio": {
+        "id": 0.0,
+        "marital_status": 0.0,
+        "application_mode": 0.0,
+        "application_order": 0.0,
+        "course": 0.0,
+        "daytime/evening_attendance": 0.0,
+        "previous_qualification": 0.0,
+        "previous_qualification_(grade)": 0.0,
+        "nacionality": 0.0,
+        "mother's_qualification": 0.0,
+        "father's_qualification": 0.0,
+        "mother's_occupation": 0.0,
+        "father's_occupation": 0.0,
+        "admission_grade": 0.0,
+        "displaced": 0.0,
+        "educational_special_needs": 0.0,
+        "debtor": 0.0,
+        "tuition_fees_up_to_date": 0.0,
+        "gender": 0.0,
+        "scholarship_holder": 0.0,
+        "age_at_enrollment": 0.0,
+        "international": 0.0,
+        "curricular_units_1st_sem_(credited)": 0.0,
+        "curricular_units_1st_sem_(enrolled)": 0.0,
+        "curricular_units_1st_sem_(evaluations)": 0.0,
+        "curricular_units_1st_sem_(approved)": 0.0,
+        "curricular_units_1st_sem_(grade)": 0.0,
+        "curricular_units_1st_sem_(without_evaluations)": 0.0,
+        "curricular_units_2nd_sem_(credited)": 0.0,
+        "curricular_units_2nd_sem_(enrolled)": 0.0,
+        "curricular_units_2nd_sem_(evaluations)": 0.0,
+        "curricular_units_2nd_sem_(approved)": 0.0,
+        "curricular_units_2nd_sem_(grade)": 0.0,
+        "curricular_units_2nd_sem_(without_evaluations)": 0.0,
+        "unemployment_rate": 0.0,
+        "inflation_rate": 0.0,
+        "gdp": 0.0,
+        "target": 0.0
+      },
+      "numeric_columns": [
+        "id",
+        "marital_status",
+        "application_mode",
+        "application_order",
+        "course",
+        "daytime/evening_attendance",
+        "previous_qualification",
+        "previous_qualification_(grade)",
+        "nacionality",
+        "mother's_qualification",
+        "father's_qualification",
+        "mother's_occupation",
+        "father's_occupation",
+        "admission_grade",
+        "displaced",
+        "educational_special_needs",
+        "debtor",
+        "tuition_fees_up_to_date",
+        "gender",
+        "scholarship_holder",
+        "age_at_enrollment",
+        "international",
+        "curricular_units_1st_sem_(credited)",
+        "curricular_units_1st_sem_(enrolled)",
+        "curricular_units_1st_sem_(evaluations)",
+        "curricular_units_1st_sem_(approved)",
+        "curricular_units_1st_sem_(grade)",
+        "curricular_units_1st_sem_(without_evaluations)",
+        "curricular_units_2nd_sem_(credited)",
+        "curricular_units_2nd_sem_(enrolled)",
+        "curricular_units_2nd_sem_(evaluations)",
+        "curricular_units_2nd_sem_(approved)",
+        "curricular_units_2nd_sem_(grade)",
+        "curricular_units_2nd_sem_(without_evaluations)",
+        "unemployment_rate",
+        "inflation_rate",
+        "gdp"
+      ],
+      "categorical_columns": [
+        "target"
+      ]
+    }
+  },
+  "input_config": {
+    "input_mode": "single_file_split",
+    "train_data_path": "data/academic_success/train.csv",
+    "test_data_path": null,
+    "test_data_reading_options": null,
+    "test_has_target": false
+  },
+  "test_dataset_intake": null,
+  "task_summary": {
+    "business_goal": "University student success office. Identify students at risk of\n  dropout or academic underperformance to enable early support interventions\n  such as tutoring, counselling, and financial aid. Surface the strongest\n  predictors and recommend policy actions.",
+    "data_description": "Classification with an Academic Success Dataset\n\n\n============================================================\n1. Overview\n============================================================\n\nWelcome to the 2024 Kaggle Playground Series!\n\nWe plan to continue in the spirit of previous playgrounds, providing interesting and approachable datasets for our community to practice their machine learning skills, and anticipate a competition each month.\n\nYour Goal:\nThe goal of this competition is to predict academic risk of students in higher education.\n\n\n============================================================\n2. Evaluation\n============================================================\n\nSubmissions are evaluated using the accuracy score.\n\n\n============================================================\n3. Submission File\n============================================================\n\nFor each id row in the test set, you must predict the class value of the Target, which is a categorical academic risk assessment.\n\nThe file should contain a header and have the following format:\n\nid,Target\n76518,Graduate\n76519,Graduate\n76520,Graduate\netc.\n\n\n============================================================\n4. About the Tabular Playground Series\n============================================================\n\nThe goal of the Tabular Playground Series is to provide the Kaggle community with a variety of fairly light-weight challenges that can be used to learn and sharpen skills in different aspects of machine learning and data science.\n\nThe duration of each competition will generally only last a few weeks, and may have longer or shorter durations depending on the challenge.\n\nThe challenges will generally use fairly light-weight datasets that are synthetically generated from real-world data, and will provide an opportunity to quickly iterate through various model and feature engineering ideas, create visualizations, etc.\n\n\n============================================================\n5. Synthetically-Generated Datasets\n============================================================\n\nUsing synthetic data for Playground competitions allows us to strike a balance between having real-world data with named features and ensuring test labels are not publicly available.\n\nThis allows us to host competitions with more interesting datasets than in the past.\n\nWhile there are still challenges with synthetic data generation, the state-of-the-art is much better now than when we started the Tabular Playground Series two years ago, and that goal is to produce datasets that have far fewer artifacts.\n\nPlease feel free to give us feedback on the datasets for the different competitions so that we can continue to improve!\n\n\n============================================================\n6. Citation\n============================================================\n\nWalter Reade and Ashley Chow.\n\nClassification with an Academic Success Dataset.\n\nhttps://kaggle.com/competitions/playground-series-s4e6, 2024.\n\nKaggle.\n================\n\n============================================================\n7. Column Descriptions\n============================================================\n\nid:\nUnique row identifier in the local dataset.\n\nMarital status:\nEncoded marital status of the student at enrollment.\n\nApplication mode:\nEncoded admission or application channel used by the student.\n\nApplication order:\nPreference order in which the student applied for the course.\n\nCourse:\nEncoded academic program or degree course.\n\nDaytime/evening attendance:\nIndicator of whether the student attends during daytime or evening.\n\nPrevious qualification:\nEncoded type of qualification held before enrollment.\n\nPrevious qualification (grade):\nNumeric grade associated with the student's previous qualification.\n\nNacionality:\nEncoded nationality of the student.\n\nMother's qualification:\nEncoded education level of the student's mother.\n\nFather's qualification:\nEncoded education level of the student's father.\n\nMother's occupation:\nEncoded occupation category of the student's mother.\n\nFather's occupation:\nEncoded occupation category of the student's father.\n\nAdmission grade:\nStudent's admission score or grade at entry.\n\nDisplaced:\nBinary indicator related to displaced student status.\n\nEducational special needs:\nBinary indicator for special educational needs.\n\nDebtor:\nBinary indicator showing whether the student has outstanding debt.\n\nTuition fees up to date:\nBinary indicator showing whether tuition payments are current.\n\nGender:\nEncoded gender indicator.\n\nScholarship holder:\nBinary indicator for scholarship support.\n\nAge at enrollment:\nAge of the student when entering the program.\n\nInternational:\nBinary indicator for international student status.\n\nCurricular units 1st sem (credited):\nNumber of first-semester curricular units credited from prior work or transfer.\n\nCurricular units 1st sem (enrolled):\nNumber of first-semester curricular units enrolled.\n\nCurricular units 1st sem (evaluations):\nNumber of first-semester evaluations taken.\n\nCurricular units 1st sem (approved):\nNumber of first-semester curricular units successfully approved.\n\nCurricular units 1st sem (grade):\nAverage grade across first-semester curricular units.\n\nCurricular units 1st sem (without evaluations):\nNumber of first-semester curricular units without evaluation records.\n\nCurricular units 2nd sem (credited):\nNumber of second-semester curricular units credited from prior work or transfer.\n\nCurricular units 2nd sem (enrolled):\nNumber of second-semester curricular units enrolled.\n\nCurricular units 2nd sem (evaluations):\nNumber of second-semester evaluations taken.\n\nCurricular units 2nd sem (approved):\nNumber of second-semester curricular units successfully approved.\n\nCurricular units 2nd sem (grade):\nAverage grade across second-semester curricular units.\n\nCurricular units 2nd sem (without evaluations):\nNumber of second-semester curricular units without evaluation records.\n\nUnemployment rate:\nMacroeconomic unemployment rate associated with the observation period.\n\nInflation rate:\nMacroeconomic inflation rate associated with the observation period.\n\nGDP:\nMacroeconomic GDP-related indicator associated with the observation period.\n\nTarget:\nFinal student academic status. Values observed locally are Graduate, Dropout, and Enrolled.",
+    "task_type": "classification",
+    "workflow_type": "supervised",
+    "supported_by_current_pipeline": true,
+    "target_column": "target",
+    "initial_target_inference": {
+      "target_column": "target",
+      "task_type": "classification",
+      "confidence": 0.9,
+      "reason": "The user goal is to identify students at risk of dropout or academic underperformance, which aligns with predicting the categorical academic risk assessment provided in the 'target' column.",
+      "source": "llm"
+    },
+    "target_inference": {
+      "target_column": "target",
+      "task_type": "classification",
+      "confidence": 0.9,
+      "reason": "The user goal is to identify students at risk of dropout or academic underperformance, which aligns with predicting the categorical academic risk assessment provided in the 'target' column.",
+      "source": "llm"
+    },
+    "primary_metric": "f1_weighted",
+    "candidate_model_ids": [
+      "logistic_regression",
+      "random_forest_classifier",
+      "gradient_boosting_classifier"
+    ],
+    "candidate_models": [
+      {
+        "model_id": "logistic_regression",
+        "task_type": "classification",
+        "estimator": "LogisticRegression",
+        "preprocessing": {
+          "categorical_encoding": "one_hot",
+          "numeric_imputation": "median",
+          "categorical_imputation": "mode",
+          "numeric_scaling": true,
+          "numeric_outlier_clipping": true,
+          "remove_constant_features": true,
+          "correlation_threshold": 0.98,
+          "drop_target_leakage_features": true,
+          "requires_all_features_numeric": true,
+          "allows_missing_feature_values": false
+        },
+        "validation": {
+          "selection_metric": "f1_weighted",
+          "required_checks": [
+            "all_features_numeric",
+            "no_missing_feature_values",
+            "train_test_columns_match",
+            "target_column_present"
+          ]
+        }
+      },
+      {
+        "model_id": "random_forest_classifier",
+        "task_type": "classification",
+        "estimator": "RandomForestClassifier",
+        "preprocessing": {
+          "categorical_encoding": "one_hot",
+          "numeric_imputation": "median",
+          "categorical_imputation": "mode",
+          "numeric_scaling": false,
+          "numeric_outlier_clipping": true,
+          "remove_constant_features": true,
+          "correlation_threshold": null,
+          "drop_target_leakage_features": true,
+          "requires_all_features_numeric": true,
+          "allows_missing_feature_values": false
+        },
+        "validation": {
+          "selection_metric": "f1_weighted",
+          "required_checks": [
+            "all_features_numeric",
+            "no_missing_feature_values",
+            "train_test_columns_match",
+            "target_column_present"
+          ]
+        }
+      },
+      {
+        "model_id": "gradient_boosting_classifier",
+        "task_type": "classification",
+        "estimator": "GradientBoostingClassifier",
+        "preprocessing": {
+          "categorical_encoding": "one_hot",
+          "numeric_imputation": "median",
+          "categorical_imputation": "mode",
+          "numeric_scaling": false,
+          "numeric_outlier_clipping": true,
+          "remove_constant_features": true,
+          "correlation_threshold": null,
+          "drop_target_leakage_features": true,
+          "requires_all_features_numeric": true,
+          "allows_missing_feature_values": false
+        },
+        "validation": {
+          "selection_metric": "f1_weighted",
+          "required_checks": [
+            "all_features_numeric",
+            "no_missing_feature_values",
+            "train_test_columns_match",
+            "target_column_present"
+          ]
+        }
+      }
+    ],
+    "risk_notes": [],
+    "data_reading_options": {
+      "sep": ",",
+      "encoding": "utf-8"
+    },
+    "test_data_reading_options": null,
+    "input_mode": "single_file_split",
+    "initial_feature_engineering_policy": {
+      "mode": "light",
+      "can_be_skipped": true,
+      "decision_required_after_cleaning": true
+    }
+  },
+  "stage_contracts": {
+    "data_cleaning": {
+      "required_artifacts": [
+        "cleaned_data.csv",
+        "train_data.csv",
+        "test_data.csv",
+        "cleaning_report.json"
+      ],
+      "required_report_fields": [
+        "stage",
+        "status",
+        "target_column",
+        "profile_before",
+        "profile_after",
+        "row_loss",
+        "row_loss_breakdown",
+        "duplicate_policy",
+        "numeric_like_conversions",
+        "split",
+        "recommended_tool_gaps"
+      ],
+      "validation_rules": [
+        {
+          "id": "target_preserved",
+          "check": "target column exists after cleaning when workflow_type is supervised"
+        },
+        {
+          "id": "non_empty_columns",
+          "check": "cleaned dataset has at least one non-empty column"
+        },
+        {
+          "id": "row_loss_reported",
+          "check": "cleaning_report.json includes row_loss"
+        }
+      ],
+      "allowed_tools": [
+        "basic_clean_dataframe",
+        "decide_duplicate_removal",
+        "drop_duplicate_rows",
+        "drop_empty_columns",
+        "numeric_like_conversion_report",
+        "profile_dataframe",
+        "split_cleaned_data"
+      ],
+      "recommended_tool_gap_field": "recommended_tool_gaps"
+    },
+    "feature_engineering": {
+      "required_artifacts": [
+        "fe_train.csv",
+        "fe_test.csv",
+        "feature_policy_report.json",
+        "feature_report.json"
+      ],
+      "required_report_fields": [
+        "stage",
+        "status",
+        "policy",
+        "pipelines",
+        "execution",
+        "train_shape",
+        "test_shape",
+        "target_column",
+        "recommended_tool_gaps"
+      ],
+      "validation_rules": [
+        {
+          "id": "policy_justified",
+          "check": "feature policy mode and reason are reported"
+        },
+        {
+          "id": "matching_columns",
+          "check": "feature train/test columns match in order"
+        },
+        {
+          "id": "target_preserved",
+          "check": "target column remains present when workflow_type is supervised"
+        },
+        {
+          "id": "model_preprocessing_requirements",
+          "check": "feature policy accounts for candidate_models preprocessing requirements"
+        },
+        {
+          "id": "target_balance_reported",
+          "check": "feature_report.json reports target class balance before modelling"
+        }
+      ],
+      "allowed_tools": [
+        "recommend_feature_engineering_policy",
+        "apply_model_feature_policy",
+        "align_and_validate_feature_matrices",
+        "clip_numeric_outliers_with_report",
+        "convert_boolean_like_features",
+        "create_datetime_features_with_report",
+        "create_missing_indicators_with_report",
+        "drop_target_leakage_features_with_report",
+        "encode_categorical_features_with_report",
+        "impute_missing_features",
+        "impute_missing_features_with_report",
+        "profile_features",
+        "remove_highly_correlated_features_with_report",
+        "remove_low_information_features_with_report",
+        "scale_numeric_features_with_report",
+        "validate_matching_columns"
+      ],
+      "recommended_tool_gap_field": "recommended_tool_gaps"
+    },
+    "eda_analysis": {
+      "required_artifacts": [
+        "eda_report.json",
+        "eda_summary.md"
+      ],
+      "required_report_fields": [
+        "stage",
+        "status",
+        "leakage_policy",
+        "dataset_overview",
+        "target_analysis",
+        "feature_target_relationships",
+        "feature_engineering_recommendations"
+      ],
+      "validation_rules": [
+        {
+          "id": "train_only_target_analysis",
+          "check": "feature-target analysis uses train_data only"
+        },
+        {
+          "id": "eda_summary_present",
+          "check": "eda_summary.md exists for business reporting"
+        }
+      ],
+      "allowed_tools": [
+        "build_eda_report",
+        "build_eda_summary"
+      ],
+      "recommended_tool_gap_field": "recommended_tool_gaps"
+    },
+    "model_selection": {
+      "required_artifacts": [
+        "model_report.json",
+        "feature_importance.json"
+      ],
+      "required_report_fields": [
+        "task_type",
+        "target_column",
+        "candidate_model_ids",
+        "metric",
+        "candidate_results",
+        "selected_model_id",
+        "best_model",
+        "best_cv_score",
+        "test_metrics",
+        "tuning",
+        "recommended_tool_gaps"
+      ],
+      "validation_rules": [
+        {
+          "id": "metric_matches_task",
+          "check": "selected metric matches task_summary.primary_metric"
+        },
+        {
+          "id": "test_metrics_reported",
+          "check": "model_report.json includes final test metrics"
+        },
+        {
+          "id": "supervised_only",
+          "check": "model selection runs only when supported_by_current_pipeline is true"
+        },
+        {
+          "id": "model_id_tracked",
+          "check": "model_report.json identifies evaluated and selected model IDs"
+        },
+        {
+          "id": "class_imbalance_strategy",
+          "check": "model_report.json reports class imbalance handling strategy"
+        }
+      ],
+      "allowed_tools": [
+        "infer_task_type",
+        "default_tuning_plan",
+        "llm_tuning_plan",
+        "tune_and_evaluate_model",
+        "train_and_evaluate_model",
+        "validate_json_object"
+      ],
+      "recommended_tool_gap_field": "recommended_tool_gaps",
+      "imbalance_strategy": "class_weight_or_resampling"
+    }
+  }
+}

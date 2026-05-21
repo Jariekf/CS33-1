@@ -1,0 +1,49 @@
+{
+  "task_type": "regression",
+  "target_column": "yield",
+  "model_id": "ridge_regression",
+  "metric": "r2",
+  "cv_score": -0.012014529651025674,
+  "cv_scores": [],
+  "test_metrics": {
+    "r2": -0.023665408274816446,
+    "mae": 1820.8466486128762,
+    "rmse": 2646.684737210472
+  },
+  "tuning": {
+    "status": "completed",
+    "failure_reason": "",
+    "baseline": {
+      "metric": "r2",
+      "cv": 3,
+      "scores": [
+        -0.004080642211817143,
+        -0.02963593279944332,
+        -0.0036603541257880234
+      ],
+      "mean_cv_score": -0.012458976379016162
+    },
+    "plan": {
+      "source": "llm",
+      "model_id": "ridge_regression",
+      "task_type": "regression",
+      "metric": "r2",
+      "cv": 3,
+      "budget": "small",
+      "param_grid": {
+        "alpha": [
+          0.1,
+          1.0,
+          10.0
+        ]
+      },
+      "explanation": "The baseline report indicates weak performance with negative R2 scores. To improve the model, we broaden the search for the alpha parameter by including lower and mid-range values, which can help in finding a better regularization strength."
+    },
+    "n_jobs": 1,
+    "best_params": {
+      "alpha": 10.0
+    },
+    "best_cv_score": -0.012014529651025674,
+    "explanation": "The baseline report indicates weak performance with negative R2 scores. To improve the model, we broaden the search for the alpha parameter by including lower and mid-range values, which can help in finding a better regularization strength."
+  }
+}

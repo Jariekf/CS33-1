@@ -1,0 +1,62 @@
+{
+  "task_type": "regression",
+  "target_column": "yield",
+  "model_id": "random_forest_regressor",
+  "metric": "r2",
+  "cv_score": 0.017759497358692755,
+  "cv_scores": [],
+  "test_metrics": {
+    "r2": -0.0818704679169937,
+    "mae": 1796.219012826676,
+    "rmse": 2720.889044240805
+  },
+  "tuning": {
+    "status": "completed",
+    "failure_reason": "",
+    "baseline": {
+      "metric": "r2",
+      "cv": 3,
+      "scores": [
+        -0.09831417648092611,
+        -1.2869617437490994,
+        0.00014064863841578568
+      ],
+      "mean_cv_score": -0.4617117571972032
+    },
+    "plan": {
+      "source": "llm",
+      "model_id": "random_forest_regressor",
+      "task_type": "regression",
+      "metric": "r2",
+      "cv": 3,
+      "budget": "small",
+      "param_grid": {
+        "n_estimators": [
+          100,
+          200
+        ],
+        "max_depth": [
+          5,
+          10
+        ],
+        "min_samples_leaf": [
+          1,
+          2
+        ],
+        "max_features": [
+          "sqrt"
+        ]
+      },
+      "explanation": "The baseline report indicates weak performance, so we broadened the search space for max_depth and included multiple values for min_samples_leaf to explore their impact on model performance."
+    },
+    "n_jobs": 1,
+    "best_params": {
+      "max_depth": 10,
+      "max_features": "sqrt",
+      "min_samples_leaf": 2,
+      "n_estimators": 200
+    },
+    "best_cv_score": 0.017759497358692755,
+    "explanation": "The baseline report indicates weak performance, so we broadened the search space for max_depth and included multiple values for min_samples_leaf to explore their impact on model performance."
+  }
+}

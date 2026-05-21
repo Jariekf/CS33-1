@@ -1,0 +1,21 @@
+{
+  "stage": "feature_decision",
+  "feature_engineering_policy": {
+    "mode": "standard",
+    "reason": "At least one candidate model requires encoded numeric features and numeric scaling.",
+    "task_type": "classification",
+    "candidate_model_ids": [
+      "logistic_regression",
+      "random_forest_classifier",
+      "gradient_boosting_classifier"
+    ],
+    "candidate_model_requirements": {
+      "encoding_required": true,
+      "scaling_required": true
+    },
+    "eda_recommendations": [
+      "Create missing indicators and impute high-missingness columns using train-fitted values.",
+      "Use frequency encoding or drop high-cardinality categorical columns instead of wide one-hot encoding."
+    ]
+  }
+}

@@ -1,0 +1,481 @@
+{
+  "dataset_intake": {
+    "source_path": "data/student_study/DATA (1).csv",
+    "data_reading_options": {
+      "sep": ",",
+      "encoding": "utf-8-sig"
+    },
+    "encoding_detection": {
+      "encoding": "utf-8-sig",
+      "confidence": "high"
+    },
+    "delimiter_detection": {
+      "delimiter": ",",
+      "confidence": "high"
+    },
+    "sample_size_bytes": 10878,
+    "preview_metadata": {
+      "source_file_size_bytes": 10878,
+      "preview_rows": 145,
+      "preview_columns": 33,
+      "column_names": [
+        "student_id",
+        "1",
+        "2",
+        "3",
+        "4",
+        "5",
+        "6",
+        "7",
+        "8",
+        "9",
+        "10",
+        "11",
+        "12",
+        "13",
+        "14",
+        "15",
+        "16",
+        "17",
+        "18",
+        "19",
+        "20",
+        "21",
+        "22",
+        "23",
+        "24",
+        "25",
+        "26",
+        "27",
+        "28",
+        "29",
+        "30",
+        "course_id",
+        "grade"
+      ],
+      "dtypes": {
+        "student_id": "object",
+        "1": "int64",
+        "2": "int64",
+        "3": "int64",
+        "4": "int64",
+        "5": "int64",
+        "6": "int64",
+        "7": "int64",
+        "8": "int64",
+        "9": "int64",
+        "10": "int64",
+        "11": "int64",
+        "12": "int64",
+        "13": "int64",
+        "14": "int64",
+        "15": "int64",
+        "16": "int64",
+        "17": "int64",
+        "18": "int64",
+        "19": "int64",
+        "20": "int64",
+        "21": "int64",
+        "22": "int64",
+        "23": "int64",
+        "24": "int64",
+        "25": "int64",
+        "26": "int64",
+        "27": "int64",
+        "28": "int64",
+        "29": "int64",
+        "30": "int64",
+        "course_id": "int64",
+        "grade": "int64"
+      },
+      "missing_ratio": {
+        "student_id": 0.0,
+        "1": 0.0,
+        "2": 0.0,
+        "3": 0.0,
+        "4": 0.0,
+        "5": 0.0,
+        "6": 0.0,
+        "7": 0.0,
+        "8": 0.0,
+        "9": 0.0,
+        "10": 0.0,
+        "11": 0.0,
+        "12": 0.0,
+        "13": 0.0,
+        "14": 0.0,
+        "15": 0.0,
+        "16": 0.0,
+        "17": 0.0,
+        "18": 0.0,
+        "19": 0.0,
+        "20": 0.0,
+        "21": 0.0,
+        "22": 0.0,
+        "23": 0.0,
+        "24": 0.0,
+        "25": 0.0,
+        "26": 0.0,
+        "27": 0.0,
+        "28": 0.0,
+        "29": 0.0,
+        "30": 0.0,
+        "course_id": 0.0,
+        "grade": 0.0
+      },
+      "numeric_columns": [
+        "1",
+        "2",
+        "3",
+        "4",
+        "5",
+        "6",
+        "7",
+        "8",
+        "9",
+        "10",
+        "11",
+        "12",
+        "13",
+        "14",
+        "15",
+        "16",
+        "17",
+        "18",
+        "19",
+        "20",
+        "21",
+        "22",
+        "23",
+        "24",
+        "25",
+        "26",
+        "27",
+        "28",
+        "29",
+        "30",
+        "course_id",
+        "grade"
+      ],
+      "categorical_columns": [
+        "student_id"
+      ]
+    }
+  },
+  "input_config": {
+    "input_mode": "single_file_split",
+    "train_data_path": "data/student_study/DATA (1).csv",
+    "test_data_path": null,
+    "test_data_reading_options": null,
+    "test_has_target": false
+  },
+  "test_dataset_intake": null,
+  "task_summary": {
+    "business_goal": "Predict student study performance outcomes and identify the\n  strongest behavioural or academic factors associated with better or worse\n  results.",
+    "data_description": "Higher Education Students Performance Evaluation\nUCI Machine Learning Repository Dataset\n\nDonated:\nAugust 14, 2023\n\n\n============================================================\n1. Dataset Basic Information\n============================================================\n\nDataset Name:\nHigher Education Students Performance Evaluation\n\nDataset Characteristics:\nMultivariate\n\nSubject Area:\nSocial Science\n\nAssociated Task:\nClassification\n\nFeature Type:\nInteger\n\nNumber of Instances:\n145\n\nNumber of Features:\n31\n\nHas Missing Values:\nNo\n\n\n============================================================\n2. Dataset Purpose\n============================================================\n\nThe data was collected from students in the Faculty of Engineering and the Faculty of Educational Sciences in 2019.\n\nThe purpose of this dataset is to predict students' end-of-term performances using machine learning techniques.\n\n\n============================================================\n3. Additional Information\n============================================================\n\nQuestions 1 to 10 are personal questions.\n\nQuestions 11 to 16 are family-related questions.\n\nThe remaining questions are about education habits.\n\n\n============================================================\n4. Introductory Paper\n============================================================\n\nPaper Title:\nStudent Performance Classification Using Artificial Intelligence Techniques\n\nAuthors:\nN. Yilmaz\nB. Şekeroğlu\n\nYear:\n2019\n\nPublished In:\nAdvances in Intelligent Systems and Computing, Volume 1095\n\n\n============================================================\n5. Variables Table\n============================================================\n\n1. Student Age\nRole:\nFeature\n\nType:\nCategorical\n\nDemographic:\nAge\n\nDescription:\n1 = 18-21\n2 = 22-25\n3 = above 26\n\nMissing Values:\nNo\n\n\n2. Sex\nRole:\nFeature\n\nType:\nBinary\n\nDemographic:\nSex\n\nDescription:\n1 = female\n2 = male\n\nMissing Values:\nNo\n\n\n3. Graduated high-school type\nRole:\nFeature\n\nType:\nCategorical\n\nDemographic:\nEducation Level\n\nDescription:\n1 = private\n2 = state\n3 = other\n\nMissing Values:\nNo\n\n\n4. Scholarship type\nRole:\nFeature\n\nType:\nCategorical\n\nDescription:\n1 = None\n2 = 25%\n3 = 50%\n4 = 75%\n5 = Full\n\nMissing Values:\nNo\n\n\n5. Additional work\nRole:\nFeature\n\nType:\nBinary\n\nDescription:\n1 = Yes\n2 = No\n\nMissing Values:\nNo\n\n\n6. Regular artistic or sports activity\nRole:\nFeature\n\nType:\nBinary\n\nDescription:\n1 = Yes\n2 = No\n\nMissing Values:\nNo\n\n\n7. Do you have a partner\nRole:\nFeature\n\nType:\nBinary\n\nDemographic:\nMarital Status\n\nDescription:\n1 = Yes\n2 = No\n\nMissing Values:\nNo\n\n\n8. Total salary if available\nRole:\nFeature\n\nType:\nCategorical\n\nDemographic:\nIncome\n\nDescription:\n1 = USD 135-200\n2 = USD 201-270\n3 = USD 271-340\n4 = USD 341-410\n5 = above 410\n\nMissing Values:\nNo\n\n\n9. Transportation to the university\nRole:\nFeature\n\nType:\nCategorical\n\nDescription:\n1 = Bus\n2 = Private car / taxi\n3 = Bicycle\n4 = Other\n\nMissing Values:\nNo\n\n\n10. Accommodation type in Cyprus\nRole:\nFeature\n\nType:\nCategorical\n\nDescription:\n1 = Rental\n2 = Dormitory\n3 = With family\n4 = Other\n\nMissing Values:\nNo\n\n\n11. Mother's education\nRole:\nFeature\n\nType:\nCategorical\n\nDemographic:\nEducation Level\n\nDescription:\n1 = Primary school\n2 = Secondary school\n3 = High school\n4 = University\n5 = MSc.\n6 = Ph.D.\n\nMissing Values:\nNo\n\n\n12. Father's education\nRole:\nFeature\n\nType:\nCategorical\n\nDemographic:\nEducation Level\n\nDescription:\n1 = Primary school\n2 = Secondary school\n3 = High school\n4 = University\n5 = MSc.\n6 = Ph.D.\n\nMissing Values:\nNo\n\n\n13. Number of sisters / brothers if available\nRole:\nFeature\n\nType:\nInteger\n\nDescription:\n1 = 1\n2 = 2\n3 = 3\n4 = 4\n5 = 5 or above\n\nMissing Values:\nNo\n\n\n14. Parental status\nRole:\nFeature\n\nType:\nCategorical\n\nDemographic:\nMarital Status\n\nDescription:\n1 = Married\n2 = Divorced\n3 = Died, one of them or both\n\nMissing Values:\nNo\n\n\n15. Mother's occupation\nRole:\nFeature\n\nType:\nCategorical\n\nDemographic:\nOccupation\n\nDescription:\n1 = Retired\n2 = Housewife\n3 = Government officer\n4 = Private sector employee\n5 = Self-employment\n6 = Other\n\nMissing Values:\nNo\n\n\n16. Father's occupation\nRole:\nFeature\n\nType:\nCategorical\n\nDemographic:\nOccupation\n\nDescription:\n1 = Retired\n2 = Housewife\n3 = Government officer\n4 = Private sector employee\n5 = Self-employment\n6 = Other\n\nMissing Values:\nNo\n\n\n17. Weekly study hours\nRole:\nFeature\n\nType:\nCategorical\n\nDescription:\n1 = None\n2 = Less than 5 hours\n3 = 6-10 hours\n4 = 11-20 hours\n5 = More than 20 hours\n\nMissing Values:\nNo\n\n\n18. Reading frequency, non-scientific books / journals\nRole:\nFeature\n\nType:\nCategorical\n\nDescription:\n1 = None\n2 = Sometimes\n3 = Often\n\nMissing Values:\nNo\n\n\n19. Reading frequency, scientific books / journals\nRole:\nFeature\n\nType:\nCategorical\n\nDescription:\n1 = None\n2 = Sometimes\n3 = Often\n\nMissing Values:\nNo\n\n\n20. Attendance to seminars / conferences related to the department\nRole:\nFeature\n\nType:\nBinary\n\nDescription:\n1 = Yes\n2 = No\n\nMissing Values:\nNo\n\n\n21. Impact of your projects / activities on your success\nRole:\nFeature\n\nType:\nCategorical\n\nDescription:\n1 = Positive\n2 = Negative\n3 = Neutral\n\nMissing Values:\nNo\n\n\n22. Attendance to classes\nRole:\nFeature\n\nType:\nCategorical\n\nDescription:\n1 = Always\n2 = Sometimes\n3 = Never\n\nMissing Values:\nNo\n\n\n23. Preparation to midterm exams 1\nRole:\nFeature\n\nType:\nCategorical\n\nDescription:\n1 = Alone\n2 = With friends\n3 = Not applicable\n\nMissing Values:\nNo\n\n\n24. Preparation to midterm exams 2\nRole:\nFeature\n\nType:\nCategorical\n\nDescription:\n1 = Closest date to the exam\n2 = Regularly during the semester\n3 = Never\n\nMissing Values:\nNo\n\n\n25. Taking notes in classes\nRole:\nFeature\n\nType:\nCategorical\n\nDescription:\n1 = Never\n2 = Sometimes\n3 = Always\n\nMissing Values:\nNo\n\n\n26. Listening in classes\nRole:\nFeature\n\nType:\nCategorical\n\nDescription:\n1 = Never\n2 = Sometimes\n3 = Always\n\nMissing Values:\nNo\n\n\n27. Discussion improves my interest and success in the course\nRole:\nFeature\n\nType:\nCategorical\n\nDescription:\n1 = Never\n2 = Sometimes\n3 = Always\n\nMissing Values:\nNo\n\n\n28. Flip-classroom\nRole:\nFeature\n\nType:\nCategorical\n\nDescription:\n1 = Not useful\n2 = Useful\n3 = Not applicable\n\nMissing Values:\nNo\n\n\n29. Cumulative grade point average in the last semester / 4.00\nRole:\nFeature\n\nType:\nCategorical\n\nDescription:\n1 = Less than 2.00\n2 = 2.00-2.49\n3 = 2.50-2.99\n4 = 3.00-3.49\n5 = Above 3.49\n\nMissing Values:\nNo\n\n\n30. Expected cumulative grade point average in graduation / 4.00\nRole:\nFeature\n\nType:\nCategorical\n\nDescription:\n1 = Less than 2.00\n2 = 2.00-2.49\n3 = 2.50-2.99\n4 = 3.00-3.49\n5 = Above 3.49\n\nMissing Values:\nNo\n\n\n31. Course ID\nRole:\nFeature\n\nType:\nInteger\n\nMissing Values:\nNo\n\n\n32. OUTPUT Grade\nRole:\nTarget\n\nType:\nCategorical\n\nDescription:\n0 = Fail\n1 = DD\n2 = DC\n3 = CC\n4 = CB\n5 = BB\n6 = BA\n7 = AA\n\nMissing Values:\nNo\n\n\n33. Student ID\nRole:\nID\n\nType:\nCategorical\n\nMissing Values:\nNo\n\n\n============================================================\n6. Additional Variable Information\n============================================================\n\nClass Labels\n\nStudent ID\n1- Student Age (1: 18-21, 2: 22-25, 3: above 26)\n2- Sex (1: female, 2: male)\n3- Graduated high-school type: (1: private, 2: state, 3: other)\n4- Scholarship type: (1: None, 2: 25%, 3: 50%, 4: 75%, 5: Full)\n5- Additional work: (1: Yes, 2: No)\n6- Regular artistic or sports activity: (1: Yes, 2: No)\n7- Do you have a partner: (1: Yes, 2: No)\n8- Total salary if available (1: USD 135-200, 2: USD 201-270, 3: USD 271-340, 4: USD 341-410, 5: above 410)\n9- Transportation to the university: (1: Bus, 2: Private car/taxi, 3: bicycle, 4: Other)\n10- Accommodation type in Cyprus: (1: rental, 2: dormitory, 3: with family, 4: Other)\n11- Mothersâ€™ education: (1: primary school, 2: secondary school, 3: high school, 4: university, 5: MSc., 6: Ph.D.)\n12- Fathersâ€™ education: (1: primary school, 2: secondary school, 3: high school, 4: university, 5: MSc., 6: Ph.D.)\n13- Number of sisters/brothers (if available): (1: 1, 2:, 2, 3: 3, 4: 4, 5: 5 or above)\n14- Parental status: (1: married, 2: divorced, 3: died - one of them or both)\n15- Mothersâ€™ occupation: (1: retired, 2: housewife, 3: government officer, 4: private sector employee, 5: self-employment, 6: other)\n16- Fathersâ€™ occupation: (1: retired, 2: government officer, 3: private sector employee, 4: self-employment, 5: other)\n17- Weekly study hours: (1: None, 2: <5 hours, 3: 6-10 hours, 4: 11-20 hours, 5: more than 20 hours)\n18- Reading frequency (non-scientific books/journals): (1: None, 2: Sometimes, 3: Often)\n19- Reading frequency (scientific books/journals): (1: None, 2: Sometimes, 3: Often)\n20- Attendance to the seminars/conferences related to the department: (1: Yes, 2: No)\n21- Impact of your projects/activities on your success: (1: positive, 2: negative, 3: neutral)\n22- Attendance to classes (1: always, 2: sometimes, 3: never)\n23- Preparation to midterm exams 1: (1: alone, 2: with friends, 3: not applicable)\n24- Preparation to midterm exams 2: (1: closest date to the exam, 2: regularly during the semester, 3: never)\n25- Taking notes in classes: (1: never, 2: sometimes, 3: always)\n26- Listening in classes: (1: never, 2: sometimes, 3: always)\n27- Discussion improves my interest and success in the course: (1: never, 2: sometimes, 3: always)\n28- Flip-classroom: (1: not useful, 2: useful, 3: not applicable)\n29- Cumulative grade point average in the last semester (/4.00): (1: <2.00, 2: 2.00-2.49, 3: 2.50-2.99, 4: 3.00-3.49, 5: above 3.49)\n30- Expected Cumulative grade point average in the graduation (/4.00): (1: <2.00, 2: 2.00-2.49, 3: 2.50-2.99, 4: 3.00-3.49, 5: above 3.49)\n31- Course ID\n32- OUTPUT Grade (0: Fail, 1: DD, 2: DC, 3: CC, 4: CB, 5: BB, 6: BA, 7: AA)\n\n\n============================================================\n7. Dataset Files\n============================================================\n\nFile Name:\nDATA (1).csv\n\nFile Size:\n10.8 KB\n\n\n============================================================\n8. Citations / Acknowledgements\n============================================================\n\nIf you use this dataset, please cite:\n\nYilmaz N., Sekeroglu B. (2020).\nStudent Performance Classification Using Artificial Intelligence Techniques.\n\nIn:\nAliev R., Kacprzyk J., Pedrycz W., Jamshidi M., Babanli M., Sadikoglu F. (eds)\n\nConference:\n10th International Conference on Theory and Application of Soft Computing, Computing with Words and Perceptions - ICSCCW 2019.\n\nSeries:\nAdvances in Intelligent Systems and Computing, Volume 1095.\n\nPublisher:\nSpringer, Cham.\n\n\n============================================================\n9. Keywords\n============================================================\n\neducation\n\n\n============================================================\n10. Creators\n============================================================\n\nCreator 1:\nNevriye Yilmaz\n\nEmail:\nnevriye.yilmaz@neu.edu.tr\n\nCreator 2:\nBoran Şekeroğlu\n\nEmail:\nboran.sekeroglu@neu.edu.tr\n\n\n============================================================\n11. DOI\n============================================================\n\nDOI:\n10.24432/C51G82\n\n\n============================================================\n12. License\n============================================================\n\nLicense:\nCreative Commons Attribution 4.0 International, CC BY 4.0\n\nLicense Meaning:\nThis license allows sharing and adaptation of the dataset for any purpose, as long as appropriate credit is given.",
+    "task_type": "classification",
+    "workflow_type": "supervised",
+    "supported_by_current_pipeline": true,
+    "target_column": "1",
+    "initial_target_inference": {
+      "target_column": "1",
+      "task_type": "classification",
+      "confidence": 0.4,
+      "reason": "deterministic fallback inference",
+      "source": "rules"
+    },
+    "target_inference": {
+      "target_column": "1",
+      "task_type": "classification",
+      "confidence": 0.4,
+      "reason": "deterministic fallback inference",
+      "source": "rules"
+    },
+    "primary_metric": "f1_weighted",
+    "candidate_model_ids": [
+      "logistic_regression",
+      "random_forest_classifier",
+      "gradient_boosting_classifier"
+    ],
+    "candidate_models": [
+      {
+        "model_id": "logistic_regression",
+        "task_type": "classification",
+        "estimator": "LogisticRegression",
+        "preprocessing": {
+          "categorical_encoding": "one_hot",
+          "numeric_imputation": "median",
+          "categorical_imputation": "mode",
+          "numeric_scaling": true,
+          "numeric_outlier_clipping": true,
+          "remove_constant_features": true,
+          "correlation_threshold": 0.98,
+          "drop_target_leakage_features": true,
+          "requires_all_features_numeric": true,
+          "allows_missing_feature_values": false
+        },
+        "validation": {
+          "selection_metric": "f1_weighted",
+          "required_checks": [
+            "all_features_numeric",
+            "no_missing_feature_values",
+            "train_test_columns_match",
+            "target_column_present"
+          ]
+        }
+      },
+      {
+        "model_id": "random_forest_classifier",
+        "task_type": "classification",
+        "estimator": "RandomForestClassifier",
+        "preprocessing": {
+          "categorical_encoding": "one_hot",
+          "numeric_imputation": "median",
+          "categorical_imputation": "mode",
+          "numeric_scaling": false,
+          "numeric_outlier_clipping": true,
+          "remove_constant_features": true,
+          "correlation_threshold": null,
+          "drop_target_leakage_features": true,
+          "requires_all_features_numeric": true,
+          "allows_missing_feature_values": false
+        },
+        "validation": {
+          "selection_metric": "f1_weighted",
+          "required_checks": [
+            "all_features_numeric",
+            "no_missing_feature_values",
+            "train_test_columns_match",
+            "target_column_present"
+          ]
+        }
+      },
+      {
+        "model_id": "gradient_boosting_classifier",
+        "task_type": "classification",
+        "estimator": "GradientBoostingClassifier",
+        "preprocessing": {
+          "categorical_encoding": "one_hot",
+          "numeric_imputation": "median",
+          "categorical_imputation": "mode",
+          "numeric_scaling": false,
+          "numeric_outlier_clipping": true,
+          "remove_constant_features": true,
+          "correlation_threshold": null,
+          "drop_target_leakage_features": true,
+          "requires_all_features_numeric": true,
+          "allows_missing_feature_values": false
+        },
+        "validation": {
+          "selection_metric": "f1_weighted",
+          "required_checks": [
+            "all_features_numeric",
+            "no_missing_feature_values",
+            "train_test_columns_match",
+            "target_column_present"
+          ]
+        }
+      }
+    ],
+    "risk_notes": [],
+    "data_reading_options": {
+      "sep": ",",
+      "encoding": "utf-8-sig"
+    },
+    "test_data_reading_options": null,
+    "input_mode": "single_file_split",
+    "initial_feature_engineering_policy": {
+      "mode": "light",
+      "can_be_skipped": true,
+      "decision_required_after_cleaning": true
+    }
+  },
+  "stage_contracts": {
+    "data_cleaning": {
+      "required_artifacts": [
+        "cleaned_data.csv",
+        "train_data.csv",
+        "test_data.csv",
+        "cleaning_report.json"
+      ],
+      "required_report_fields": [
+        "stage",
+        "status",
+        "target_column",
+        "profile_before",
+        "profile_after",
+        "row_loss",
+        "row_loss_breakdown",
+        "duplicate_policy",
+        "numeric_like_conversions",
+        "split",
+        "recommended_tool_gaps"
+      ],
+      "validation_rules": [
+        {
+          "id": "target_preserved",
+          "check": "target column exists after cleaning when workflow_type is supervised"
+        },
+        {
+          "id": "non_empty_columns",
+          "check": "cleaned dataset has at least one non-empty column"
+        },
+        {
+          "id": "row_loss_reported",
+          "check": "cleaning_report.json includes row_loss"
+        }
+      ],
+      "allowed_tools": [
+        "basic_clean_dataframe",
+        "decide_duplicate_removal",
+        "drop_duplicate_rows",
+        "drop_empty_columns",
+        "numeric_like_conversion_report",
+        "profile_dataframe",
+        "split_cleaned_data"
+      ],
+      "recommended_tool_gap_field": "recommended_tool_gaps"
+    },
+    "feature_engineering": {
+      "required_artifacts": [
+        "fe_train.csv",
+        "fe_test.csv",
+        "feature_policy_report.json",
+        "feature_report.json"
+      ],
+      "required_report_fields": [
+        "stage",
+        "status",
+        "policy",
+        "pipelines",
+        "execution",
+        "train_shape",
+        "test_shape",
+        "target_column",
+        "recommended_tool_gaps"
+      ],
+      "validation_rules": [
+        {
+          "id": "policy_justified",
+          "check": "feature policy mode and reason are reported"
+        },
+        {
+          "id": "matching_columns",
+          "check": "feature train/test columns match in order"
+        },
+        {
+          "id": "target_preserved",
+          "check": "target column remains present when workflow_type is supervised"
+        },
+        {
+          "id": "model_preprocessing_requirements",
+          "check": "feature policy accounts for candidate_models preprocessing requirements"
+        },
+        {
+          "id": "target_balance_reported",
+          "check": "feature_report.json reports target class balance before modelling"
+        }
+      ],
+      "allowed_tools": [
+        "recommend_feature_engineering_policy",
+        "apply_model_feature_policy",
+        "align_and_validate_feature_matrices",
+        "clip_numeric_outliers_with_report",
+        "convert_boolean_like_features",
+        "create_datetime_features_with_report",
+        "create_missing_indicators_with_report",
+        "drop_target_leakage_features_with_report",
+        "encode_categorical_features_with_report",
+        "impute_missing_features",
+        "impute_missing_features_with_report",
+        "profile_features",
+        "remove_highly_correlated_features_with_report",
+        "remove_low_information_features_with_report",
+        "scale_numeric_features_with_report",
+        "validate_matching_columns"
+      ],
+      "recommended_tool_gap_field": "recommended_tool_gaps"
+    },
+    "eda_analysis": {
+      "required_artifacts": [
+        "eda_report.json",
+        "eda_summary.md"
+      ],
+      "required_report_fields": [
+        "stage",
+        "status",
+        "leakage_policy",
+        "dataset_overview",
+        "target_analysis",
+        "feature_target_relationships",
+        "feature_engineering_recommendations"
+      ],
+      "validation_rules": [
+        {
+          "id": "train_only_target_analysis",
+          "check": "feature-target analysis uses train_data only"
+        },
+        {
+          "id": "eda_summary_present",
+          "check": "eda_summary.md exists for business reporting"
+        }
+      ],
+      "allowed_tools": [
+        "build_eda_report",
+        "build_eda_summary"
+      ],
+      "recommended_tool_gap_field": "recommended_tool_gaps"
+    },
+    "model_selection": {
+      "required_artifacts": [
+        "model_report.json",
+        "feature_importance.json"
+      ],
+      "required_report_fields": [
+        "task_type",
+        "target_column",
+        "candidate_model_ids",
+        "metric",
+        "candidate_results",
+        "selected_model_id",
+        "best_model",
+        "best_cv_score",
+        "test_metrics",
+        "tuning",
+        "recommended_tool_gaps"
+      ],
+      "validation_rules": [
+        {
+          "id": "metric_matches_task",
+          "check": "selected metric matches task_summary.primary_metric"
+        },
+        {
+          "id": "test_metrics_reported",
+          "check": "model_report.json includes final test metrics"
+        },
+        {
+          "id": "supervised_only",
+          "check": "model selection runs only when supported_by_current_pipeline is true"
+        },
+        {
+          "id": "model_id_tracked",
+          "check": "model_report.json identifies evaluated and selected model IDs"
+        },
+        {
+          "id": "class_imbalance_strategy",
+          "check": "model_report.json reports class imbalance handling strategy"
+        }
+      ],
+      "allowed_tools": [
+        "infer_task_type",
+        "default_tuning_plan",
+        "llm_tuning_plan",
+        "tune_and_evaluate_model",
+        "train_and_evaluate_model",
+        "validate_json_object"
+      ],
+      "recommended_tool_gap_field": "recommended_tool_gaps",
+      "imbalance_strategy": "class_weight_or_resampling"
+    }
+  }
+}

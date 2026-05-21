@@ -1,0 +1,977 @@
+{
+  "stage": "feature_engineering",
+  "status": "completed",
+  "policy": {
+    "mode": "standard",
+    "reason": "At least one candidate model requires encoded numeric features and numeric scaling.",
+    "task_type": "classification",
+    "candidate_model_ids": [
+      "logistic_regression",
+      "random_forest_classifier",
+      "gradient_boosting_classifier"
+    ],
+    "candidate_model_requirements": {
+      "encoding_required": true,
+      "scaling_required": true
+    },
+    "eda_recommendations": [
+      "Use frequency encoding or drop high-cardinality categorical columns instead of wide one-hot encoding.",
+      "Drop ID-like columns from model features to reduce memorization risk."
+    ]
+  },
+  "pipelines": {
+    "logistic_regression": {
+      "model_id": "logistic_regression",
+      "train_path": "workspace/pipelines/logistic_regression/fe_train.csv",
+      "test_path": "workspace/pipelines/logistic_regression/fe_test.csv",
+      "execution": {
+        "model_id": "logistic_regression",
+        "steps": [
+          "create_missing_indicators",
+          "impute_missing_features",
+          "convert_boolean_like_features",
+          "create_datetime_features",
+          "encode_categorical_features",
+          "clip_numeric_outliers",
+          "remove_low_information_features",
+          "remove_highly_correlated_features",
+          "drop_target_leakage_features",
+          "align_and_validate_feature_matrices",
+          "scale_numeric_features"
+        ],
+        "step_reports": {
+          "create_missing_indicators": {
+            "source_columns": [],
+            "created_columns": []
+          },
+          "impute_missing_features": {
+            "numeric_strategy": "median",
+            "categorical_strategy": "mode",
+            "imputed_columns": [],
+            "fill_values": {}
+          },
+          "convert_boolean_like_features": {
+            "converted_columns": []
+          },
+          "create_datetime_features": {
+            "transformed_columns": [],
+            "created_columns": {}
+          },
+          "encode_categorical_features": {
+            "one_hot_encoded_columns": [
+              "geography",
+              "gender"
+            ],
+            "frequency_encoded_columns": [
+              "surname"
+            ],
+            "dropped_identifier_like_columns": [],
+            "output_column_count": 17
+          },
+          "clip_numeric_outliers": {
+            "clipped_columns": {
+              "id": {
+                "lower": 1681.52,
+                "upper": 163411.48,
+                "train_values_clipped": 2642,
+                "test_values_clipped": 662
+              },
+              "customerid": {
+                "lower": 15570194.0,
+                "upper": 15810723.0,
+                "train_values_clipped": 2583,
+                "test_values_clipped": 683
+              },
+              "creditscore": {
+                "lower": 468.0,
+                "upper": 850.0,
+                "train_values_clipped": 1313,
+                "test_values_clipped": 328
+              },
+              "age": {
+                "lower": 22.0,
+                "upper": 66.0,
+                "train_values_clipped": 2195,
+                "test_values_clipped": 528
+              },
+              "balance": {
+                "lower": 0.0,
+                "upper": 172274.01,
+                "train_values_clipped": 1319,
+                "test_values_clipped": 344
+              },
+              "numofproducts": {
+                "lower": 1.0,
+                "upper": 3.0,
+                "train_values_clipped": 389,
+                "test_values_clipped": 86
+              },
+              "estimatedsalary": {
+                "lower": 1713.1,
+                "upper": 196257.55180000002,
+                "train_values_clipped": 2621,
+                "test_values_clipped": 626
+              },
+              "surname_frequency": {
+                "lower": 2.2722624917630484e-05,
+                "upper": 0.01499693244563612,
+                "train_values_clipped": 813,
+                "test_values_clipped": 336
+              }
+            }
+          },
+          "remove_low_information_features": {
+            "removed_columns": []
+          },
+          "remove_highly_correlated_features": {
+            "removed_columns": [
+              "gender_Male"
+            ],
+            "threshold": 0.98
+          },
+          "drop_target_leakage_features": {
+            "removed_columns": [],
+            "warnings": []
+          },
+          "align_and_validate_feature_matrices": {
+            "train_test_columns_match": true,
+            "all_features_numeric": true,
+            "non_numeric_features": [],
+            "missing_feature_values_train": 0,
+            "missing_feature_values_test": 0,
+            "feature_count": 15
+          },
+          "scale_numeric_features": {
+            "scaled_columns": [
+              "id",
+              "customerid",
+              "creditscore",
+              "age",
+              "tenure",
+              "balance",
+              "numofproducts",
+              "hascrcard",
+              "isactivemember",
+              "estimatedsalary",
+              "surname_frequency",
+              "geography_France",
+              "geography_Germany",
+              "geography_Spain",
+              "gender_Female"
+            ]
+          }
+        },
+        "input_profile": {
+          "train_shape": [
+            132027,
+            14
+          ],
+          "test_shape": [
+            33007,
+            14
+          ],
+          "feature_count": 13,
+          "numeric_features": [
+            "id",
+            "customerid",
+            "creditscore",
+            "age",
+            "tenure",
+            "balance",
+            "numofproducts",
+            "hascrcard",
+            "isactivemember",
+            "estimatedsalary"
+          ],
+          "categorical_features": [
+            "surname",
+            "geography",
+            "gender"
+          ],
+          "datetime_like_features": [],
+          "boolean_like_features": [],
+          "id_like_features": [
+            "id",
+            "customerid"
+          ],
+          "high_cardinality_features": [
+            "surname",
+            "creditscore",
+            "age",
+            "balance",
+            "estimatedsalary"
+          ],
+          "missing_ratio_train": {
+            "id": 0.0,
+            "customerid": 0.0,
+            "surname": 0.0,
+            "creditscore": 0.0,
+            "geography": 0.0,
+            "gender": 0.0,
+            "age": 0.0,
+            "tenure": 0.0,
+            "balance": 0.0,
+            "numofproducts": 0.0,
+            "hascrcard": 0.0,
+            "isactivemember": 0.0,
+            "estimatedsalary": 0.0
+          },
+          "missing_ratio_test": {
+            "id": 0.0,
+            "customerid": 0.0,
+            "surname": 0.0,
+            "creditscore": 0.0,
+            "geography": 0.0,
+            "gender": 0.0,
+            "age": 0.0,
+            "tenure": 0.0,
+            "balance": 0.0,
+            "numofproducts": 0.0,
+            "hascrcard": 0.0,
+            "isactivemember": 0.0,
+            "estimatedsalary": 0.0
+          }
+        },
+        "output_profile": {
+          "train_shape": [
+            132027,
+            16
+          ],
+          "test_shape": [
+            33007,
+            16
+          ],
+          "feature_count": 15,
+          "numeric_features": [
+            "id",
+            "customerid",
+            "creditscore",
+            "age",
+            "tenure",
+            "balance",
+            "numofproducts",
+            "hascrcard",
+            "isactivemember",
+            "estimatedsalary",
+            "surname_frequency",
+            "geography_France",
+            "geography_Germany",
+            "geography_Spain",
+            "gender_Female"
+          ],
+          "categorical_features": [],
+          "datetime_like_features": [],
+          "boolean_like_features": [],
+          "id_like_features": [
+            "id",
+            "customerid"
+          ],
+          "high_cardinality_features": [
+            "creditscore",
+            "age",
+            "balance",
+            "estimatedsalary",
+            "surname_frequency"
+          ],
+          "missing_ratio_train": {
+            "id": 0.0,
+            "customerid": 0.0,
+            "creditscore": 0.0,
+            "age": 0.0,
+            "tenure": 0.0,
+            "balance": 0.0,
+            "numofproducts": 0.0,
+            "hascrcard": 0.0,
+            "isactivemember": 0.0,
+            "estimatedsalary": 0.0,
+            "surname_frequency": 0.0,
+            "geography_France": 0.0,
+            "geography_Germany": 0.0,
+            "geography_Spain": 0.0,
+            "gender_Female": 0.0
+          },
+          "missing_ratio_test": {
+            "id": 0.0,
+            "customerid": 0.0,
+            "creditscore": 0.0,
+            "age": 0.0,
+            "tenure": 0.0,
+            "balance": 0.0,
+            "numofproducts": 0.0,
+            "hascrcard": 0.0,
+            "isactivemember": 0.0,
+            "estimatedsalary": 0.0,
+            "surname_frequency": 0.0,
+            "geography_France": 0.0,
+            "geography_Germany": 0.0,
+            "geography_Spain": 0.0,
+            "gender_Female": 0.0
+          }
+        },
+        "preprocessing": {
+          "categorical_encoding": "one_hot",
+          "numeric_imputation": "median",
+          "categorical_imputation": "mode",
+          "numeric_scaling": true,
+          "numeric_outlier_clipping": true,
+          "remove_constant_features": true,
+          "correlation_threshold": 0.98,
+          "drop_target_leakage_features": true,
+          "requires_all_features_numeric": true,
+          "allows_missing_feature_values": false
+        },
+        "eda_recommendations": [
+          "Use frequency encoding or drop high-cardinality categorical columns instead of wide one-hot encoding.",
+          "Drop ID-like columns from model features to reduce memorization risk."
+        ],
+        "eda_policy_actions": {
+          "applied": [
+            {
+              "recommendation": "Use frequency encoding or drop high-cardinality categorical columns instead of wide one-hot encoding.",
+              "action": "used frequency encoding for high-cardinality categorical features"
+            },
+            {
+              "recommendation": "Drop ID-like columns from model features to reduce memorization risk.",
+              "action": "dropped identifier-like categorical features during encoding"
+            }
+          ],
+          "deferred": []
+        }
+      },
+      "train_shape": [
+        132027,
+        16
+      ],
+      "test_shape": [
+        33007,
+        16
+      ],
+      "target_column": "exited"
+    },
+    "random_forest_classifier": {
+      "model_id": "random_forest_classifier",
+      "train_path": "workspace/pipelines/random_forest_classifier/fe_train.csv",
+      "test_path": "workspace/pipelines/random_forest_classifier/fe_test.csv",
+      "execution": {
+        "model_id": "random_forest_classifier",
+        "steps": [
+          "create_missing_indicators",
+          "impute_missing_features",
+          "convert_boolean_like_features",
+          "create_datetime_features",
+          "encode_categorical_features",
+          "clip_numeric_outliers",
+          "remove_low_information_features",
+          "drop_target_leakage_features",
+          "align_and_validate_feature_matrices"
+        ],
+        "step_reports": {
+          "create_missing_indicators": {
+            "source_columns": [],
+            "created_columns": []
+          },
+          "impute_missing_features": {
+            "numeric_strategy": "median",
+            "categorical_strategy": "mode",
+            "imputed_columns": [],
+            "fill_values": {}
+          },
+          "convert_boolean_like_features": {
+            "converted_columns": []
+          },
+          "create_datetime_features": {
+            "transformed_columns": [],
+            "created_columns": {}
+          },
+          "encode_categorical_features": {
+            "one_hot_encoded_columns": [
+              "geography",
+              "gender"
+            ],
+            "frequency_encoded_columns": [
+              "surname"
+            ],
+            "dropped_identifier_like_columns": [],
+            "output_column_count": 17
+          },
+          "clip_numeric_outliers": {
+            "clipped_columns": {
+              "id": {
+                "lower": 1681.52,
+                "upper": 163411.48,
+                "train_values_clipped": 2642,
+                "test_values_clipped": 662
+              },
+              "customerid": {
+                "lower": 15570194.0,
+                "upper": 15810723.0,
+                "train_values_clipped": 2583,
+                "test_values_clipped": 683
+              },
+              "creditscore": {
+                "lower": 468.0,
+                "upper": 850.0,
+                "train_values_clipped": 1313,
+                "test_values_clipped": 328
+              },
+              "age": {
+                "lower": 22.0,
+                "upper": 66.0,
+                "train_values_clipped": 2195,
+                "test_values_clipped": 528
+              },
+              "balance": {
+                "lower": 0.0,
+                "upper": 172274.01,
+                "train_values_clipped": 1319,
+                "test_values_clipped": 344
+              },
+              "numofproducts": {
+                "lower": 1.0,
+                "upper": 3.0,
+                "train_values_clipped": 389,
+                "test_values_clipped": 86
+              },
+              "estimatedsalary": {
+                "lower": 1713.1,
+                "upper": 196257.55180000002,
+                "train_values_clipped": 2621,
+                "test_values_clipped": 626
+              },
+              "surname_frequency": {
+                "lower": 2.2722624917630484e-05,
+                "upper": 0.01499693244563612,
+                "train_values_clipped": 813,
+                "test_values_clipped": 336
+              }
+            }
+          },
+          "remove_low_information_features": {
+            "removed_columns": []
+          },
+          "drop_target_leakage_features": {
+            "removed_columns": [],
+            "warnings": []
+          },
+          "align_and_validate_feature_matrices": {
+            "train_test_columns_match": true,
+            "all_features_numeric": true,
+            "non_numeric_features": [],
+            "missing_feature_values_train": 0,
+            "missing_feature_values_test": 0,
+            "feature_count": 16
+          }
+        },
+        "input_profile": {
+          "train_shape": [
+            132027,
+            14
+          ],
+          "test_shape": [
+            33007,
+            14
+          ],
+          "feature_count": 13,
+          "numeric_features": [
+            "id",
+            "customerid",
+            "creditscore",
+            "age",
+            "tenure",
+            "balance",
+            "numofproducts",
+            "hascrcard",
+            "isactivemember",
+            "estimatedsalary"
+          ],
+          "categorical_features": [
+            "surname",
+            "geography",
+            "gender"
+          ],
+          "datetime_like_features": [],
+          "boolean_like_features": [],
+          "id_like_features": [
+            "id",
+            "customerid"
+          ],
+          "high_cardinality_features": [
+            "surname",
+            "creditscore",
+            "age",
+            "balance",
+            "estimatedsalary"
+          ],
+          "missing_ratio_train": {
+            "id": 0.0,
+            "customerid": 0.0,
+            "surname": 0.0,
+            "creditscore": 0.0,
+            "geography": 0.0,
+            "gender": 0.0,
+            "age": 0.0,
+            "tenure": 0.0,
+            "balance": 0.0,
+            "numofproducts": 0.0,
+            "hascrcard": 0.0,
+            "isactivemember": 0.0,
+            "estimatedsalary": 0.0
+          },
+          "missing_ratio_test": {
+            "id": 0.0,
+            "customerid": 0.0,
+            "surname": 0.0,
+            "creditscore": 0.0,
+            "geography": 0.0,
+            "gender": 0.0,
+            "age": 0.0,
+            "tenure": 0.0,
+            "balance": 0.0,
+            "numofproducts": 0.0,
+            "hascrcard": 0.0,
+            "isactivemember": 0.0,
+            "estimatedsalary": 0.0
+          }
+        },
+        "output_profile": {
+          "train_shape": [
+            132027,
+            17
+          ],
+          "test_shape": [
+            33007,
+            17
+          ],
+          "feature_count": 16,
+          "numeric_features": [
+            "id",
+            "customerid",
+            "creditscore",
+            "age",
+            "tenure",
+            "balance",
+            "numofproducts",
+            "hascrcard",
+            "isactivemember",
+            "estimatedsalary",
+            "surname_frequency",
+            "geography_France",
+            "geography_Germany",
+            "geography_Spain",
+            "gender_Female",
+            "gender_Male"
+          ],
+          "categorical_features": [],
+          "datetime_like_features": [],
+          "boolean_like_features": [],
+          "id_like_features": [
+            "id",
+            "customerid"
+          ],
+          "high_cardinality_features": [
+            "creditscore",
+            "age",
+            "balance",
+            "estimatedsalary",
+            "surname_frequency"
+          ],
+          "missing_ratio_train": {
+            "id": 0.0,
+            "customerid": 0.0,
+            "creditscore": 0.0,
+            "age": 0.0,
+            "tenure": 0.0,
+            "balance": 0.0,
+            "numofproducts": 0.0,
+            "hascrcard": 0.0,
+            "isactivemember": 0.0,
+            "estimatedsalary": 0.0,
+            "surname_frequency": 0.0,
+            "geography_France": 0.0,
+            "geography_Germany": 0.0,
+            "geography_Spain": 0.0,
+            "gender_Female": 0.0,
+            "gender_Male": 0.0
+          },
+          "missing_ratio_test": {
+            "id": 0.0,
+            "customerid": 0.0,
+            "creditscore": 0.0,
+            "age": 0.0,
+            "tenure": 0.0,
+            "balance": 0.0,
+            "numofproducts": 0.0,
+            "hascrcard": 0.0,
+            "isactivemember": 0.0,
+            "estimatedsalary": 0.0,
+            "surname_frequency": 0.0,
+            "geography_France": 0.0,
+            "geography_Germany": 0.0,
+            "geography_Spain": 0.0,
+            "gender_Female": 0.0,
+            "gender_Male": 0.0
+          }
+        },
+        "preprocessing": {
+          "categorical_encoding": "one_hot",
+          "numeric_imputation": "median",
+          "categorical_imputation": "mode",
+          "numeric_scaling": false,
+          "numeric_outlier_clipping": true,
+          "remove_constant_features": true,
+          "correlation_threshold": null,
+          "drop_target_leakage_features": true,
+          "requires_all_features_numeric": true,
+          "allows_missing_feature_values": false
+        },
+        "eda_recommendations": [
+          "Use frequency encoding or drop high-cardinality categorical columns instead of wide one-hot encoding.",
+          "Drop ID-like columns from model features to reduce memorization risk."
+        ],
+        "eda_policy_actions": {
+          "applied": [
+            {
+              "recommendation": "Use frequency encoding or drop high-cardinality categorical columns instead of wide one-hot encoding.",
+              "action": "used frequency encoding for high-cardinality categorical features"
+            },
+            {
+              "recommendation": "Drop ID-like columns from model features to reduce memorization risk.",
+              "action": "dropped identifier-like categorical features during encoding"
+            }
+          ],
+          "deferred": []
+        }
+      },
+      "train_shape": [
+        132027,
+        17
+      ],
+      "test_shape": [
+        33007,
+        17
+      ],
+      "target_column": "exited"
+    },
+    "gradient_boosting_classifier": {
+      "model_id": "gradient_boosting_classifier",
+      "train_path": "workspace/pipelines/gradient_boosting_classifier/fe_train.csv",
+      "test_path": "workspace/pipelines/gradient_boosting_classifier/fe_test.csv",
+      "execution": {
+        "model_id": "gradient_boosting_classifier",
+        "steps": [
+          "create_missing_indicators",
+          "impute_missing_features",
+          "convert_boolean_like_features",
+          "create_datetime_features",
+          "encode_categorical_features",
+          "clip_numeric_outliers",
+          "remove_low_information_features",
+          "drop_target_leakage_features",
+          "align_and_validate_feature_matrices"
+        ],
+        "step_reports": {
+          "create_missing_indicators": {
+            "source_columns": [],
+            "created_columns": []
+          },
+          "impute_missing_features": {
+            "numeric_strategy": "median",
+            "categorical_strategy": "mode",
+            "imputed_columns": [],
+            "fill_values": {}
+          },
+          "convert_boolean_like_features": {
+            "converted_columns": []
+          },
+          "create_datetime_features": {
+            "transformed_columns": [],
+            "created_columns": {}
+          },
+          "encode_categorical_features": {
+            "one_hot_encoded_columns": [
+              "geography",
+              "gender"
+            ],
+            "frequency_encoded_columns": [
+              "surname"
+            ],
+            "dropped_identifier_like_columns": [],
+            "output_column_count": 17
+          },
+          "clip_numeric_outliers": {
+            "clipped_columns": {
+              "id": {
+                "lower": 1681.52,
+                "upper": 163411.48,
+                "train_values_clipped": 2642,
+                "test_values_clipped": 662
+              },
+              "customerid": {
+                "lower": 15570194.0,
+                "upper": 15810723.0,
+                "train_values_clipped": 2583,
+                "test_values_clipped": 683
+              },
+              "creditscore": {
+                "lower": 468.0,
+                "upper": 850.0,
+                "train_values_clipped": 1313,
+                "test_values_clipped": 328
+              },
+              "age": {
+                "lower": 22.0,
+                "upper": 66.0,
+                "train_values_clipped": 2195,
+                "test_values_clipped": 528
+              },
+              "balance": {
+                "lower": 0.0,
+                "upper": 172274.01,
+                "train_values_clipped": 1319,
+                "test_values_clipped": 344
+              },
+              "numofproducts": {
+                "lower": 1.0,
+                "upper": 3.0,
+                "train_values_clipped": 389,
+                "test_values_clipped": 86
+              },
+              "estimatedsalary": {
+                "lower": 1713.1,
+                "upper": 196257.55180000002,
+                "train_values_clipped": 2621,
+                "test_values_clipped": 626
+              },
+              "surname_frequency": {
+                "lower": 2.2722624917630484e-05,
+                "upper": 0.01499693244563612,
+                "train_values_clipped": 813,
+                "test_values_clipped": 336
+              }
+            }
+          },
+          "remove_low_information_features": {
+            "removed_columns": []
+          },
+          "drop_target_leakage_features": {
+            "removed_columns": [],
+            "warnings": []
+          },
+          "align_and_validate_feature_matrices": {
+            "train_test_columns_match": true,
+            "all_features_numeric": true,
+            "non_numeric_features": [],
+            "missing_feature_values_train": 0,
+            "missing_feature_values_test": 0,
+            "feature_count": 16
+          }
+        },
+        "input_profile": {
+          "train_shape": [
+            132027,
+            14
+          ],
+          "test_shape": [
+            33007,
+            14
+          ],
+          "feature_count": 13,
+          "numeric_features": [
+            "id",
+            "customerid",
+            "creditscore",
+            "age",
+            "tenure",
+            "balance",
+            "numofproducts",
+            "hascrcard",
+            "isactivemember",
+            "estimatedsalary"
+          ],
+          "categorical_features": [
+            "surname",
+            "geography",
+            "gender"
+          ],
+          "datetime_like_features": [],
+          "boolean_like_features": [],
+          "id_like_features": [
+            "id",
+            "customerid"
+          ],
+          "high_cardinality_features": [
+            "surname",
+            "creditscore",
+            "age",
+            "balance",
+            "estimatedsalary"
+          ],
+          "missing_ratio_train": {
+            "id": 0.0,
+            "customerid": 0.0,
+            "surname": 0.0,
+            "creditscore": 0.0,
+            "geography": 0.0,
+            "gender": 0.0,
+            "age": 0.0,
+            "tenure": 0.0,
+            "balance": 0.0,
+            "numofproducts": 0.0,
+            "hascrcard": 0.0,
+            "isactivemember": 0.0,
+            "estimatedsalary": 0.0
+          },
+          "missing_ratio_test": {
+            "id": 0.0,
+            "customerid": 0.0,
+            "surname": 0.0,
+            "creditscore": 0.0,
+            "geography": 0.0,
+            "gender": 0.0,
+            "age": 0.0,
+            "tenure": 0.0,
+            "balance": 0.0,
+            "numofproducts": 0.0,
+            "hascrcard": 0.0,
+            "isactivemember": 0.0,
+            "estimatedsalary": 0.0
+          }
+        },
+        "output_profile": {
+          "train_shape": [
+            132027,
+            17
+          ],
+          "test_shape": [
+            33007,
+            17
+          ],
+          "feature_count": 16,
+          "numeric_features": [
+            "id",
+            "customerid",
+            "creditscore",
+            "age",
+            "tenure",
+            "balance",
+            "numofproducts",
+            "hascrcard",
+            "isactivemember",
+            "estimatedsalary",
+            "surname_frequency",
+            "geography_France",
+            "geography_Germany",
+            "geography_Spain",
+            "gender_Female",
+            "gender_Male"
+          ],
+          "categorical_features": [],
+          "datetime_like_features": [],
+          "boolean_like_features": [],
+          "id_like_features": [
+            "id",
+            "customerid"
+          ],
+          "high_cardinality_features": [
+            "creditscore",
+            "age",
+            "balance",
+            "estimatedsalary",
+            "surname_frequency"
+          ],
+          "missing_ratio_train": {
+            "id": 0.0,
+            "customerid": 0.0,
+            "creditscore": 0.0,
+            "age": 0.0,
+            "tenure": 0.0,
+            "balance": 0.0,
+            "numofproducts": 0.0,
+            "hascrcard": 0.0,
+            "isactivemember": 0.0,
+            "estimatedsalary": 0.0,
+            "surname_frequency": 0.0,
+            "geography_France": 0.0,
+            "geography_Germany": 0.0,
+            "geography_Spain": 0.0,
+            "gender_Female": 0.0,
+            "gender_Male": 0.0
+          },
+          "missing_ratio_test": {
+            "id": 0.0,
+            "customerid": 0.0,
+            "creditscore": 0.0,
+            "age": 0.0,
+            "tenure": 0.0,
+            "balance": 0.0,
+            "numofproducts": 0.0,
+            "hascrcard": 0.0,
+            "isactivemember": 0.0,
+            "estimatedsalary": 0.0,
+            "surname_frequency": 0.0,
+            "geography_France": 0.0,
+            "geography_Germany": 0.0,
+            "geography_Spain": 0.0,
+            "gender_Female": 0.0,
+            "gender_Male": 0.0
+          }
+        },
+        "preprocessing": {
+          "categorical_encoding": "one_hot",
+          "numeric_imputation": "median",
+          "categorical_imputation": "mode",
+          "numeric_scaling": false,
+          "numeric_outlier_clipping": true,
+          "remove_constant_features": true,
+          "correlation_threshold": null,
+          "drop_target_leakage_features": true,
+          "requires_all_features_numeric": true,
+          "allows_missing_feature_values": false
+        },
+        "eda_recommendations": [
+          "Use frequency encoding or drop high-cardinality categorical columns instead of wide one-hot encoding.",
+          "Drop ID-like columns from model features to reduce memorization risk."
+        ],
+        "eda_policy_actions": {
+          "applied": [
+            {
+              "recommendation": "Use frequency encoding or drop high-cardinality categorical columns instead of wide one-hot encoding.",
+              "action": "used frequency encoding for high-cardinality categorical features"
+            },
+            {
+              "recommendation": "Drop ID-like columns from model features to reduce memorization risk.",
+              "action": "dropped identifier-like categorical features during encoding"
+            }
+          ],
+          "deferred": []
+        }
+      },
+      "train_shape": [
+        132027,
+        17
+      ],
+      "test_shape": [
+        33007,
+        17
+      ],
+      "target_column": "exited"
+    }
+  },
+  "execution": {
+    "pipeline_count": 3,
+    "model_ids": [
+      "logistic_regression",
+      "random_forest_classifier",
+      "gradient_boosting_classifier"
+    ]
+  },
+  "train_shape": [
+    132027,
+    16
+  ],
+  "test_shape": [
+    33007,
+    16
+  ],
+  "target_column": "exited"
+}

@@ -1,0 +1,1495 @@
+{
+  "task_type": "regression",
+  "target_column": "quality_score",
+  "candidate_model_ids": [
+    "ridge_regression",
+    "random_forest_regressor",
+    "gradient_boosting_regressor"
+  ],
+  "metric": "r2",
+  "candidate_results": [
+    {
+      "model_id": "ridge_regression",
+      "model_report_path": "workspace/pipelines/ridge_regression/model_report.json",
+      "feature_importance_path": "workspace/pipelines/ridge_regression/feature_importance.json",
+      "feature_pipeline": {
+        "model_id": "ridge_regression",
+        "train_path": "workspace/pipelines/ridge_regression/fe_train.csv",
+        "test_path": "workspace/pipelines/ridge_regression/fe_test.csv",
+        "execution": {
+          "model_id": "ridge_regression",
+          "steps": [
+            "create_missing_indicators",
+            "impute_missing_features",
+            "convert_boolean_like_features",
+            "create_datetime_features",
+            "encode_categorical_features",
+            "clip_numeric_outliers",
+            "remove_low_information_features",
+            "remove_highly_correlated_features",
+            "drop_target_leakage_features",
+            "align_and_validate_feature_matrices",
+            "scale_numeric_features"
+          ],
+          "step_reports": {
+            "create_missing_indicators": {
+              "source_columns": [],
+              "created_columns": []
+            },
+            "impute_missing_features": {
+              "numeric_strategy": "median",
+              "categorical_strategy": "mode",
+              "imputed_columns": [],
+              "fill_values": {}
+            },
+            "convert_boolean_like_features": {
+              "converted_columns": []
+            },
+            "create_datetime_features": {
+              "transformed_columns": [
+                "harvest_date"
+              ],
+              "created_columns": {
+                "harvest_date": [
+                  "harvest_date_year",
+                  "harvest_date_month",
+                  "harvest_date_dayofweek"
+                ]
+              }
+            },
+            "encode_categorical_features": {
+              "one_hot_encoded_columns": [
+                "variety",
+                "region",
+                "quality_category",
+                "ripeness_category"
+              ],
+              "frequency_encoded_columns": [],
+              "dropped_identifier_like_columns": [],
+              "output_column_count": 38
+            },
+            "clip_numeric_outliers": {
+              "clipped_columns": {
+                "sample_id": {
+                  "lower": 8.99,
+                  "upper": 989.02,
+                  "train_values_clipped": 16,
+                  "test_values_clipped": 3
+                },
+                "ripeness_index": {
+                  "lower": 1.07,
+                  "upper": 6.9501,
+                  "train_values_clipped": 14,
+                  "test_values_clipped": 4
+                },
+                "sugar_content_brix": {
+                  "lower": 15.0899,
+                  "upper": 21.8701,
+                  "train_values_clipped": 16,
+                  "test_values_clipped": 14
+                },
+                "firmness_kgf": {
+                  "lower": 0.55,
+                  "upper": 4.930199999999999,
+                  "train_values_clipped": 15,
+                  "test_values_clipped": 5
+                },
+                "length_cm": {
+                  "lower": 10.2594,
+                  "upper": 29.7801,
+                  "train_values_clipped": 16,
+                  "test_values_clipped": 7
+                },
+                "weight_g": {
+                  "lower": 82.7154,
+                  "upper": 247.39159999999998,
+                  "train_values_clipped": 16,
+                  "test_values_clipped": 9
+                },
+                "tree_age_years": {
+                  "lower": 2.2,
+                  "upper": 19.8,
+                  "train_values_clipped": 11,
+                  "test_values_clipped": 2
+                },
+                "altitude_m": {
+                  "lower": 13.69,
+                  "upper": 1477.409,
+                  "train_values_clipped": 16,
+                  "test_values_clipped": 5
+                },
+                "rainfall_mm": {
+                  "lower": 1019.094,
+                  "upper": 2971.711,
+                  "train_values_clipped": 16,
+                  "test_values_clipped": 1
+                },
+                "soil_nitrogen_ppm": {
+                  "lower": 12.295000000000002,
+                  "upper": 197.41,
+                  "train_values_clipped": 16,
+                  "test_values_clipped": 4
+                }
+              }
+            },
+            "remove_low_information_features": {
+              "removed_columns": [
+                "harvest_date_year"
+              ]
+            },
+            "remove_highly_correlated_features": {
+              "removed_columns": [],
+              "threshold": 0.98
+            },
+            "drop_target_leakage_features": {
+              "removed_columns": [],
+              "warnings": []
+            },
+            "align_and_validate_feature_matrices": {
+              "train_test_columns_match": true,
+              "all_features_numeric": true,
+              "non_numeric_features": [],
+              "missing_feature_values_train": 0,
+              "missing_feature_values_test": 0,
+              "feature_count": 36
+            },
+            "scale_numeric_features": {
+              "scaled_columns": [
+                "sample_id",
+                "ripeness_index",
+                "sugar_content_brix",
+                "firmness_kgf",
+                "length_cm",
+                "weight_g",
+                "tree_age_years",
+                "altitude_m",
+                "rainfall_mm",
+                "soil_nitrogen_ppm",
+                "harvest_date_month",
+                "harvest_date_dayofweek",
+                "variety_Blue Java",
+                "variety_Burro",
+                "variety_Cavendish",
+                "variety_Fehi",
+                "variety_Lady Finger",
+                "variety_Manzano",
+                "variety_Plantain",
+                "variety_Red Dacca",
+                "region_Brazil",
+                "region_Colombia",
+                "region_Costa Rica",
+                "region_Ecuador",
+                "region_Guatemala",
+                "region_Honduras",
+                "region_India",
+                "region_Philippines",
+                "quality_category_Good",
+                "quality_category_Premium",
+                "quality_category_Processing",
+                "quality_category_Unripe",
+                "ripeness_category_Green",
+                "ripeness_category_Overripe",
+                "ripeness_category_Ripe",
+                "ripeness_category_Turning"
+              ]
+            }
+          },
+          "input_profile": {
+            "train_shape": [
+              800,
+              16
+            ],
+            "test_shape": [
+              200,
+              16
+            ],
+            "feature_count": 15,
+            "numeric_features": [
+              "sample_id",
+              "ripeness_index",
+              "sugar_content_brix",
+              "firmness_kgf",
+              "length_cm",
+              "weight_g",
+              "tree_age_years",
+              "altitude_m",
+              "rainfall_mm",
+              "soil_nitrogen_ppm"
+            ],
+            "categorical_features": [
+              "variety",
+              "region",
+              "quality_category",
+              "ripeness_category",
+              "harvest_date"
+            ],
+            "datetime_like_features": [
+              "harvest_date"
+            ],
+            "boolean_like_features": [],
+            "id_like_features": [
+              "sample_id",
+              "length_cm",
+              "weight_g",
+              "altitude_m",
+              "rainfall_mm",
+              "soil_nitrogen_ppm"
+            ],
+            "high_cardinality_features": [
+              "ripeness_index",
+              "sugar_content_brix",
+              "firmness_kgf",
+              "harvest_date",
+              "tree_age_years"
+            ],
+            "missing_ratio_train": {
+              "sample_id": 0.0,
+              "variety": 0.0,
+              "region": 0.0,
+              "quality_category": 0.0,
+              "ripeness_index": 0.0,
+              "ripeness_category": 0.0,
+              "sugar_content_brix": 0.0,
+              "firmness_kgf": 0.0,
+              "length_cm": 0.0,
+              "weight_g": 0.0,
+              "harvest_date": 0.0,
+              "tree_age_years": 0.0,
+              "altitude_m": 0.0,
+              "rainfall_mm": 0.0,
+              "soil_nitrogen_ppm": 0.0
+            },
+            "missing_ratio_test": {
+              "sample_id": 0.0,
+              "variety": 0.0,
+              "region": 0.0,
+              "quality_category": 0.0,
+              "ripeness_index": 0.0,
+              "ripeness_category": 0.0,
+              "sugar_content_brix": 0.0,
+              "firmness_kgf": 0.0,
+              "length_cm": 0.0,
+              "weight_g": 0.0,
+              "harvest_date": 0.0,
+              "tree_age_years": 0.0,
+              "altitude_m": 0.0,
+              "rainfall_mm": 0.0,
+              "soil_nitrogen_ppm": 0.0
+            }
+          },
+          "output_profile": {
+            "train_shape": [
+              800,
+              37
+            ],
+            "test_shape": [
+              200,
+              37
+            ],
+            "feature_count": 36,
+            "numeric_features": [
+              "sample_id",
+              "ripeness_index",
+              "sugar_content_brix",
+              "firmness_kgf",
+              "length_cm",
+              "weight_g",
+              "tree_age_years",
+              "altitude_m",
+              "rainfall_mm",
+              "soil_nitrogen_ppm",
+              "harvest_date_month",
+              "harvest_date_dayofweek",
+              "variety_Blue Java",
+              "variety_Burro",
+              "variety_Cavendish",
+              "variety_Fehi",
+              "variety_Lady Finger",
+              "variety_Manzano",
+              "variety_Plantain",
+              "variety_Red Dacca",
+              "region_Brazil",
+              "region_Colombia",
+              "region_Costa Rica",
+              "region_Ecuador",
+              "region_Guatemala",
+              "region_Honduras",
+              "region_India",
+              "region_Philippines",
+              "quality_category_Good",
+              "quality_category_Premium",
+              "quality_category_Processing",
+              "quality_category_Unripe",
+              "ripeness_category_Green",
+              "ripeness_category_Overripe",
+              "ripeness_category_Ripe",
+              "ripeness_category_Turning"
+            ],
+            "categorical_features": [],
+            "datetime_like_features": [],
+            "boolean_like_features": [],
+            "id_like_features": [
+              "sample_id",
+              "length_cm",
+              "weight_g",
+              "altitude_m",
+              "rainfall_mm"
+            ],
+            "high_cardinality_features": [
+              "ripeness_index",
+              "sugar_content_brix",
+              "firmness_kgf",
+              "tree_age_years",
+              "soil_nitrogen_ppm"
+            ],
+            "missing_ratio_train": {
+              "sample_id": 0.0,
+              "ripeness_index": 0.0,
+              "sugar_content_brix": 0.0,
+              "firmness_kgf": 0.0,
+              "length_cm": 0.0,
+              "weight_g": 0.0,
+              "tree_age_years": 0.0,
+              "altitude_m": 0.0,
+              "rainfall_mm": 0.0,
+              "soil_nitrogen_ppm": 0.0,
+              "harvest_date_month": 0.0,
+              "harvest_date_dayofweek": 0.0,
+              "variety_Blue Java": 0.0,
+              "variety_Burro": 0.0,
+              "variety_Cavendish": 0.0,
+              "variety_Fehi": 0.0,
+              "variety_Lady Finger": 0.0,
+              "variety_Manzano": 0.0,
+              "variety_Plantain": 0.0,
+              "variety_Red Dacca": 0.0,
+              "region_Brazil": 0.0,
+              "region_Colombia": 0.0,
+              "region_Costa Rica": 0.0,
+              "region_Ecuador": 0.0,
+              "region_Guatemala": 0.0,
+              "region_Honduras": 0.0,
+              "region_India": 0.0,
+              "region_Philippines": 0.0,
+              "quality_category_Good": 0.0,
+              "quality_category_Premium": 0.0,
+              "quality_category_Processing": 0.0,
+              "quality_category_Unripe": 0.0,
+              "ripeness_category_Green": 0.0,
+              "ripeness_category_Overripe": 0.0,
+              "ripeness_category_Ripe": 0.0,
+              "ripeness_category_Turning": 0.0
+            },
+            "missing_ratio_test": {
+              "sample_id": 0.0,
+              "ripeness_index": 0.0,
+              "sugar_content_brix": 0.0,
+              "firmness_kgf": 0.0,
+              "length_cm": 0.0,
+              "weight_g": 0.0,
+              "tree_age_years": 0.0,
+              "altitude_m": 0.0,
+              "rainfall_mm": 0.0,
+              "soil_nitrogen_ppm": 0.0,
+              "harvest_date_month": 0.0,
+              "harvest_date_dayofweek": 0.0,
+              "variety_Blue Java": 0.0,
+              "variety_Burro": 0.0,
+              "variety_Cavendish": 0.0,
+              "variety_Fehi": 0.0,
+              "variety_Lady Finger": 0.0,
+              "variety_Manzano": 0.0,
+              "variety_Plantain": 0.0,
+              "variety_Red Dacca": 0.0,
+              "region_Brazil": 0.0,
+              "region_Colombia": 0.0,
+              "region_Costa Rica": 0.0,
+              "region_Ecuador": 0.0,
+              "region_Guatemala": 0.0,
+              "region_Honduras": 0.0,
+              "region_India": 0.0,
+              "region_Philippines": 0.0,
+              "quality_category_Good": 0.0,
+              "quality_category_Premium": 0.0,
+              "quality_category_Processing": 0.0,
+              "quality_category_Unripe": 0.0,
+              "ripeness_category_Green": 0.0,
+              "ripeness_category_Overripe": 0.0,
+              "ripeness_category_Ripe": 0.0,
+              "ripeness_category_Turning": 0.0
+            }
+          },
+          "preprocessing": {
+            "categorical_encoding": "one_hot",
+            "numeric_imputation": "median",
+            "categorical_imputation": "mode",
+            "numeric_scaling": true,
+            "numeric_outlier_clipping": true,
+            "remove_constant_features": true,
+            "correlation_threshold": 0.98,
+            "drop_target_leakage_features": true,
+            "requires_all_features_numeric": true,
+            "allows_missing_feature_values": false
+          },
+          "eda_recommendations": [
+            "Use frequency encoding or drop high-cardinality categorical columns instead of wide one-hot encoding.",
+            "Drop ID-like columns from model features to reduce memorization risk."
+          ],
+          "eda_policy_actions": {
+            "applied": [
+              {
+                "recommendation": "Use frequency encoding or drop high-cardinality categorical columns instead of wide one-hot encoding.",
+                "action": "used frequency encoding for high-cardinality categorical features"
+              },
+              {
+                "recommendation": "Drop ID-like columns from model features to reduce memorization risk.",
+                "action": "dropped identifier-like categorical features during encoding"
+              }
+            ],
+            "deferred": []
+          }
+        },
+        "train_shape": [
+          800,
+          37
+        ],
+        "test_shape": [
+          200,
+          37
+        ],
+        "target_column": "quality_score"
+      },
+      "task_type": "regression",
+      "target_column": "quality_score",
+      "metric": "r2",
+      "cv_score": 0.9844309675893498,
+      "cv_scores": [],
+      "test_metrics": {
+        "r2": 0.9826584869870758,
+        "mae": 0.06163690498654331,
+        "rmse": 0.0722539792728544
+      },
+      "tuning": {
+        "status": "completed",
+        "failure_reason": "",
+        "baseline": {
+          "metric": "r2",
+          "cv": 3,
+          "scores": [
+            0.9848054584461177,
+            0.9850355165343629,
+            0.9833539673292938
+          ],
+          "mean_cv_score": 0.9843983141032582
+        },
+        "plan": {
+          "source": "llm",
+          "model_id": "ridge_regression",
+          "task_type": "regression",
+          "metric": "r2",
+          "cv": 3,
+          "budget": "small",
+          "param_grid": {
+            "alpha": [
+              0.1,
+              1.0,
+              10.0
+            ]
+          },
+          "explanation": "The baseline performance is strong, so a compact grid is chosen to efficiently explore the alpha parameter, which has a significant impact on regularization strength."
+        },
+        "n_jobs": -1,
+        "best_params": {
+          "alpha": 0.1
+        },
+        "best_cv_score": 0.9844309675893498,
+        "explanation": "The baseline performance is strong, so a compact grid is chosen to efficiently explore the alpha parameter, which has a significant impact on regularization strength."
+      }
+    },
+    {
+      "model_id": "random_forest_regressor",
+      "model_report_path": "workspace/pipelines/random_forest_regressor/model_report.json",
+      "feature_importance_path": "workspace/pipelines/random_forest_regressor/feature_importance.json",
+      "feature_pipeline": {
+        "model_id": "random_forest_regressor",
+        "train_path": "workspace/pipelines/random_forest_regressor/fe_train.csv",
+        "test_path": "workspace/pipelines/random_forest_regressor/fe_test.csv",
+        "execution": {
+          "model_id": "random_forest_regressor",
+          "steps": [
+            "create_missing_indicators",
+            "impute_missing_features",
+            "convert_boolean_like_features",
+            "create_datetime_features",
+            "encode_categorical_features",
+            "clip_numeric_outliers",
+            "remove_low_information_features",
+            "drop_target_leakage_features",
+            "align_and_validate_feature_matrices"
+          ],
+          "step_reports": {
+            "create_missing_indicators": {
+              "source_columns": [],
+              "created_columns": []
+            },
+            "impute_missing_features": {
+              "numeric_strategy": "median",
+              "categorical_strategy": "mode",
+              "imputed_columns": [],
+              "fill_values": {}
+            },
+            "convert_boolean_like_features": {
+              "converted_columns": []
+            },
+            "create_datetime_features": {
+              "transformed_columns": [
+                "harvest_date"
+              ],
+              "created_columns": {
+                "harvest_date": [
+                  "harvest_date_year",
+                  "harvest_date_month",
+                  "harvest_date_dayofweek"
+                ]
+              }
+            },
+            "encode_categorical_features": {
+              "one_hot_encoded_columns": [
+                "variety",
+                "region",
+                "quality_category",
+                "ripeness_category"
+              ],
+              "frequency_encoded_columns": [],
+              "dropped_identifier_like_columns": [],
+              "output_column_count": 38
+            },
+            "clip_numeric_outliers": {
+              "clipped_columns": {
+                "sample_id": {
+                  "lower": 8.99,
+                  "upper": 989.02,
+                  "train_values_clipped": 16,
+                  "test_values_clipped": 3
+                },
+                "ripeness_index": {
+                  "lower": 1.07,
+                  "upper": 6.9501,
+                  "train_values_clipped": 14,
+                  "test_values_clipped": 4
+                },
+                "sugar_content_brix": {
+                  "lower": 15.0899,
+                  "upper": 21.8701,
+                  "train_values_clipped": 16,
+                  "test_values_clipped": 14
+                },
+                "firmness_kgf": {
+                  "lower": 0.55,
+                  "upper": 4.930199999999999,
+                  "train_values_clipped": 15,
+                  "test_values_clipped": 5
+                },
+                "length_cm": {
+                  "lower": 10.2594,
+                  "upper": 29.7801,
+                  "train_values_clipped": 16,
+                  "test_values_clipped": 7
+                },
+                "weight_g": {
+                  "lower": 82.7154,
+                  "upper": 247.39159999999998,
+                  "train_values_clipped": 16,
+                  "test_values_clipped": 9
+                },
+                "tree_age_years": {
+                  "lower": 2.2,
+                  "upper": 19.8,
+                  "train_values_clipped": 11,
+                  "test_values_clipped": 2
+                },
+                "altitude_m": {
+                  "lower": 13.69,
+                  "upper": 1477.409,
+                  "train_values_clipped": 16,
+                  "test_values_clipped": 5
+                },
+                "rainfall_mm": {
+                  "lower": 1019.094,
+                  "upper": 2971.711,
+                  "train_values_clipped": 16,
+                  "test_values_clipped": 1
+                },
+                "soil_nitrogen_ppm": {
+                  "lower": 12.295000000000002,
+                  "upper": 197.41,
+                  "train_values_clipped": 16,
+                  "test_values_clipped": 4
+                }
+              }
+            },
+            "remove_low_information_features": {
+              "removed_columns": [
+                "harvest_date_year"
+              ]
+            },
+            "drop_target_leakage_features": {
+              "removed_columns": [],
+              "warnings": []
+            },
+            "align_and_validate_feature_matrices": {
+              "train_test_columns_match": true,
+              "all_features_numeric": true,
+              "non_numeric_features": [],
+              "missing_feature_values_train": 0,
+              "missing_feature_values_test": 0,
+              "feature_count": 36
+            }
+          },
+          "input_profile": {
+            "train_shape": [
+              800,
+              16
+            ],
+            "test_shape": [
+              200,
+              16
+            ],
+            "feature_count": 15,
+            "numeric_features": [
+              "sample_id",
+              "ripeness_index",
+              "sugar_content_brix",
+              "firmness_kgf",
+              "length_cm",
+              "weight_g",
+              "tree_age_years",
+              "altitude_m",
+              "rainfall_mm",
+              "soil_nitrogen_ppm"
+            ],
+            "categorical_features": [
+              "variety",
+              "region",
+              "quality_category",
+              "ripeness_category",
+              "harvest_date"
+            ],
+            "datetime_like_features": [
+              "harvest_date"
+            ],
+            "boolean_like_features": [],
+            "id_like_features": [
+              "sample_id",
+              "length_cm",
+              "weight_g",
+              "altitude_m",
+              "rainfall_mm",
+              "soil_nitrogen_ppm"
+            ],
+            "high_cardinality_features": [
+              "ripeness_index",
+              "sugar_content_brix",
+              "firmness_kgf",
+              "harvest_date",
+              "tree_age_years"
+            ],
+            "missing_ratio_train": {
+              "sample_id": 0.0,
+              "variety": 0.0,
+              "region": 0.0,
+              "quality_category": 0.0,
+              "ripeness_index": 0.0,
+              "ripeness_category": 0.0,
+              "sugar_content_brix": 0.0,
+              "firmness_kgf": 0.0,
+              "length_cm": 0.0,
+              "weight_g": 0.0,
+              "harvest_date": 0.0,
+              "tree_age_years": 0.0,
+              "altitude_m": 0.0,
+              "rainfall_mm": 0.0,
+              "soil_nitrogen_ppm": 0.0
+            },
+            "missing_ratio_test": {
+              "sample_id": 0.0,
+              "variety": 0.0,
+              "region": 0.0,
+              "quality_category": 0.0,
+              "ripeness_index": 0.0,
+              "ripeness_category": 0.0,
+              "sugar_content_brix": 0.0,
+              "firmness_kgf": 0.0,
+              "length_cm": 0.0,
+              "weight_g": 0.0,
+              "harvest_date": 0.0,
+              "tree_age_years": 0.0,
+              "altitude_m": 0.0,
+              "rainfall_mm": 0.0,
+              "soil_nitrogen_ppm": 0.0
+            }
+          },
+          "output_profile": {
+            "train_shape": [
+              800,
+              37
+            ],
+            "test_shape": [
+              200,
+              37
+            ],
+            "feature_count": 36,
+            "numeric_features": [
+              "sample_id",
+              "ripeness_index",
+              "sugar_content_brix",
+              "firmness_kgf",
+              "length_cm",
+              "weight_g",
+              "tree_age_years",
+              "altitude_m",
+              "rainfall_mm",
+              "soil_nitrogen_ppm",
+              "harvest_date_month",
+              "harvest_date_dayofweek",
+              "variety_Blue Java",
+              "variety_Burro",
+              "variety_Cavendish",
+              "variety_Fehi",
+              "variety_Lady Finger",
+              "variety_Manzano",
+              "variety_Plantain",
+              "variety_Red Dacca",
+              "region_Brazil",
+              "region_Colombia",
+              "region_Costa Rica",
+              "region_Ecuador",
+              "region_Guatemala",
+              "region_Honduras",
+              "region_India",
+              "region_Philippines",
+              "quality_category_Good",
+              "quality_category_Premium",
+              "quality_category_Processing",
+              "quality_category_Unripe",
+              "ripeness_category_Green",
+              "ripeness_category_Overripe",
+              "ripeness_category_Ripe",
+              "ripeness_category_Turning"
+            ],
+            "categorical_features": [],
+            "datetime_like_features": [],
+            "boolean_like_features": [],
+            "id_like_features": [
+              "sample_id",
+              "length_cm",
+              "weight_g",
+              "altitude_m",
+              "rainfall_mm"
+            ],
+            "high_cardinality_features": [
+              "ripeness_index",
+              "sugar_content_brix",
+              "firmness_kgf",
+              "tree_age_years",
+              "soil_nitrogen_ppm"
+            ],
+            "missing_ratio_train": {
+              "sample_id": 0.0,
+              "ripeness_index": 0.0,
+              "sugar_content_brix": 0.0,
+              "firmness_kgf": 0.0,
+              "length_cm": 0.0,
+              "weight_g": 0.0,
+              "tree_age_years": 0.0,
+              "altitude_m": 0.0,
+              "rainfall_mm": 0.0,
+              "soil_nitrogen_ppm": 0.0,
+              "harvest_date_month": 0.0,
+              "harvest_date_dayofweek": 0.0,
+              "variety_Blue Java": 0.0,
+              "variety_Burro": 0.0,
+              "variety_Cavendish": 0.0,
+              "variety_Fehi": 0.0,
+              "variety_Lady Finger": 0.0,
+              "variety_Manzano": 0.0,
+              "variety_Plantain": 0.0,
+              "variety_Red Dacca": 0.0,
+              "region_Brazil": 0.0,
+              "region_Colombia": 0.0,
+              "region_Costa Rica": 0.0,
+              "region_Ecuador": 0.0,
+              "region_Guatemala": 0.0,
+              "region_Honduras": 0.0,
+              "region_India": 0.0,
+              "region_Philippines": 0.0,
+              "quality_category_Good": 0.0,
+              "quality_category_Premium": 0.0,
+              "quality_category_Processing": 0.0,
+              "quality_category_Unripe": 0.0,
+              "ripeness_category_Green": 0.0,
+              "ripeness_category_Overripe": 0.0,
+              "ripeness_category_Ripe": 0.0,
+              "ripeness_category_Turning": 0.0
+            },
+            "missing_ratio_test": {
+              "sample_id": 0.0,
+              "ripeness_index": 0.0,
+              "sugar_content_brix": 0.0,
+              "firmness_kgf": 0.0,
+              "length_cm": 0.0,
+              "weight_g": 0.0,
+              "tree_age_years": 0.0,
+              "altitude_m": 0.0,
+              "rainfall_mm": 0.0,
+              "soil_nitrogen_ppm": 0.0,
+              "harvest_date_month": 0.0,
+              "harvest_date_dayofweek": 0.0,
+              "variety_Blue Java": 0.0,
+              "variety_Burro": 0.0,
+              "variety_Cavendish": 0.0,
+              "variety_Fehi": 0.0,
+              "variety_Lady Finger": 0.0,
+              "variety_Manzano": 0.0,
+              "variety_Plantain": 0.0,
+              "variety_Red Dacca": 0.0,
+              "region_Brazil": 0.0,
+              "region_Colombia": 0.0,
+              "region_Costa Rica": 0.0,
+              "region_Ecuador": 0.0,
+              "region_Guatemala": 0.0,
+              "region_Honduras": 0.0,
+              "region_India": 0.0,
+              "region_Philippines": 0.0,
+              "quality_category_Good": 0.0,
+              "quality_category_Premium": 0.0,
+              "quality_category_Processing": 0.0,
+              "quality_category_Unripe": 0.0,
+              "ripeness_category_Green": 0.0,
+              "ripeness_category_Overripe": 0.0,
+              "ripeness_category_Ripe": 0.0,
+              "ripeness_category_Turning": 0.0
+            }
+          },
+          "preprocessing": {
+            "categorical_encoding": "one_hot",
+            "numeric_imputation": "median",
+            "categorical_imputation": "mode",
+            "numeric_scaling": false,
+            "numeric_outlier_clipping": true,
+            "remove_constant_features": true,
+            "correlation_threshold": null,
+            "drop_target_leakage_features": true,
+            "requires_all_features_numeric": true,
+            "allows_missing_feature_values": false
+          },
+          "eda_recommendations": [
+            "Use frequency encoding or drop high-cardinality categorical columns instead of wide one-hot encoding.",
+            "Drop ID-like columns from model features to reduce memorization risk."
+          ],
+          "eda_policy_actions": {
+            "applied": [
+              {
+                "recommendation": "Use frequency encoding or drop high-cardinality categorical columns instead of wide one-hot encoding.",
+                "action": "used frequency encoding for high-cardinality categorical features"
+              },
+              {
+                "recommendation": "Drop ID-like columns from model features to reduce memorization risk.",
+                "action": "dropped identifier-like categorical features during encoding"
+              }
+            ],
+            "deferred": []
+          }
+        },
+        "train_shape": [
+          800,
+          37
+        ],
+        "test_shape": [
+          200,
+          37
+        ],
+        "target_column": "quality_score"
+      },
+      "task_type": "regression",
+      "target_column": "quality_score",
+      "metric": "r2",
+      "cv_score": 0.9067291282856448,
+      "cv_scores": [],
+      "test_metrics": {
+        "r2": 0.9134615431540596,
+        "mae": 0.13235995847797788,
+        "rmse": 0.161407180193734
+      },
+      "tuning": {
+        "status": "completed",
+        "failure_reason": "",
+        "baseline": {
+          "metric": "r2",
+          "cv": 3,
+          "scores": [
+            0.9557793814306783,
+            0.9487568182128613,
+            0.9582481473191284
+          ],
+          "mean_cv_score": 0.9542614489875559
+        },
+        "plan": {
+          "source": "llm",
+          "model_id": "random_forest_regressor",
+          "task_type": "regression",
+          "metric": "r2",
+          "cv": 3,
+          "budget": "small",
+          "param_grid": {
+            "n_estimators": [
+              100,
+              200
+            ],
+            "max_depth": [
+              5,
+              10
+            ],
+            "min_samples_leaf": [
+              1,
+              2
+            ],
+            "max_features": [
+              "sqrt"
+            ]
+          },
+          "explanation": "The tuning plan focuses on a compact grid with a mix of n_estimators and max_depth to explore model complexity while ensuring computational efficiency. The inclusion of min_samples_leaf and max_features allows for fine-tuning of the model's ability to generalize without overfitting."
+        },
+        "n_jobs": -1,
+        "best_params": {
+          "max_depth": 10,
+          "max_features": "sqrt",
+          "min_samples_leaf": 1,
+          "n_estimators": 200
+        },
+        "best_cv_score": 0.9067291282856448,
+        "explanation": "The tuning plan focuses on a compact grid with a mix of n_estimators and max_depth to explore model complexity while ensuring computational efficiency. The inclusion of min_samples_leaf and max_features allows for fine-tuning of the model's ability to generalize without overfitting."
+      }
+    },
+    {
+      "model_id": "gradient_boosting_regressor",
+      "model_report_path": "workspace/pipelines/gradient_boosting_regressor/model_report.json",
+      "feature_importance_path": "workspace/pipelines/gradient_boosting_regressor/feature_importance.json",
+      "feature_pipeline": {
+        "model_id": "gradient_boosting_regressor",
+        "train_path": "workspace/pipelines/gradient_boosting_regressor/fe_train.csv",
+        "test_path": "workspace/pipelines/gradient_boosting_regressor/fe_test.csv",
+        "execution": {
+          "model_id": "gradient_boosting_regressor",
+          "steps": [
+            "create_missing_indicators",
+            "impute_missing_features",
+            "convert_boolean_like_features",
+            "create_datetime_features",
+            "encode_categorical_features",
+            "clip_numeric_outliers",
+            "remove_low_information_features",
+            "drop_target_leakage_features",
+            "align_and_validate_feature_matrices"
+          ],
+          "step_reports": {
+            "create_missing_indicators": {
+              "source_columns": [],
+              "created_columns": []
+            },
+            "impute_missing_features": {
+              "numeric_strategy": "median",
+              "categorical_strategy": "mode",
+              "imputed_columns": [],
+              "fill_values": {}
+            },
+            "convert_boolean_like_features": {
+              "converted_columns": []
+            },
+            "create_datetime_features": {
+              "transformed_columns": [
+                "harvest_date"
+              ],
+              "created_columns": {
+                "harvest_date": [
+                  "harvest_date_year",
+                  "harvest_date_month",
+                  "harvest_date_dayofweek"
+                ]
+              }
+            },
+            "encode_categorical_features": {
+              "one_hot_encoded_columns": [
+                "variety",
+                "region",
+                "quality_category",
+                "ripeness_category"
+              ],
+              "frequency_encoded_columns": [],
+              "dropped_identifier_like_columns": [],
+              "output_column_count": 38
+            },
+            "clip_numeric_outliers": {
+              "clipped_columns": {
+                "sample_id": {
+                  "lower": 8.99,
+                  "upper": 989.02,
+                  "train_values_clipped": 16,
+                  "test_values_clipped": 3
+                },
+                "ripeness_index": {
+                  "lower": 1.07,
+                  "upper": 6.9501,
+                  "train_values_clipped": 14,
+                  "test_values_clipped": 4
+                },
+                "sugar_content_brix": {
+                  "lower": 15.0899,
+                  "upper": 21.8701,
+                  "train_values_clipped": 16,
+                  "test_values_clipped": 14
+                },
+                "firmness_kgf": {
+                  "lower": 0.55,
+                  "upper": 4.930199999999999,
+                  "train_values_clipped": 15,
+                  "test_values_clipped": 5
+                },
+                "length_cm": {
+                  "lower": 10.2594,
+                  "upper": 29.7801,
+                  "train_values_clipped": 16,
+                  "test_values_clipped": 7
+                },
+                "weight_g": {
+                  "lower": 82.7154,
+                  "upper": 247.39159999999998,
+                  "train_values_clipped": 16,
+                  "test_values_clipped": 9
+                },
+                "tree_age_years": {
+                  "lower": 2.2,
+                  "upper": 19.8,
+                  "train_values_clipped": 11,
+                  "test_values_clipped": 2
+                },
+                "altitude_m": {
+                  "lower": 13.69,
+                  "upper": 1477.409,
+                  "train_values_clipped": 16,
+                  "test_values_clipped": 5
+                },
+                "rainfall_mm": {
+                  "lower": 1019.094,
+                  "upper": 2971.711,
+                  "train_values_clipped": 16,
+                  "test_values_clipped": 1
+                },
+                "soil_nitrogen_ppm": {
+                  "lower": 12.295000000000002,
+                  "upper": 197.41,
+                  "train_values_clipped": 16,
+                  "test_values_clipped": 4
+                }
+              }
+            },
+            "remove_low_information_features": {
+              "removed_columns": [
+                "harvest_date_year"
+              ]
+            },
+            "drop_target_leakage_features": {
+              "removed_columns": [],
+              "warnings": []
+            },
+            "align_and_validate_feature_matrices": {
+              "train_test_columns_match": true,
+              "all_features_numeric": true,
+              "non_numeric_features": [],
+              "missing_feature_values_train": 0,
+              "missing_feature_values_test": 0,
+              "feature_count": 36
+            }
+          },
+          "input_profile": {
+            "train_shape": [
+              800,
+              16
+            ],
+            "test_shape": [
+              200,
+              16
+            ],
+            "feature_count": 15,
+            "numeric_features": [
+              "sample_id",
+              "ripeness_index",
+              "sugar_content_brix",
+              "firmness_kgf",
+              "length_cm",
+              "weight_g",
+              "tree_age_years",
+              "altitude_m",
+              "rainfall_mm",
+              "soil_nitrogen_ppm"
+            ],
+            "categorical_features": [
+              "variety",
+              "region",
+              "quality_category",
+              "ripeness_category",
+              "harvest_date"
+            ],
+            "datetime_like_features": [
+              "harvest_date"
+            ],
+            "boolean_like_features": [],
+            "id_like_features": [
+              "sample_id",
+              "length_cm",
+              "weight_g",
+              "altitude_m",
+              "rainfall_mm",
+              "soil_nitrogen_ppm"
+            ],
+            "high_cardinality_features": [
+              "ripeness_index",
+              "sugar_content_brix",
+              "firmness_kgf",
+              "harvest_date",
+              "tree_age_years"
+            ],
+            "missing_ratio_train": {
+              "sample_id": 0.0,
+              "variety": 0.0,
+              "region": 0.0,
+              "quality_category": 0.0,
+              "ripeness_index": 0.0,
+              "ripeness_category": 0.0,
+              "sugar_content_brix": 0.0,
+              "firmness_kgf": 0.0,
+              "length_cm": 0.0,
+              "weight_g": 0.0,
+              "harvest_date": 0.0,
+              "tree_age_years": 0.0,
+              "altitude_m": 0.0,
+              "rainfall_mm": 0.0,
+              "soil_nitrogen_ppm": 0.0
+            },
+            "missing_ratio_test": {
+              "sample_id": 0.0,
+              "variety": 0.0,
+              "region": 0.0,
+              "quality_category": 0.0,
+              "ripeness_index": 0.0,
+              "ripeness_category": 0.0,
+              "sugar_content_brix": 0.0,
+              "firmness_kgf": 0.0,
+              "length_cm": 0.0,
+              "weight_g": 0.0,
+              "harvest_date": 0.0,
+              "tree_age_years": 0.0,
+              "altitude_m": 0.0,
+              "rainfall_mm": 0.0,
+              "soil_nitrogen_ppm": 0.0
+            }
+          },
+          "output_profile": {
+            "train_shape": [
+              800,
+              37
+            ],
+            "test_shape": [
+              200,
+              37
+            ],
+            "feature_count": 36,
+            "numeric_features": [
+              "sample_id",
+              "ripeness_index",
+              "sugar_content_brix",
+              "firmness_kgf",
+              "length_cm",
+              "weight_g",
+              "tree_age_years",
+              "altitude_m",
+              "rainfall_mm",
+              "soil_nitrogen_ppm",
+              "harvest_date_month",
+              "harvest_date_dayofweek",
+              "variety_Blue Java",
+              "variety_Burro",
+              "variety_Cavendish",
+              "variety_Fehi",
+              "variety_Lady Finger",
+              "variety_Manzano",
+              "variety_Plantain",
+              "variety_Red Dacca",
+              "region_Brazil",
+              "region_Colombia",
+              "region_Costa Rica",
+              "region_Ecuador",
+              "region_Guatemala",
+              "region_Honduras",
+              "region_India",
+              "region_Philippines",
+              "quality_category_Good",
+              "quality_category_Premium",
+              "quality_category_Processing",
+              "quality_category_Unripe",
+              "ripeness_category_Green",
+              "ripeness_category_Overripe",
+              "ripeness_category_Ripe",
+              "ripeness_category_Turning"
+            ],
+            "categorical_features": [],
+            "datetime_like_features": [],
+            "boolean_like_features": [],
+            "id_like_features": [
+              "sample_id",
+              "length_cm",
+              "weight_g",
+              "altitude_m",
+              "rainfall_mm"
+            ],
+            "high_cardinality_features": [
+              "ripeness_index",
+              "sugar_content_brix",
+              "firmness_kgf",
+              "tree_age_years",
+              "soil_nitrogen_ppm"
+            ],
+            "missing_ratio_train": {
+              "sample_id": 0.0,
+              "ripeness_index": 0.0,
+              "sugar_content_brix": 0.0,
+              "firmness_kgf": 0.0,
+              "length_cm": 0.0,
+              "weight_g": 0.0,
+              "tree_age_years": 0.0,
+              "altitude_m": 0.0,
+              "rainfall_mm": 0.0,
+              "soil_nitrogen_ppm": 0.0,
+              "harvest_date_month": 0.0,
+              "harvest_date_dayofweek": 0.0,
+              "variety_Blue Java": 0.0,
+              "variety_Burro": 0.0,
+              "variety_Cavendish": 0.0,
+              "variety_Fehi": 0.0,
+              "variety_Lady Finger": 0.0,
+              "variety_Manzano": 0.0,
+              "variety_Plantain": 0.0,
+              "variety_Red Dacca": 0.0,
+              "region_Brazil": 0.0,
+              "region_Colombia": 0.0,
+              "region_Costa Rica": 0.0,
+              "region_Ecuador": 0.0,
+              "region_Guatemala": 0.0,
+              "region_Honduras": 0.0,
+              "region_India": 0.0,
+              "region_Philippines": 0.0,
+              "quality_category_Good": 0.0,
+              "quality_category_Premium": 0.0,
+              "quality_category_Processing": 0.0,
+              "quality_category_Unripe": 0.0,
+              "ripeness_category_Green": 0.0,
+              "ripeness_category_Overripe": 0.0,
+              "ripeness_category_Ripe": 0.0,
+              "ripeness_category_Turning": 0.0
+            },
+            "missing_ratio_test": {
+              "sample_id": 0.0,
+              "ripeness_index": 0.0,
+              "sugar_content_brix": 0.0,
+              "firmness_kgf": 0.0,
+              "length_cm": 0.0,
+              "weight_g": 0.0,
+              "tree_age_years": 0.0,
+              "altitude_m": 0.0,
+              "rainfall_mm": 0.0,
+              "soil_nitrogen_ppm": 0.0,
+              "harvest_date_month": 0.0,
+              "harvest_date_dayofweek": 0.0,
+              "variety_Blue Java": 0.0,
+              "variety_Burro": 0.0,
+              "variety_Cavendish": 0.0,
+              "variety_Fehi": 0.0,
+              "variety_Lady Finger": 0.0,
+              "variety_Manzano": 0.0,
+              "variety_Plantain": 0.0,
+              "variety_Red Dacca": 0.0,
+              "region_Brazil": 0.0,
+              "region_Colombia": 0.0,
+              "region_Costa Rica": 0.0,
+              "region_Ecuador": 0.0,
+              "region_Guatemala": 0.0,
+              "region_Honduras": 0.0,
+              "region_India": 0.0,
+              "region_Philippines": 0.0,
+              "quality_category_Good": 0.0,
+              "quality_category_Premium": 0.0,
+              "quality_category_Processing": 0.0,
+              "quality_category_Unripe": 0.0,
+              "ripeness_category_Green": 0.0,
+              "ripeness_category_Overripe": 0.0,
+              "ripeness_category_Ripe": 0.0,
+              "ripeness_category_Turning": 0.0
+            }
+          },
+          "preprocessing": {
+            "categorical_encoding": "one_hot",
+            "numeric_imputation": "median",
+            "categorical_imputation": "mode",
+            "numeric_scaling": false,
+            "numeric_outlier_clipping": true,
+            "remove_constant_features": true,
+            "correlation_threshold": null,
+            "drop_target_leakage_features": true,
+            "requires_all_features_numeric": true,
+            "allows_missing_feature_values": false
+          },
+          "eda_recommendations": [
+            "Use frequency encoding or drop high-cardinality categorical columns instead of wide one-hot encoding.",
+            "Drop ID-like columns from model features to reduce memorization risk."
+          ],
+          "eda_policy_actions": {
+            "applied": [
+              {
+                "recommendation": "Use frequency encoding or drop high-cardinality categorical columns instead of wide one-hot encoding.",
+                "action": "used frequency encoding for high-cardinality categorical features"
+              },
+              {
+                "recommendation": "Drop ID-like columns from model features to reduce memorization risk.",
+                "action": "dropped identifier-like categorical features during encoding"
+              }
+            ],
+            "deferred": []
+          }
+        },
+        "train_shape": [
+          800,
+          37
+        ],
+        "test_shape": [
+          200,
+          37
+        ],
+        "target_column": "quality_score"
+      },
+      "task_type": "regression",
+      "target_column": "quality_score",
+      "metric": "r2",
+      "cv_score": 0.9762357286821786,
+      "cv_scores": [],
+      "test_metrics": {
+        "r2": 0.978787299947906,
+        "mae": 0.06401748499734873,
+        "rmse": 0.07991278248437361
+      },
+      "tuning": {
+        "status": "completed",
+        "failure_reason": "",
+        "baseline": {
+          "metric": "r2",
+          "cv": 3,
+          "scores": [
+            0.9728386836959513,
+            0.9620616291938764,
+            0.9703141056300587
+          ],
+          "mean_cv_score": 0.9684048061732954
+        },
+        "plan": {
+          "source": "llm",
+          "model_id": "gradient_boosting_regressor",
+          "task_type": "regression",
+          "metric": "r2",
+          "cv": 3,
+          "budget": "small",
+          "param_grid": {
+            "n_estimators": [
+              100,
+              150
+            ],
+            "learning_rate": [
+              0.03,
+              0.1
+            ],
+            "max_depth": [
+              2,
+              3
+            ],
+            "subsample": [
+              0.8
+            ]
+          },
+          "explanation": "The tuning plan focuses on a compact grid with a mix of n_estimators and learning_rate to explore their impact on performance, while max_depth is varied to allow for deeper trees, which can capture more complex patterns. Subsample is fixed to maintain model stability."
+        },
+        "n_jobs": -1,
+        "best_params": {
+          "learning_rate": 0.1,
+          "max_depth": 3,
+          "n_estimators": 150,
+          "subsample": 0.8
+        },
+        "best_cv_score": 0.9762357286821786,
+        "explanation": "The tuning plan focuses on a compact grid with a mix of n_estimators and learning_rate to explore their impact on performance, while max_depth is varied to allow for deeper trees, which can capture more complex patterns. Subsample is fixed to maintain model stability."
+      }
+    }
+  ],
+  "selected_model_id": "ridge_regression",
+  "best_model": "ridge_regression",
+  "best_cv_score": 0.9844309675893498,
+  "test_metrics": {
+    "r2": 0.9826584869870758,
+    "mae": 0.06163690498654331,
+    "rmse": 0.0722539792728544
+  },
+  "tuning": {
+    "enabled": true,
+    "strategy": "LLM-assisted tuning plan with deterministic validated GridSearchCV execution",
+    "selected_model_tuning": {
+      "status": "completed",
+      "failure_reason": "",
+      "baseline": {
+        "metric": "r2",
+        "cv": 3,
+        "scores": [
+          0.9848054584461177,
+          0.9850355165343629,
+          0.9833539673292938
+        ],
+        "mean_cv_score": 0.9843983141032582
+      },
+      "plan": {
+        "source": "llm",
+        "model_id": "ridge_regression",
+        "task_type": "regression",
+        "metric": "r2",
+        "cv": 3,
+        "budget": "small",
+        "param_grid": {
+          "alpha": [
+            0.1,
+            1.0,
+            10.0
+          ]
+        },
+        "explanation": "The baseline performance is strong, so a compact grid is chosen to efficiently explore the alpha parameter, which has a significant impact on regularization strength."
+      },
+      "n_jobs": -1,
+      "best_params": {
+        "alpha": 0.1
+      },
+      "best_cv_score": 0.9844309675893498,
+      "explanation": "The baseline performance is strong, so a compact grid is chosen to efficiently explore the alpha parameter, which has a significant impact on regularization strength."
+    },
+    "candidate_tuning_status": {
+      "ridge_regression": "completed",
+      "random_forest_regressor": "completed",
+      "gradient_boosting_regressor": "completed"
+    }
+  },
+  "selected_model_report_path": "workspace/pipelines/ridge_regression/model_report.json",
+  "selected_feature_importance_path": "workspace/pipelines/ridge_regression/feature_importance.json"
+}

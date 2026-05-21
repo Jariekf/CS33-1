@@ -1,0 +1,126 @@
+{
+  "stage": "eda_analysis",
+  "status": "completed",
+  "leakage_policy": {
+    "data_quality_scope": "cleaned_data",
+    "feature_target_analysis_scope": "train_data_only",
+    "test_data_used_for_feature_target_analysis": false
+  },
+  "dataset_overview": {
+    "rows": 2200,
+    "columns": 9,
+    "numeric_columns": [
+      "nitrogen",
+      "phosphorus",
+      "potassium",
+      "temperature",
+      "humidity",
+      "ph_value",
+      "rainfall",
+      "yield"
+    ],
+    "categorical_columns": [
+      "crop"
+    ],
+    "missing_ratio": {
+      "nitrogen": 0.0,
+      "phosphorus": 0.0,
+      "potassium": 0.0,
+      "temperature": 0.0,
+      "humidity": 0.0,
+      "ph_value": 0.0,
+      "rainfall": 0.0,
+      "crop": 0.0,
+      "yield": 0.0
+    },
+    "dtypes": {
+      "nitrogen": "int64",
+      "phosphorus": "int64",
+      "potassium": "int64",
+      "temperature": "float64",
+      "humidity": "float64",
+      "ph_value": "float64",
+      "rainfall": "float64",
+      "crop": "object",
+      "yield": "int64"
+    },
+    "duplicate_rows": 0
+  },
+  "feature_quality": {
+    "high_missing_columns": [],
+    "high_cardinality_columns": [
+      "crop"
+    ],
+    "id_like_columns": [
+      "temperature",
+      "humidity",
+      "ph_value",
+      "rainfall"
+    ],
+    "constant_columns": []
+  },
+  "target_analysis": {
+    "target_column": "yield",
+    "task_type": "regression",
+    "mean": 2702.8443181818184,
+    "median": 1825.0,
+    "std": 3936.7223673915664,
+    "min": 2.0,
+    "max": 120000.0,
+    "skew": 16.411269231517174,
+    "summary": "mean=2702.844, median=1825.000, skew=16.411"
+  },
+  "feature_target_relationships": {
+    "top_numeric_relationships": [
+      {
+        "feature": "rainfall",
+        "score_name": "abs_corr",
+        "score": 0.0822
+      },
+      {
+        "feature": "temperature",
+        "score_name": "abs_corr",
+        "score": 0.0364
+      },
+      {
+        "feature": "humidity",
+        "score_name": "abs_corr",
+        "score": 0.0349
+      },
+      {
+        "feature": "ph_value",
+        "score_name": "abs_corr",
+        "score": 0.0302
+      },
+      {
+        "feature": "phosphorus",
+        "score_name": "abs_corr",
+        "score": 0.0215
+      },
+      {
+        "feature": "potassium",
+        "score_name": "abs_corr",
+        "score": 0.0169
+      },
+      {
+        "feature": "nitrogen",
+        "score_name": "abs_corr",
+        "score": 0.0023
+      }
+    ],
+    "top_categorical_relationships": [
+      {
+        "feature": "crop",
+        "score_name": "target_mean_spread",
+        "score": 0.9742
+      }
+    ]
+  },
+  "feature_engineering_recommendations": [
+    "Use frequency encoding or drop high-cardinality categorical columns instead of wide one-hot encoding.",
+    "Drop ID-like columns from model features to reduce memorization risk.",
+    "Consider robust metrics or transformations for highly skewed regression targets."
+  ],
+  "data_description_used": true,
+  "data_description": "CROP PRICE PREDICTION\n\n\n============================================================\n1. About Dataset\n============================================================\n\nCROP PRICE PREDICTION\n\n\n============================================================\n2. INTRODUCTION\n============================================================\n\nCrop yield prediction plays a vital role in modern agriculture, especially with the increasing adoption of data-driven approaches. Comprehensive datasets, including information about soil composition, environmental factors, historical yield data, and crop management practices, are crucial for accurate yield predictions. Analyzing and understanding these datasets can provide valuable insights for optimizing agricultural practices and ensuring sustainable crop production.\n\n\n============================================================\n3. WHY IS YIELD PREDICTION IMPORTANT?\n============================================================\n\n1. Optimized Production:\n\nAccurate yield predictions help farmers optimize their production plans by adjusting planting schedules, selecting suitable crop varieties, and implementing appropriate management practices.\n\n\n2. Resource Efficiency:\n\nData-driven yield predictions enable efficient use of resources such as water, fertilizers, and pesticides, leading to cost savings and reduced environmental impact.\n\n\n3. Risk Mitigation:\n\nPredicting yields allows farmers to anticipate and mitigate risks such as crop failures due to adverse weather conditions, pest infestations, or diseases.\n\n\n4. Market Planning:\n\nYield predictions assist farmers in planning for market fluctuations by forecasting supply and demand dynamics, thereby optimizing marketing strategies and maximizing profits.\n\n\n5. Sustainability:\n\nBy promoting optimal resource use and reducing waste, accurate yield predictions contribute to sustainable agriculture practices and environmental conservation.\n\n\n============================================================\n4. CONCLUSION\n============================================================\n\nAccurate crop yield prediction is essential for modern agriculture's success, enabling farmers to make informed decisions, optimize resource use, mitigate risks, and enhance sustainability. Leveraging comprehensive datasets and advanced analytical tools empowers farmers and agricultural experts to improve production efficiency, resilience, and profitability, ultimately ensuring food security and environmental stewardship in the agricultural sector.\n\n\n============================================================\n5. Column Descriptions\n============================================================\n\nNitrogen:\nRatio of nitrogen content in the soil.\n\nPhosphorus:\nRatio of phosphorus content in the soil.\n\nPotassium:\nRatio of potassium content in the soil.\n\nTemperature:\nAmbient temperature in degrees Celsius.\n\nHumidity:\nRelative humidity in percent.\n\npH_Value:\nSoil pH value.\n\nRainfall:\nRainfall in millimeters.\n\nCrop:\nCrop category associated with the observed conditions.\n\nYield:\nObserved crop yield for the row.\n\n\n============================================================\n6. Suggested Modeling Notes\n============================================================\n\n- Crop is a categorical target and Yield is a numeric target; they should not both be used as predictors for the same supervised task unless the task design explicitly allows it.\n\n- Soil nutrients and weather variables are all numeric and can be used directly for regression or classification.\n\n- Yield spans a wide numeric range, so scaling or log transformation may be worth testing depending on the model family.\n\n\n============================================================\n7. Usability\n============================================================\n\n9.41\n\n\n============================================================\n8. License\n============================================================\n\nMIT\n\n\n============================================================\n9. Collaborators\n============================================================\n\nVarshita Nalluri (Owner)"
+}

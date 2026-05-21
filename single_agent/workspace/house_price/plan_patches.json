@@ -1,0 +1,54 @@
+[
+  {
+    "plan_version": 2,
+    "after_stage": "data_cleaning",
+    "reason": "classification target appears imbalanced after cleaning; high missingness detected in columns: ['alley', 'masvnrtype', 'fireplacequ', 'poolqc', 'fence', 'miscfeature']",
+    "updates": {
+      "model_selection": {
+        "imbalance_strategy": "class_weight_or_resampling",
+        "validation_rules": [
+          {
+            "id": "class_imbalance_strategy",
+            "check": "model_report.json reports class imbalance handling strategy"
+          }
+        ]
+      },
+      "feature_engineering": {
+        "validation_rules": [
+          {
+            "id": "target_balance_reported",
+            "check": "feature_report.json reports target class balance before modelling"
+          },
+          {
+            "id": "high_missingness_handled",
+            "check": "feature_report.json creates or justifies missingness indicators for high-missingness columns"
+          }
+        ],
+        "high_missing_columns": [
+          "alley",
+          "masvnrtype",
+          "fireplacequ",
+          "poolqc",
+          "fence",
+          "miscfeature"
+        ]
+      }
+    }
+  },
+  {
+    "plan_version": 3,
+    "after_stage": "feature_engineering",
+    "reason": "feature engineering produced high-dimensional data",
+    "updates": {
+      "model_selection": {
+        "candidate_model_constraint": "prefer_regularized_or_high_dimensional_capable_models",
+        "validation_rules": [
+          {
+            "id": "high_dimensional_model",
+            "check": "selected model can handle high-dimensional feature tables"
+          }
+        ]
+      }
+    }
+  }
+]

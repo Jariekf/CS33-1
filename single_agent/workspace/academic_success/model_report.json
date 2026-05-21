@@ -1,0 +1,1935 @@
+{
+  "task_type": "classification",
+  "target_column": "target",
+  "candidate_model_ids": [
+    "logistic_regression",
+    "random_forest_classifier",
+    "gradient_boosting_classifier"
+  ],
+  "metric": "f1_weighted",
+  "candidate_results": [
+    {
+      "model_id": "logistic_regression",
+      "model_report_path": "workspace/pipelines/logistic_regression/model_report.json",
+      "feature_importance_path": "workspace/pipelines/logistic_regression/feature_importance.json",
+      "feature_pipeline": {
+        "model_id": "logistic_regression",
+        "train_path": "workspace/pipelines/logistic_regression/fe_train.csv",
+        "test_path": "workspace/pipelines/logistic_regression/fe_test.csv",
+        "execution": {
+          "model_id": "logistic_regression",
+          "steps": [
+            "create_missing_indicators",
+            "impute_missing_features",
+            "convert_boolean_like_features",
+            "create_datetime_features",
+            "encode_categorical_features",
+            "clip_numeric_outliers",
+            "remove_low_information_features",
+            "remove_highly_correlated_features",
+            "drop_target_leakage_features",
+            "align_and_validate_feature_matrices",
+            "scale_numeric_features"
+          ],
+          "step_reports": {
+            "create_missing_indicators": {
+              "source_columns": [],
+              "created_columns": []
+            },
+            "impute_missing_features": {
+              "numeric_strategy": "median",
+              "categorical_strategy": "mode",
+              "imputed_columns": [],
+              "fill_values": {}
+            },
+            "convert_boolean_like_features": {
+              "converted_columns": []
+            },
+            "create_datetime_features": {
+              "transformed_columns": [],
+              "created_columns": {}
+            },
+            "encode_categorical_features": {
+              "one_hot_encoded_columns": [],
+              "frequency_encoded_columns": [],
+              "dropped_identifier_like_columns": [],
+              "output_column_count": 38
+            },
+            "clip_numeric_outliers": {
+              "clipped_columns": {
+                "id": {
+                  "lower": 805.13,
+                  "upper": 75749.87,
+                  "train_values_clipped": 1226,
+                  "test_values_clipped": 348
+                },
+                "marital_status": {
+                  "lower": 1.0,
+                  "upper": 4.0,
+                  "train_values_clipped": 120,
+                  "test_values_clipped": 31
+                },
+                "application_mode": {
+                  "lower": 1.0,
+                  "upper": 44.0,
+                  "train_values_clipped": 536,
+                  "test_values_clipped": 131
+                },
+                "application_order": {
+                  "lower": 1.0,
+                  "upper": 6.0,
+                  "train_values_clipped": 2,
+                  "test_values_clipped": 2
+                },
+                "course": {
+                  "lower": 171.0,
+                  "upper": 9991.0,
+                  "train_values_clipped": 60,
+                  "test_values_clipped": 13
+                },
+                "previous_qualification": {
+                  "lower": 1.0,
+                  "upper": 39.0,
+                  "train_values_clipped": 438,
+                  "test_values_clipped": 89
+                },
+                "previous_qualification_(grade)": {
+                  "lower": 102.0,
+                  "upper": 160.0,
+                  "train_values_clipped": 1170,
+                  "test_values_clipped": 314
+                },
+                "mother's_qualification": {
+                  "lower": 1.0,
+                  "upper": 38.0,
+                  "train_values_clipped": 126,
+                  "test_values_clipped": 32
+                },
+                "father's_qualification": {
+                  "lower": 1.0,
+                  "upper": 38.0,
+                  "train_values_clipped": 141,
+                  "test_values_clipped": 41
+                },
+                "mother's_occupation": {
+                  "lower": 0.0,
+                  "upper": 90.0,
+                  "train_values_clipped": 555,
+                  "test_values_clipped": 126
+                },
+                "father's_occupation": {
+                  "lower": 0.0,
+                  "upper": 90.0,
+                  "train_values_clipped": 570,
+                  "test_values_clipped": 125
+                },
+                "admission_grade": {
+                  "lower": 98.0,
+                  "upper": 160.0,
+                  "train_values_clipped": 997,
+                  "test_values_clipped": 289
+                },
+                "age_at_enrollment": {
+                  "lower": 18.0,
+                  "upper": 49.0,
+                  "train_values_clipped": 573,
+                  "test_values_clipped": 119
+                },
+                "curricular_units_1st_sem_(credited)": {
+                  "lower": 0.0,
+                  "upper": 7.0,
+                  "train_values_clipped": 471,
+                  "test_values_clipped": 117
+                },
+                "curricular_units_1st_sem_(enrolled)": {
+                  "lower": 0.0,
+                  "upper": 12.0,
+                  "train_values_clipped": 370,
+                  "test_values_clipped": 83
+                },
+                "curricular_units_1st_sem_(evaluations)": {
+                  "lower": 0.0,
+                  "upper": 16.0,
+                  "train_values_clipped": 597,
+                  "test_values_clipped": 163
+                },
+                "curricular_units_1st_sem_(approved)": {
+                  "lower": 0.0,
+                  "upper": 11.0,
+                  "train_values_clipped": 414,
+                  "test_values_clipped": 102
+                },
+                "curricular_units_1st_sem_(grade)": {
+                  "lower": 0.0,
+                  "upper": 15.333333333333334,
+                  "train_values_clipped": 607,
+                  "test_values_clipped": 172
+                },
+                "curricular_units_1st_sem_(without_evaluations)": {
+                  "lower": 0.0,
+                  "upper": 2.0,
+                  "train_values_clipped": 260,
+                  "test_values_clipped": 72
+                },
+                "curricular_units_2nd_sem_(credited)": {
+                  "lower": 0.0,
+                  "upper": 5.0,
+                  "train_values_clipped": 404,
+                  "test_values_clipped": 100
+                },
+                "curricular_units_2nd_sem_(enrolled)": {
+                  "lower": 0.0,
+                  "upper": 11.0,
+                  "train_values_clipped": 371,
+                  "test_values_clipped": 90
+                },
+                "curricular_units_2nd_sem_(evaluations)": {
+                  "lower": 0.0,
+                  "upper": 16.0,
+                  "train_values_clipped": 442,
+                  "test_values_clipped": 115
+                },
+                "curricular_units_2nd_sem_(approved)": {
+                  "lower": 0.0,
+                  "upper": 9.0,
+                  "train_values_clipped": 584,
+                  "test_values_clipped": 142
+                },
+                "curricular_units_2nd_sem_(grade)": {
+                  "lower": 0.0,
+                  "upper": 15.60966666666573,
+                  "train_values_clipped": 613,
+                  "test_values_clipped": 147
+                },
+                "curricular_units_2nd_sem_(without_evaluations)": {
+                  "lower": 0.0,
+                  "upper": 2.0,
+                  "train_values_clipped": 538,
+                  "test_values_clipped": 141
+                }
+              }
+            },
+            "remove_low_information_features": {
+              "removed_columns": []
+            },
+            "remove_highly_correlated_features": {
+              "removed_columns": [],
+              "threshold": 0.98
+            },
+            "drop_target_leakage_features": {
+              "removed_columns": [],
+              "warnings": []
+            },
+            "align_and_validate_feature_matrices": {
+              "train_test_columns_match": true,
+              "all_features_numeric": true,
+              "non_numeric_features": [],
+              "missing_feature_values_train": 0,
+              "missing_feature_values_test": 0,
+              "feature_count": 37
+            },
+            "scale_numeric_features": {
+              "scaled_columns": [
+                "id",
+                "marital_status",
+                "application_mode",
+                "application_order",
+                "course",
+                "daytime/evening_attendance",
+                "previous_qualification",
+                "previous_qualification_(grade)",
+                "nacionality",
+                "mother's_qualification",
+                "father's_qualification",
+                "mother's_occupation",
+                "father's_occupation",
+                "admission_grade",
+                "displaced",
+                "educational_special_needs",
+                "debtor",
+                "tuition_fees_up_to_date",
+                "gender",
+                "scholarship_holder",
+                "age_at_enrollment",
+                "international",
+                "curricular_units_1st_sem_(credited)",
+                "curricular_units_1st_sem_(enrolled)",
+                "curricular_units_1st_sem_(evaluations)",
+                "curricular_units_1st_sem_(approved)",
+                "curricular_units_1st_sem_(grade)",
+                "curricular_units_1st_sem_(without_evaluations)",
+                "curricular_units_2nd_sem_(credited)",
+                "curricular_units_2nd_sem_(enrolled)",
+                "curricular_units_2nd_sem_(evaluations)",
+                "curricular_units_2nd_sem_(approved)",
+                "curricular_units_2nd_sem_(grade)",
+                "curricular_units_2nd_sem_(without_evaluations)",
+                "unemployment_rate",
+                "inflation_rate",
+                "gdp"
+              ]
+            }
+          },
+          "input_profile": {
+            "train_shape": [
+              61214,
+              38
+            ],
+            "test_shape": [
+              15304,
+              38
+            ],
+            "feature_count": 37,
+            "numeric_features": [
+              "id",
+              "marital_status",
+              "application_mode",
+              "application_order",
+              "course",
+              "daytime/evening_attendance",
+              "previous_qualification",
+              "previous_qualification_(grade)",
+              "nacionality",
+              "mother's_qualification",
+              "father's_qualification",
+              "mother's_occupation",
+              "father's_occupation",
+              "admission_grade",
+              "displaced",
+              "educational_special_needs",
+              "debtor",
+              "tuition_fees_up_to_date",
+              "gender",
+              "scholarship_holder",
+              "age_at_enrollment",
+              "international",
+              "curricular_units_1st_sem_(credited)",
+              "curricular_units_1st_sem_(enrolled)",
+              "curricular_units_1st_sem_(evaluations)",
+              "curricular_units_1st_sem_(approved)",
+              "curricular_units_1st_sem_(grade)",
+              "curricular_units_1st_sem_(without_evaluations)",
+              "curricular_units_2nd_sem_(credited)",
+              "curricular_units_2nd_sem_(enrolled)",
+              "curricular_units_2nd_sem_(evaluations)",
+              "curricular_units_2nd_sem_(approved)",
+              "curricular_units_2nd_sem_(grade)",
+              "curricular_units_2nd_sem_(without_evaluations)",
+              "unemployment_rate",
+              "inflation_rate",
+              "gdp"
+            ],
+            "categorical_features": [],
+            "datetime_like_features": [],
+            "boolean_like_features": [],
+            "id_like_features": [
+              "id"
+            ],
+            "high_cardinality_features": [
+              "application_mode",
+              "previous_qualification",
+              "previous_qualification_(grade)",
+              "mother's_qualification",
+              "father's_qualification",
+              "mother's_occupation",
+              "father's_occupation",
+              "admission_grade",
+              "age_at_enrollment",
+              "curricular_units_1st_sem_(credited)",
+              "curricular_units_1st_sem_(enrolled)",
+              "curricular_units_1st_sem_(evaluations)",
+              "curricular_units_1st_sem_(approved)",
+              "curricular_units_1st_sem_(grade)",
+              "curricular_units_2nd_sem_(enrolled)",
+              "curricular_units_2nd_sem_(evaluations)",
+              "curricular_units_2nd_sem_(grade)"
+            ],
+            "missing_ratio_train": {
+              "id": 0.0,
+              "marital_status": 0.0,
+              "application_mode": 0.0,
+              "application_order": 0.0,
+              "course": 0.0,
+              "daytime/evening_attendance": 0.0,
+              "previous_qualification": 0.0,
+              "previous_qualification_(grade)": 0.0,
+              "nacionality": 0.0,
+              "mother's_qualification": 0.0,
+              "father's_qualification": 0.0,
+              "mother's_occupation": 0.0,
+              "father's_occupation": 0.0,
+              "admission_grade": 0.0,
+              "displaced": 0.0,
+              "educational_special_needs": 0.0,
+              "debtor": 0.0,
+              "tuition_fees_up_to_date": 0.0,
+              "gender": 0.0,
+              "scholarship_holder": 0.0,
+              "age_at_enrollment": 0.0,
+              "international": 0.0,
+              "curricular_units_1st_sem_(credited)": 0.0,
+              "curricular_units_1st_sem_(enrolled)": 0.0,
+              "curricular_units_1st_sem_(evaluations)": 0.0,
+              "curricular_units_1st_sem_(approved)": 0.0,
+              "curricular_units_1st_sem_(grade)": 0.0,
+              "curricular_units_1st_sem_(without_evaluations)": 0.0,
+              "curricular_units_2nd_sem_(credited)": 0.0,
+              "curricular_units_2nd_sem_(enrolled)": 0.0,
+              "curricular_units_2nd_sem_(evaluations)": 0.0,
+              "curricular_units_2nd_sem_(approved)": 0.0,
+              "curricular_units_2nd_sem_(grade)": 0.0,
+              "curricular_units_2nd_sem_(without_evaluations)": 0.0,
+              "unemployment_rate": 0.0,
+              "inflation_rate": 0.0,
+              "gdp": 0.0
+            },
+            "missing_ratio_test": {
+              "id": 0.0,
+              "marital_status": 0.0,
+              "application_mode": 0.0,
+              "application_order": 0.0,
+              "course": 0.0,
+              "daytime/evening_attendance": 0.0,
+              "previous_qualification": 0.0,
+              "previous_qualification_(grade)": 0.0,
+              "nacionality": 0.0,
+              "mother's_qualification": 0.0,
+              "father's_qualification": 0.0,
+              "mother's_occupation": 0.0,
+              "father's_occupation": 0.0,
+              "admission_grade": 0.0,
+              "displaced": 0.0,
+              "educational_special_needs": 0.0,
+              "debtor": 0.0,
+              "tuition_fees_up_to_date": 0.0,
+              "gender": 0.0,
+              "scholarship_holder": 0.0,
+              "age_at_enrollment": 0.0,
+              "international": 0.0,
+              "curricular_units_1st_sem_(credited)": 0.0,
+              "curricular_units_1st_sem_(enrolled)": 0.0,
+              "curricular_units_1st_sem_(evaluations)": 0.0,
+              "curricular_units_1st_sem_(approved)": 0.0,
+              "curricular_units_1st_sem_(grade)": 0.0,
+              "curricular_units_1st_sem_(without_evaluations)": 0.0,
+              "curricular_units_2nd_sem_(credited)": 0.0,
+              "curricular_units_2nd_sem_(enrolled)": 0.0,
+              "curricular_units_2nd_sem_(evaluations)": 0.0,
+              "curricular_units_2nd_sem_(approved)": 0.0,
+              "curricular_units_2nd_sem_(grade)": 0.0,
+              "curricular_units_2nd_sem_(without_evaluations)": 0.0,
+              "unemployment_rate": 0.0,
+              "inflation_rate": 0.0,
+              "gdp": 0.0
+            }
+          },
+          "output_profile": {
+            "train_shape": [
+              61214,
+              38
+            ],
+            "test_shape": [
+              15304,
+              38
+            ],
+            "feature_count": 37,
+            "numeric_features": [
+              "id",
+              "marital_status",
+              "application_mode",
+              "application_order",
+              "course",
+              "daytime/evening_attendance",
+              "previous_qualification",
+              "previous_qualification_(grade)",
+              "nacionality",
+              "mother's_qualification",
+              "father's_qualification",
+              "mother's_occupation",
+              "father's_occupation",
+              "admission_grade",
+              "displaced",
+              "educational_special_needs",
+              "debtor",
+              "tuition_fees_up_to_date",
+              "gender",
+              "scholarship_holder",
+              "age_at_enrollment",
+              "international",
+              "curricular_units_1st_sem_(credited)",
+              "curricular_units_1st_sem_(enrolled)",
+              "curricular_units_1st_sem_(evaluations)",
+              "curricular_units_1st_sem_(approved)",
+              "curricular_units_1st_sem_(grade)",
+              "curricular_units_1st_sem_(without_evaluations)",
+              "curricular_units_2nd_sem_(credited)",
+              "curricular_units_2nd_sem_(enrolled)",
+              "curricular_units_2nd_sem_(evaluations)",
+              "curricular_units_2nd_sem_(approved)",
+              "curricular_units_2nd_sem_(grade)",
+              "curricular_units_2nd_sem_(without_evaluations)",
+              "unemployment_rate",
+              "inflation_rate",
+              "gdp"
+            ],
+            "categorical_features": [],
+            "datetime_like_features": [],
+            "boolean_like_features": [],
+            "id_like_features": [
+              "id"
+            ],
+            "high_cardinality_features": [
+              "previous_qualification_(grade)",
+              "mother's_qualification",
+              "father's_qualification",
+              "admission_grade",
+              "age_at_enrollment",
+              "curricular_units_1st_sem_(grade)",
+              "curricular_units_2nd_sem_(grade)"
+            ],
+            "missing_ratio_train": {
+              "id": 0.0,
+              "marital_status": 0.0,
+              "application_mode": 0.0,
+              "application_order": 0.0,
+              "course": 0.0,
+              "daytime/evening_attendance": 0.0,
+              "previous_qualification": 0.0,
+              "previous_qualification_(grade)": 0.0,
+              "nacionality": 0.0,
+              "mother's_qualification": 0.0,
+              "father's_qualification": 0.0,
+              "mother's_occupation": 0.0,
+              "father's_occupation": 0.0,
+              "admission_grade": 0.0,
+              "displaced": 0.0,
+              "educational_special_needs": 0.0,
+              "debtor": 0.0,
+              "tuition_fees_up_to_date": 0.0,
+              "gender": 0.0,
+              "scholarship_holder": 0.0,
+              "age_at_enrollment": 0.0,
+              "international": 0.0,
+              "curricular_units_1st_sem_(credited)": 0.0,
+              "curricular_units_1st_sem_(enrolled)": 0.0,
+              "curricular_units_1st_sem_(evaluations)": 0.0,
+              "curricular_units_1st_sem_(approved)": 0.0,
+              "curricular_units_1st_sem_(grade)": 0.0,
+              "curricular_units_1st_sem_(without_evaluations)": 0.0,
+              "curricular_units_2nd_sem_(credited)": 0.0,
+              "curricular_units_2nd_sem_(enrolled)": 0.0,
+              "curricular_units_2nd_sem_(evaluations)": 0.0,
+              "curricular_units_2nd_sem_(approved)": 0.0,
+              "curricular_units_2nd_sem_(grade)": 0.0,
+              "curricular_units_2nd_sem_(without_evaluations)": 0.0,
+              "unemployment_rate": 0.0,
+              "inflation_rate": 0.0,
+              "gdp": 0.0
+            },
+            "missing_ratio_test": {
+              "id": 0.0,
+              "marital_status": 0.0,
+              "application_mode": 0.0,
+              "application_order": 0.0,
+              "course": 0.0,
+              "daytime/evening_attendance": 0.0,
+              "previous_qualification": 0.0,
+              "previous_qualification_(grade)": 0.0,
+              "nacionality": 0.0,
+              "mother's_qualification": 0.0,
+              "father's_qualification": 0.0,
+              "mother's_occupation": 0.0,
+              "father's_occupation": 0.0,
+              "admission_grade": 0.0,
+              "displaced": 0.0,
+              "educational_special_needs": 0.0,
+              "debtor": 0.0,
+              "tuition_fees_up_to_date": 0.0,
+              "gender": 0.0,
+              "scholarship_holder": 0.0,
+              "age_at_enrollment": 0.0,
+              "international": 0.0,
+              "curricular_units_1st_sem_(credited)": 0.0,
+              "curricular_units_1st_sem_(enrolled)": 0.0,
+              "curricular_units_1st_sem_(evaluations)": 0.0,
+              "curricular_units_1st_sem_(approved)": 0.0,
+              "curricular_units_1st_sem_(grade)": 0.0,
+              "curricular_units_1st_sem_(without_evaluations)": 0.0,
+              "curricular_units_2nd_sem_(credited)": 0.0,
+              "curricular_units_2nd_sem_(enrolled)": 0.0,
+              "curricular_units_2nd_sem_(evaluations)": 0.0,
+              "curricular_units_2nd_sem_(approved)": 0.0,
+              "curricular_units_2nd_sem_(grade)": 0.0,
+              "curricular_units_2nd_sem_(without_evaluations)": 0.0,
+              "unemployment_rate": 0.0,
+              "inflation_rate": 0.0,
+              "gdp": 0.0
+            }
+          },
+          "preprocessing": {
+            "categorical_encoding": "one_hot",
+            "numeric_imputation": "median",
+            "categorical_imputation": "mode",
+            "numeric_scaling": true,
+            "numeric_outlier_clipping": true,
+            "remove_constant_features": true,
+            "correlation_threshold": 0.98,
+            "drop_target_leakage_features": true,
+            "requires_all_features_numeric": true,
+            "allows_missing_feature_values": false
+          },
+          "eda_recommendations": [
+            "Drop ID-like columns from model features to reduce memorization risk."
+          ],
+          "eda_policy_actions": {
+            "applied": [
+              {
+                "recommendation": "Drop ID-like columns from model features to reduce memorization risk.",
+                "action": "dropped identifier-like categorical features during encoding"
+              }
+            ],
+            "deferred": []
+          }
+        },
+        "train_shape": [
+          61214,
+          38
+        ],
+        "test_shape": [
+          15304,
+          38
+        ],
+        "target_column": "target"
+      },
+      "task_type": "classification",
+      "target_column": "target",
+      "metric": "f1_weighted",
+      "cv_score": 0.8115129153869202,
+      "cv_scores": [],
+      "test_metrics": {
+        "accuracy": 0.8054756926293779,
+        "f1_weighted": 0.8124704979134396
+      },
+      "tuning": {
+        "status": "completed",
+        "failure_reason": "",
+        "baseline": {
+          "metric": "f1_weighted",
+          "cv": 3,
+          "scores": [
+            0.8124293556750133,
+            0.8137901682475608,
+            0.8144248847854983
+          ],
+          "mean_cv_score": 0.8135481362360242
+        },
+        "plan": {
+          "source": "llm",
+          "model_id": "logistic_regression",
+          "task_type": "classification",
+          "metric": "f1_weighted",
+          "cv": 3,
+          "budget": "small",
+          "param_grid": {
+            "C": [
+              0.1,
+              1.0
+            ],
+            "class_weight": [
+              "balanced"
+            ]
+          },
+          "explanation": "The tuning plan focuses on adjusting the regularization strength (C) and using class weighting to address class imbalance, which is crucial given the target distribution. This compact grid is suitable for a small budget while aiming to improve the model's performance."
+        },
+        "n_jobs": -1,
+        "best_params": {
+          "C": 1.0,
+          "class_weight": "balanced"
+        },
+        "best_cv_score": 0.8115129153869202,
+        "explanation": "The tuning plan focuses on adjusting the regularization strength (C) and using class weighting to address class imbalance, which is crucial given the target distribution. This compact grid is suitable for a small budget while aiming to improve the model's performance."
+      }
+    },
+    {
+      "model_id": "random_forest_classifier",
+      "model_report_path": "workspace/pipelines/random_forest_classifier/model_report.json",
+      "feature_importance_path": "workspace/pipelines/random_forest_classifier/feature_importance.json",
+      "feature_pipeline": {
+        "model_id": "random_forest_classifier",
+        "train_path": "workspace/pipelines/random_forest_classifier/fe_train.csv",
+        "test_path": "workspace/pipelines/random_forest_classifier/fe_test.csv",
+        "execution": {
+          "model_id": "random_forest_classifier",
+          "steps": [
+            "create_missing_indicators",
+            "impute_missing_features",
+            "convert_boolean_like_features",
+            "create_datetime_features",
+            "encode_categorical_features",
+            "clip_numeric_outliers",
+            "remove_low_information_features",
+            "drop_target_leakage_features",
+            "align_and_validate_feature_matrices"
+          ],
+          "step_reports": {
+            "create_missing_indicators": {
+              "source_columns": [],
+              "created_columns": []
+            },
+            "impute_missing_features": {
+              "numeric_strategy": "median",
+              "categorical_strategy": "mode",
+              "imputed_columns": [],
+              "fill_values": {}
+            },
+            "convert_boolean_like_features": {
+              "converted_columns": []
+            },
+            "create_datetime_features": {
+              "transformed_columns": [],
+              "created_columns": {}
+            },
+            "encode_categorical_features": {
+              "one_hot_encoded_columns": [],
+              "frequency_encoded_columns": [],
+              "dropped_identifier_like_columns": [],
+              "output_column_count": 38
+            },
+            "clip_numeric_outliers": {
+              "clipped_columns": {
+                "id": {
+                  "lower": 805.13,
+                  "upper": 75749.87,
+                  "train_values_clipped": 1226,
+                  "test_values_clipped": 348
+                },
+                "marital_status": {
+                  "lower": 1.0,
+                  "upper": 4.0,
+                  "train_values_clipped": 120,
+                  "test_values_clipped": 31
+                },
+                "application_mode": {
+                  "lower": 1.0,
+                  "upper": 44.0,
+                  "train_values_clipped": 536,
+                  "test_values_clipped": 131
+                },
+                "application_order": {
+                  "lower": 1.0,
+                  "upper": 6.0,
+                  "train_values_clipped": 2,
+                  "test_values_clipped": 2
+                },
+                "course": {
+                  "lower": 171.0,
+                  "upper": 9991.0,
+                  "train_values_clipped": 60,
+                  "test_values_clipped": 13
+                },
+                "previous_qualification": {
+                  "lower": 1.0,
+                  "upper": 39.0,
+                  "train_values_clipped": 438,
+                  "test_values_clipped": 89
+                },
+                "previous_qualification_(grade)": {
+                  "lower": 102.0,
+                  "upper": 160.0,
+                  "train_values_clipped": 1170,
+                  "test_values_clipped": 314
+                },
+                "mother's_qualification": {
+                  "lower": 1.0,
+                  "upper": 38.0,
+                  "train_values_clipped": 126,
+                  "test_values_clipped": 32
+                },
+                "father's_qualification": {
+                  "lower": 1.0,
+                  "upper": 38.0,
+                  "train_values_clipped": 141,
+                  "test_values_clipped": 41
+                },
+                "mother's_occupation": {
+                  "lower": 0.0,
+                  "upper": 90.0,
+                  "train_values_clipped": 555,
+                  "test_values_clipped": 126
+                },
+                "father's_occupation": {
+                  "lower": 0.0,
+                  "upper": 90.0,
+                  "train_values_clipped": 570,
+                  "test_values_clipped": 125
+                },
+                "admission_grade": {
+                  "lower": 98.0,
+                  "upper": 160.0,
+                  "train_values_clipped": 997,
+                  "test_values_clipped": 289
+                },
+                "age_at_enrollment": {
+                  "lower": 18.0,
+                  "upper": 49.0,
+                  "train_values_clipped": 573,
+                  "test_values_clipped": 119
+                },
+                "curricular_units_1st_sem_(credited)": {
+                  "lower": 0.0,
+                  "upper": 7.0,
+                  "train_values_clipped": 471,
+                  "test_values_clipped": 117
+                },
+                "curricular_units_1st_sem_(enrolled)": {
+                  "lower": 0.0,
+                  "upper": 12.0,
+                  "train_values_clipped": 370,
+                  "test_values_clipped": 83
+                },
+                "curricular_units_1st_sem_(evaluations)": {
+                  "lower": 0.0,
+                  "upper": 16.0,
+                  "train_values_clipped": 597,
+                  "test_values_clipped": 163
+                },
+                "curricular_units_1st_sem_(approved)": {
+                  "lower": 0.0,
+                  "upper": 11.0,
+                  "train_values_clipped": 414,
+                  "test_values_clipped": 102
+                },
+                "curricular_units_1st_sem_(grade)": {
+                  "lower": 0.0,
+                  "upper": 15.333333333333334,
+                  "train_values_clipped": 607,
+                  "test_values_clipped": 172
+                },
+                "curricular_units_1st_sem_(without_evaluations)": {
+                  "lower": 0.0,
+                  "upper": 2.0,
+                  "train_values_clipped": 260,
+                  "test_values_clipped": 72
+                },
+                "curricular_units_2nd_sem_(credited)": {
+                  "lower": 0.0,
+                  "upper": 5.0,
+                  "train_values_clipped": 404,
+                  "test_values_clipped": 100
+                },
+                "curricular_units_2nd_sem_(enrolled)": {
+                  "lower": 0.0,
+                  "upper": 11.0,
+                  "train_values_clipped": 371,
+                  "test_values_clipped": 90
+                },
+                "curricular_units_2nd_sem_(evaluations)": {
+                  "lower": 0.0,
+                  "upper": 16.0,
+                  "train_values_clipped": 442,
+                  "test_values_clipped": 115
+                },
+                "curricular_units_2nd_sem_(approved)": {
+                  "lower": 0.0,
+                  "upper": 9.0,
+                  "train_values_clipped": 584,
+                  "test_values_clipped": 142
+                },
+                "curricular_units_2nd_sem_(grade)": {
+                  "lower": 0.0,
+                  "upper": 15.60966666666573,
+                  "train_values_clipped": 613,
+                  "test_values_clipped": 147
+                },
+                "curricular_units_2nd_sem_(without_evaluations)": {
+                  "lower": 0.0,
+                  "upper": 2.0,
+                  "train_values_clipped": 538,
+                  "test_values_clipped": 141
+                }
+              }
+            },
+            "remove_low_information_features": {
+              "removed_columns": []
+            },
+            "drop_target_leakage_features": {
+              "removed_columns": [],
+              "warnings": []
+            },
+            "align_and_validate_feature_matrices": {
+              "train_test_columns_match": true,
+              "all_features_numeric": true,
+              "non_numeric_features": [],
+              "missing_feature_values_train": 0,
+              "missing_feature_values_test": 0,
+              "feature_count": 37
+            }
+          },
+          "input_profile": {
+            "train_shape": [
+              61214,
+              38
+            ],
+            "test_shape": [
+              15304,
+              38
+            ],
+            "feature_count": 37,
+            "numeric_features": [
+              "id",
+              "marital_status",
+              "application_mode",
+              "application_order",
+              "course",
+              "daytime/evening_attendance",
+              "previous_qualification",
+              "previous_qualification_(grade)",
+              "nacionality",
+              "mother's_qualification",
+              "father's_qualification",
+              "mother's_occupation",
+              "father's_occupation",
+              "admission_grade",
+              "displaced",
+              "educational_special_needs",
+              "debtor",
+              "tuition_fees_up_to_date",
+              "gender",
+              "scholarship_holder",
+              "age_at_enrollment",
+              "international",
+              "curricular_units_1st_sem_(credited)",
+              "curricular_units_1st_sem_(enrolled)",
+              "curricular_units_1st_sem_(evaluations)",
+              "curricular_units_1st_sem_(approved)",
+              "curricular_units_1st_sem_(grade)",
+              "curricular_units_1st_sem_(without_evaluations)",
+              "curricular_units_2nd_sem_(credited)",
+              "curricular_units_2nd_sem_(enrolled)",
+              "curricular_units_2nd_sem_(evaluations)",
+              "curricular_units_2nd_sem_(approved)",
+              "curricular_units_2nd_sem_(grade)",
+              "curricular_units_2nd_sem_(without_evaluations)",
+              "unemployment_rate",
+              "inflation_rate",
+              "gdp"
+            ],
+            "categorical_features": [],
+            "datetime_like_features": [],
+            "boolean_like_features": [],
+            "id_like_features": [
+              "id"
+            ],
+            "high_cardinality_features": [
+              "application_mode",
+              "previous_qualification",
+              "previous_qualification_(grade)",
+              "mother's_qualification",
+              "father's_qualification",
+              "mother's_occupation",
+              "father's_occupation",
+              "admission_grade",
+              "age_at_enrollment",
+              "curricular_units_1st_sem_(credited)",
+              "curricular_units_1st_sem_(enrolled)",
+              "curricular_units_1st_sem_(evaluations)",
+              "curricular_units_1st_sem_(approved)",
+              "curricular_units_1st_sem_(grade)",
+              "curricular_units_2nd_sem_(enrolled)",
+              "curricular_units_2nd_sem_(evaluations)",
+              "curricular_units_2nd_sem_(grade)"
+            ],
+            "missing_ratio_train": {
+              "id": 0.0,
+              "marital_status": 0.0,
+              "application_mode": 0.0,
+              "application_order": 0.0,
+              "course": 0.0,
+              "daytime/evening_attendance": 0.0,
+              "previous_qualification": 0.0,
+              "previous_qualification_(grade)": 0.0,
+              "nacionality": 0.0,
+              "mother's_qualification": 0.0,
+              "father's_qualification": 0.0,
+              "mother's_occupation": 0.0,
+              "father's_occupation": 0.0,
+              "admission_grade": 0.0,
+              "displaced": 0.0,
+              "educational_special_needs": 0.0,
+              "debtor": 0.0,
+              "tuition_fees_up_to_date": 0.0,
+              "gender": 0.0,
+              "scholarship_holder": 0.0,
+              "age_at_enrollment": 0.0,
+              "international": 0.0,
+              "curricular_units_1st_sem_(credited)": 0.0,
+              "curricular_units_1st_sem_(enrolled)": 0.0,
+              "curricular_units_1st_sem_(evaluations)": 0.0,
+              "curricular_units_1st_sem_(approved)": 0.0,
+              "curricular_units_1st_sem_(grade)": 0.0,
+              "curricular_units_1st_sem_(without_evaluations)": 0.0,
+              "curricular_units_2nd_sem_(credited)": 0.0,
+              "curricular_units_2nd_sem_(enrolled)": 0.0,
+              "curricular_units_2nd_sem_(evaluations)": 0.0,
+              "curricular_units_2nd_sem_(approved)": 0.0,
+              "curricular_units_2nd_sem_(grade)": 0.0,
+              "curricular_units_2nd_sem_(without_evaluations)": 0.0,
+              "unemployment_rate": 0.0,
+              "inflation_rate": 0.0,
+              "gdp": 0.0
+            },
+            "missing_ratio_test": {
+              "id": 0.0,
+              "marital_status": 0.0,
+              "application_mode": 0.0,
+              "application_order": 0.0,
+              "course": 0.0,
+              "daytime/evening_attendance": 0.0,
+              "previous_qualification": 0.0,
+              "previous_qualification_(grade)": 0.0,
+              "nacionality": 0.0,
+              "mother's_qualification": 0.0,
+              "father's_qualification": 0.0,
+              "mother's_occupation": 0.0,
+              "father's_occupation": 0.0,
+              "admission_grade": 0.0,
+              "displaced": 0.0,
+              "educational_special_needs": 0.0,
+              "debtor": 0.0,
+              "tuition_fees_up_to_date": 0.0,
+              "gender": 0.0,
+              "scholarship_holder": 0.0,
+              "age_at_enrollment": 0.0,
+              "international": 0.0,
+              "curricular_units_1st_sem_(credited)": 0.0,
+              "curricular_units_1st_sem_(enrolled)": 0.0,
+              "curricular_units_1st_sem_(evaluations)": 0.0,
+              "curricular_units_1st_sem_(approved)": 0.0,
+              "curricular_units_1st_sem_(grade)": 0.0,
+              "curricular_units_1st_sem_(without_evaluations)": 0.0,
+              "curricular_units_2nd_sem_(credited)": 0.0,
+              "curricular_units_2nd_sem_(enrolled)": 0.0,
+              "curricular_units_2nd_sem_(evaluations)": 0.0,
+              "curricular_units_2nd_sem_(approved)": 0.0,
+              "curricular_units_2nd_sem_(grade)": 0.0,
+              "curricular_units_2nd_sem_(without_evaluations)": 0.0,
+              "unemployment_rate": 0.0,
+              "inflation_rate": 0.0,
+              "gdp": 0.0
+            }
+          },
+          "output_profile": {
+            "train_shape": [
+              61214,
+              38
+            ],
+            "test_shape": [
+              15304,
+              38
+            ],
+            "feature_count": 37,
+            "numeric_features": [
+              "id",
+              "marital_status",
+              "application_mode",
+              "application_order",
+              "course",
+              "daytime/evening_attendance",
+              "previous_qualification",
+              "previous_qualification_(grade)",
+              "nacionality",
+              "mother's_qualification",
+              "father's_qualification",
+              "mother's_occupation",
+              "father's_occupation",
+              "admission_grade",
+              "displaced",
+              "educational_special_needs",
+              "debtor",
+              "tuition_fees_up_to_date",
+              "gender",
+              "scholarship_holder",
+              "age_at_enrollment",
+              "international",
+              "curricular_units_1st_sem_(credited)",
+              "curricular_units_1st_sem_(enrolled)",
+              "curricular_units_1st_sem_(evaluations)",
+              "curricular_units_1st_sem_(approved)",
+              "curricular_units_1st_sem_(grade)",
+              "curricular_units_1st_sem_(without_evaluations)",
+              "curricular_units_2nd_sem_(credited)",
+              "curricular_units_2nd_sem_(enrolled)",
+              "curricular_units_2nd_sem_(evaluations)",
+              "curricular_units_2nd_sem_(approved)",
+              "curricular_units_2nd_sem_(grade)",
+              "curricular_units_2nd_sem_(without_evaluations)",
+              "unemployment_rate",
+              "inflation_rate",
+              "gdp"
+            ],
+            "categorical_features": [],
+            "datetime_like_features": [],
+            "boolean_like_features": [],
+            "id_like_features": [
+              "id"
+            ],
+            "high_cardinality_features": [
+              "previous_qualification_(grade)",
+              "mother's_qualification",
+              "father's_qualification",
+              "admission_grade",
+              "age_at_enrollment",
+              "curricular_units_1st_sem_(grade)",
+              "curricular_units_2nd_sem_(grade)"
+            ],
+            "missing_ratio_train": {
+              "id": 0.0,
+              "marital_status": 0.0,
+              "application_mode": 0.0,
+              "application_order": 0.0,
+              "course": 0.0,
+              "daytime/evening_attendance": 0.0,
+              "previous_qualification": 0.0,
+              "previous_qualification_(grade)": 0.0,
+              "nacionality": 0.0,
+              "mother's_qualification": 0.0,
+              "father's_qualification": 0.0,
+              "mother's_occupation": 0.0,
+              "father's_occupation": 0.0,
+              "admission_grade": 0.0,
+              "displaced": 0.0,
+              "educational_special_needs": 0.0,
+              "debtor": 0.0,
+              "tuition_fees_up_to_date": 0.0,
+              "gender": 0.0,
+              "scholarship_holder": 0.0,
+              "age_at_enrollment": 0.0,
+              "international": 0.0,
+              "curricular_units_1st_sem_(credited)": 0.0,
+              "curricular_units_1st_sem_(enrolled)": 0.0,
+              "curricular_units_1st_sem_(evaluations)": 0.0,
+              "curricular_units_1st_sem_(approved)": 0.0,
+              "curricular_units_1st_sem_(grade)": 0.0,
+              "curricular_units_1st_sem_(without_evaluations)": 0.0,
+              "curricular_units_2nd_sem_(credited)": 0.0,
+              "curricular_units_2nd_sem_(enrolled)": 0.0,
+              "curricular_units_2nd_sem_(evaluations)": 0.0,
+              "curricular_units_2nd_sem_(approved)": 0.0,
+              "curricular_units_2nd_sem_(grade)": 0.0,
+              "curricular_units_2nd_sem_(without_evaluations)": 0.0,
+              "unemployment_rate": 0.0,
+              "inflation_rate": 0.0,
+              "gdp": 0.0
+            },
+            "missing_ratio_test": {
+              "id": 0.0,
+              "marital_status": 0.0,
+              "application_mode": 0.0,
+              "application_order": 0.0,
+              "course": 0.0,
+              "daytime/evening_attendance": 0.0,
+              "previous_qualification": 0.0,
+              "previous_qualification_(grade)": 0.0,
+              "nacionality": 0.0,
+              "mother's_qualification": 0.0,
+              "father's_qualification": 0.0,
+              "mother's_occupation": 0.0,
+              "father's_occupation": 0.0,
+              "admission_grade": 0.0,
+              "displaced": 0.0,
+              "educational_special_needs": 0.0,
+              "debtor": 0.0,
+              "tuition_fees_up_to_date": 0.0,
+              "gender": 0.0,
+              "scholarship_holder": 0.0,
+              "age_at_enrollment": 0.0,
+              "international": 0.0,
+              "curricular_units_1st_sem_(credited)": 0.0,
+              "curricular_units_1st_sem_(enrolled)": 0.0,
+              "curricular_units_1st_sem_(evaluations)": 0.0,
+              "curricular_units_1st_sem_(approved)": 0.0,
+              "curricular_units_1st_sem_(grade)": 0.0,
+              "curricular_units_1st_sem_(without_evaluations)": 0.0,
+              "curricular_units_2nd_sem_(credited)": 0.0,
+              "curricular_units_2nd_sem_(enrolled)": 0.0,
+              "curricular_units_2nd_sem_(evaluations)": 0.0,
+              "curricular_units_2nd_sem_(approved)": 0.0,
+              "curricular_units_2nd_sem_(grade)": 0.0,
+              "curricular_units_2nd_sem_(without_evaluations)": 0.0,
+              "unemployment_rate": 0.0,
+              "inflation_rate": 0.0,
+              "gdp": 0.0
+            }
+          },
+          "preprocessing": {
+            "categorical_encoding": "one_hot",
+            "numeric_imputation": "median",
+            "categorical_imputation": "mode",
+            "numeric_scaling": false,
+            "numeric_outlier_clipping": true,
+            "remove_constant_features": true,
+            "correlation_threshold": null,
+            "drop_target_leakage_features": true,
+            "requires_all_features_numeric": true,
+            "allows_missing_feature_values": false
+          },
+          "eda_recommendations": [
+            "Drop ID-like columns from model features to reduce memorization risk."
+          ],
+          "eda_policy_actions": {
+            "applied": [
+              {
+                "recommendation": "Drop ID-like columns from model features to reduce memorization risk.",
+                "action": "dropped identifier-like categorical features during encoding"
+              }
+            ],
+            "deferred": []
+          }
+        },
+        "train_shape": [
+          61214,
+          38
+        ],
+        "test_shape": [
+          15304,
+          38
+        ],
+        "target_column": "target"
+      },
+      "task_type": "classification",
+      "target_column": "target",
+      "metric": "f1_weighted",
+      "cv_score": 0.8139754231840435,
+      "cv_scores": [],
+      "test_metrics": {
+        "accuracy": 0.805083638264506,
+        "f1_weighted": 0.8129411571187904
+      },
+      "tuning": {
+        "status": "completed",
+        "failure_reason": "",
+        "baseline": {
+          "metric": "f1_weighted",
+          "cv": 3,
+          "scores": [
+            0.8215668046976184,
+            0.8216153735583424,
+            0.823287769779622
+          ],
+          "mean_cv_score": 0.8221566493451943
+        },
+        "plan": {
+          "source": "llm",
+          "model_id": "random_forest_classifier",
+          "task_type": "classification",
+          "metric": "f1_weighted",
+          "cv": 3,
+          "budget": "small",
+          "param_grid": {
+            "n_estimators": [
+              100,
+              200
+            ],
+            "max_depth": [
+              5,
+              10
+            ],
+            "min_samples_leaf": [
+              1,
+              2
+            ],
+            "max_features": [
+              "sqrt"
+            ],
+            "class_weight": [
+              "balanced"
+            ]
+          },
+          "explanation": "The tuning plan includes a compact grid focusing on n_estimators, max_depth, and class_weight to address class imbalance and improve model performance, while keeping the search space manageable for a small budget."
+        },
+        "n_jobs": -1,
+        "best_params": {
+          "class_weight": "balanced",
+          "max_depth": 10,
+          "max_features": "sqrt",
+          "min_samples_leaf": 1,
+          "n_estimators": 200
+        },
+        "best_cv_score": 0.8139754231840435,
+        "explanation": "The tuning plan includes a compact grid focusing on n_estimators, max_depth, and class_weight to address class imbalance and improve model performance, while keeping the search space manageable for a small budget."
+      }
+    },
+    {
+      "model_id": "gradient_boosting_classifier",
+      "model_report_path": "workspace/pipelines/gradient_boosting_classifier/model_report.json",
+      "feature_importance_path": "workspace/pipelines/gradient_boosting_classifier/feature_importance.json",
+      "feature_pipeline": {
+        "model_id": "gradient_boosting_classifier",
+        "train_path": "workspace/pipelines/gradient_boosting_classifier/fe_train.csv",
+        "test_path": "workspace/pipelines/gradient_boosting_classifier/fe_test.csv",
+        "execution": {
+          "model_id": "gradient_boosting_classifier",
+          "steps": [
+            "create_missing_indicators",
+            "impute_missing_features",
+            "convert_boolean_like_features",
+            "create_datetime_features",
+            "encode_categorical_features",
+            "clip_numeric_outliers",
+            "remove_low_information_features",
+            "drop_target_leakage_features",
+            "align_and_validate_feature_matrices"
+          ],
+          "step_reports": {
+            "create_missing_indicators": {
+              "source_columns": [],
+              "created_columns": []
+            },
+            "impute_missing_features": {
+              "numeric_strategy": "median",
+              "categorical_strategy": "mode",
+              "imputed_columns": [],
+              "fill_values": {}
+            },
+            "convert_boolean_like_features": {
+              "converted_columns": []
+            },
+            "create_datetime_features": {
+              "transformed_columns": [],
+              "created_columns": {}
+            },
+            "encode_categorical_features": {
+              "one_hot_encoded_columns": [],
+              "frequency_encoded_columns": [],
+              "dropped_identifier_like_columns": [],
+              "output_column_count": 38
+            },
+            "clip_numeric_outliers": {
+              "clipped_columns": {
+                "id": {
+                  "lower": 805.13,
+                  "upper": 75749.87,
+                  "train_values_clipped": 1226,
+                  "test_values_clipped": 348
+                },
+                "marital_status": {
+                  "lower": 1.0,
+                  "upper": 4.0,
+                  "train_values_clipped": 120,
+                  "test_values_clipped": 31
+                },
+                "application_mode": {
+                  "lower": 1.0,
+                  "upper": 44.0,
+                  "train_values_clipped": 536,
+                  "test_values_clipped": 131
+                },
+                "application_order": {
+                  "lower": 1.0,
+                  "upper": 6.0,
+                  "train_values_clipped": 2,
+                  "test_values_clipped": 2
+                },
+                "course": {
+                  "lower": 171.0,
+                  "upper": 9991.0,
+                  "train_values_clipped": 60,
+                  "test_values_clipped": 13
+                },
+                "previous_qualification": {
+                  "lower": 1.0,
+                  "upper": 39.0,
+                  "train_values_clipped": 438,
+                  "test_values_clipped": 89
+                },
+                "previous_qualification_(grade)": {
+                  "lower": 102.0,
+                  "upper": 160.0,
+                  "train_values_clipped": 1170,
+                  "test_values_clipped": 314
+                },
+                "mother's_qualification": {
+                  "lower": 1.0,
+                  "upper": 38.0,
+                  "train_values_clipped": 126,
+                  "test_values_clipped": 32
+                },
+                "father's_qualification": {
+                  "lower": 1.0,
+                  "upper": 38.0,
+                  "train_values_clipped": 141,
+                  "test_values_clipped": 41
+                },
+                "mother's_occupation": {
+                  "lower": 0.0,
+                  "upper": 90.0,
+                  "train_values_clipped": 555,
+                  "test_values_clipped": 126
+                },
+                "father's_occupation": {
+                  "lower": 0.0,
+                  "upper": 90.0,
+                  "train_values_clipped": 570,
+                  "test_values_clipped": 125
+                },
+                "admission_grade": {
+                  "lower": 98.0,
+                  "upper": 160.0,
+                  "train_values_clipped": 997,
+                  "test_values_clipped": 289
+                },
+                "age_at_enrollment": {
+                  "lower": 18.0,
+                  "upper": 49.0,
+                  "train_values_clipped": 573,
+                  "test_values_clipped": 119
+                },
+                "curricular_units_1st_sem_(credited)": {
+                  "lower": 0.0,
+                  "upper": 7.0,
+                  "train_values_clipped": 471,
+                  "test_values_clipped": 117
+                },
+                "curricular_units_1st_sem_(enrolled)": {
+                  "lower": 0.0,
+                  "upper": 12.0,
+                  "train_values_clipped": 370,
+                  "test_values_clipped": 83
+                },
+                "curricular_units_1st_sem_(evaluations)": {
+                  "lower": 0.0,
+                  "upper": 16.0,
+                  "train_values_clipped": 597,
+                  "test_values_clipped": 163
+                },
+                "curricular_units_1st_sem_(approved)": {
+                  "lower": 0.0,
+                  "upper": 11.0,
+                  "train_values_clipped": 414,
+                  "test_values_clipped": 102
+                },
+                "curricular_units_1st_sem_(grade)": {
+                  "lower": 0.0,
+                  "upper": 15.333333333333334,
+                  "train_values_clipped": 607,
+                  "test_values_clipped": 172
+                },
+                "curricular_units_1st_sem_(without_evaluations)": {
+                  "lower": 0.0,
+                  "upper": 2.0,
+                  "train_values_clipped": 260,
+                  "test_values_clipped": 72
+                },
+                "curricular_units_2nd_sem_(credited)": {
+                  "lower": 0.0,
+                  "upper": 5.0,
+                  "train_values_clipped": 404,
+                  "test_values_clipped": 100
+                },
+                "curricular_units_2nd_sem_(enrolled)": {
+                  "lower": 0.0,
+                  "upper": 11.0,
+                  "train_values_clipped": 371,
+                  "test_values_clipped": 90
+                },
+                "curricular_units_2nd_sem_(evaluations)": {
+                  "lower": 0.0,
+                  "upper": 16.0,
+                  "train_values_clipped": 442,
+                  "test_values_clipped": 115
+                },
+                "curricular_units_2nd_sem_(approved)": {
+                  "lower": 0.0,
+                  "upper": 9.0,
+                  "train_values_clipped": 584,
+                  "test_values_clipped": 142
+                },
+                "curricular_units_2nd_sem_(grade)": {
+                  "lower": 0.0,
+                  "upper": 15.60966666666573,
+                  "train_values_clipped": 613,
+                  "test_values_clipped": 147
+                },
+                "curricular_units_2nd_sem_(without_evaluations)": {
+                  "lower": 0.0,
+                  "upper": 2.0,
+                  "train_values_clipped": 538,
+                  "test_values_clipped": 141
+                }
+              }
+            },
+            "remove_low_information_features": {
+              "removed_columns": []
+            },
+            "drop_target_leakage_features": {
+              "removed_columns": [],
+              "warnings": []
+            },
+            "align_and_validate_feature_matrices": {
+              "train_test_columns_match": true,
+              "all_features_numeric": true,
+              "non_numeric_features": [],
+              "missing_feature_values_train": 0,
+              "missing_feature_values_test": 0,
+              "feature_count": 37
+            }
+          },
+          "input_profile": {
+            "train_shape": [
+              61214,
+              38
+            ],
+            "test_shape": [
+              15304,
+              38
+            ],
+            "feature_count": 37,
+            "numeric_features": [
+              "id",
+              "marital_status",
+              "application_mode",
+              "application_order",
+              "course",
+              "daytime/evening_attendance",
+              "previous_qualification",
+              "previous_qualification_(grade)",
+              "nacionality",
+              "mother's_qualification",
+              "father's_qualification",
+              "mother's_occupation",
+              "father's_occupation",
+              "admission_grade",
+              "displaced",
+              "educational_special_needs",
+              "debtor",
+              "tuition_fees_up_to_date",
+              "gender",
+              "scholarship_holder",
+              "age_at_enrollment",
+              "international",
+              "curricular_units_1st_sem_(credited)",
+              "curricular_units_1st_sem_(enrolled)",
+              "curricular_units_1st_sem_(evaluations)",
+              "curricular_units_1st_sem_(approved)",
+              "curricular_units_1st_sem_(grade)",
+              "curricular_units_1st_sem_(without_evaluations)",
+              "curricular_units_2nd_sem_(credited)",
+              "curricular_units_2nd_sem_(enrolled)",
+              "curricular_units_2nd_sem_(evaluations)",
+              "curricular_units_2nd_sem_(approved)",
+              "curricular_units_2nd_sem_(grade)",
+              "curricular_units_2nd_sem_(without_evaluations)",
+              "unemployment_rate",
+              "inflation_rate",
+              "gdp"
+            ],
+            "categorical_features": [],
+            "datetime_like_features": [],
+            "boolean_like_features": [],
+            "id_like_features": [
+              "id"
+            ],
+            "high_cardinality_features": [
+              "application_mode",
+              "previous_qualification",
+              "previous_qualification_(grade)",
+              "mother's_qualification",
+              "father's_qualification",
+              "mother's_occupation",
+              "father's_occupation",
+              "admission_grade",
+              "age_at_enrollment",
+              "curricular_units_1st_sem_(credited)",
+              "curricular_units_1st_sem_(enrolled)",
+              "curricular_units_1st_sem_(evaluations)",
+              "curricular_units_1st_sem_(approved)",
+              "curricular_units_1st_sem_(grade)",
+              "curricular_units_2nd_sem_(enrolled)",
+              "curricular_units_2nd_sem_(evaluations)",
+              "curricular_units_2nd_sem_(grade)"
+            ],
+            "missing_ratio_train": {
+              "id": 0.0,
+              "marital_status": 0.0,
+              "application_mode": 0.0,
+              "application_order": 0.0,
+              "course": 0.0,
+              "daytime/evening_attendance": 0.0,
+              "previous_qualification": 0.0,
+              "previous_qualification_(grade)": 0.0,
+              "nacionality": 0.0,
+              "mother's_qualification": 0.0,
+              "father's_qualification": 0.0,
+              "mother's_occupation": 0.0,
+              "father's_occupation": 0.0,
+              "admission_grade": 0.0,
+              "displaced": 0.0,
+              "educational_special_needs": 0.0,
+              "debtor": 0.0,
+              "tuition_fees_up_to_date": 0.0,
+              "gender": 0.0,
+              "scholarship_holder": 0.0,
+              "age_at_enrollment": 0.0,
+              "international": 0.0,
+              "curricular_units_1st_sem_(credited)": 0.0,
+              "curricular_units_1st_sem_(enrolled)": 0.0,
+              "curricular_units_1st_sem_(evaluations)": 0.0,
+              "curricular_units_1st_sem_(approved)": 0.0,
+              "curricular_units_1st_sem_(grade)": 0.0,
+              "curricular_units_1st_sem_(without_evaluations)": 0.0,
+              "curricular_units_2nd_sem_(credited)": 0.0,
+              "curricular_units_2nd_sem_(enrolled)": 0.0,
+              "curricular_units_2nd_sem_(evaluations)": 0.0,
+              "curricular_units_2nd_sem_(approved)": 0.0,
+              "curricular_units_2nd_sem_(grade)": 0.0,
+              "curricular_units_2nd_sem_(without_evaluations)": 0.0,
+              "unemployment_rate": 0.0,
+              "inflation_rate": 0.0,
+              "gdp": 0.0
+            },
+            "missing_ratio_test": {
+              "id": 0.0,
+              "marital_status": 0.0,
+              "application_mode": 0.0,
+              "application_order": 0.0,
+              "course": 0.0,
+              "daytime/evening_attendance": 0.0,
+              "previous_qualification": 0.0,
+              "previous_qualification_(grade)": 0.0,
+              "nacionality": 0.0,
+              "mother's_qualification": 0.0,
+              "father's_qualification": 0.0,
+              "mother's_occupation": 0.0,
+              "father's_occupation": 0.0,
+              "admission_grade": 0.0,
+              "displaced": 0.0,
+              "educational_special_needs": 0.0,
+              "debtor": 0.0,
+              "tuition_fees_up_to_date": 0.0,
+              "gender": 0.0,
+              "scholarship_holder": 0.0,
+              "age_at_enrollment": 0.0,
+              "international": 0.0,
+              "curricular_units_1st_sem_(credited)": 0.0,
+              "curricular_units_1st_sem_(enrolled)": 0.0,
+              "curricular_units_1st_sem_(evaluations)": 0.0,
+              "curricular_units_1st_sem_(approved)": 0.0,
+              "curricular_units_1st_sem_(grade)": 0.0,
+              "curricular_units_1st_sem_(without_evaluations)": 0.0,
+              "curricular_units_2nd_sem_(credited)": 0.0,
+              "curricular_units_2nd_sem_(enrolled)": 0.0,
+              "curricular_units_2nd_sem_(evaluations)": 0.0,
+              "curricular_units_2nd_sem_(approved)": 0.0,
+              "curricular_units_2nd_sem_(grade)": 0.0,
+              "curricular_units_2nd_sem_(without_evaluations)": 0.0,
+              "unemployment_rate": 0.0,
+              "inflation_rate": 0.0,
+              "gdp": 0.0
+            }
+          },
+          "output_profile": {
+            "train_shape": [
+              61214,
+              38
+            ],
+            "test_shape": [
+              15304,
+              38
+            ],
+            "feature_count": 37,
+            "numeric_features": [
+              "id",
+              "marital_status",
+              "application_mode",
+              "application_order",
+              "course",
+              "daytime/evening_attendance",
+              "previous_qualification",
+              "previous_qualification_(grade)",
+              "nacionality",
+              "mother's_qualification",
+              "father's_qualification",
+              "mother's_occupation",
+              "father's_occupation",
+              "admission_grade",
+              "displaced",
+              "educational_special_needs",
+              "debtor",
+              "tuition_fees_up_to_date",
+              "gender",
+              "scholarship_holder",
+              "age_at_enrollment",
+              "international",
+              "curricular_units_1st_sem_(credited)",
+              "curricular_units_1st_sem_(enrolled)",
+              "curricular_units_1st_sem_(evaluations)",
+              "curricular_units_1st_sem_(approved)",
+              "curricular_units_1st_sem_(grade)",
+              "curricular_units_1st_sem_(without_evaluations)",
+              "curricular_units_2nd_sem_(credited)",
+              "curricular_units_2nd_sem_(enrolled)",
+              "curricular_units_2nd_sem_(evaluations)",
+              "curricular_units_2nd_sem_(approved)",
+              "curricular_units_2nd_sem_(grade)",
+              "curricular_units_2nd_sem_(without_evaluations)",
+              "unemployment_rate",
+              "inflation_rate",
+              "gdp"
+            ],
+            "categorical_features": [],
+            "datetime_like_features": [],
+            "boolean_like_features": [],
+            "id_like_features": [
+              "id"
+            ],
+            "high_cardinality_features": [
+              "previous_qualification_(grade)",
+              "mother's_qualification",
+              "father's_qualification",
+              "admission_grade",
+              "age_at_enrollment",
+              "curricular_units_1st_sem_(grade)",
+              "curricular_units_2nd_sem_(grade)"
+            ],
+            "missing_ratio_train": {
+              "id": 0.0,
+              "marital_status": 0.0,
+              "application_mode": 0.0,
+              "application_order": 0.0,
+              "course": 0.0,
+              "daytime/evening_attendance": 0.0,
+              "previous_qualification": 0.0,
+              "previous_qualification_(grade)": 0.0,
+              "nacionality": 0.0,
+              "mother's_qualification": 0.0,
+              "father's_qualification": 0.0,
+              "mother's_occupation": 0.0,
+              "father's_occupation": 0.0,
+              "admission_grade": 0.0,
+              "displaced": 0.0,
+              "educational_special_needs": 0.0,
+              "debtor": 0.0,
+              "tuition_fees_up_to_date": 0.0,
+              "gender": 0.0,
+              "scholarship_holder": 0.0,
+              "age_at_enrollment": 0.0,
+              "international": 0.0,
+              "curricular_units_1st_sem_(credited)": 0.0,
+              "curricular_units_1st_sem_(enrolled)": 0.0,
+              "curricular_units_1st_sem_(evaluations)": 0.0,
+              "curricular_units_1st_sem_(approved)": 0.0,
+              "curricular_units_1st_sem_(grade)": 0.0,
+              "curricular_units_1st_sem_(without_evaluations)": 0.0,
+              "curricular_units_2nd_sem_(credited)": 0.0,
+              "curricular_units_2nd_sem_(enrolled)": 0.0,
+              "curricular_units_2nd_sem_(evaluations)": 0.0,
+              "curricular_units_2nd_sem_(approved)": 0.0,
+              "curricular_units_2nd_sem_(grade)": 0.0,
+              "curricular_units_2nd_sem_(without_evaluations)": 0.0,
+              "unemployment_rate": 0.0,
+              "inflation_rate": 0.0,
+              "gdp": 0.0
+            },
+            "missing_ratio_test": {
+              "id": 0.0,
+              "marital_status": 0.0,
+              "application_mode": 0.0,
+              "application_order": 0.0,
+              "course": 0.0,
+              "daytime/evening_attendance": 0.0,
+              "previous_qualification": 0.0,
+              "previous_qualification_(grade)": 0.0,
+              "nacionality": 0.0,
+              "mother's_qualification": 0.0,
+              "father's_qualification": 0.0,
+              "mother's_occupation": 0.0,
+              "father's_occupation": 0.0,
+              "admission_grade": 0.0,
+              "displaced": 0.0,
+              "educational_special_needs": 0.0,
+              "debtor": 0.0,
+              "tuition_fees_up_to_date": 0.0,
+              "gender": 0.0,
+              "scholarship_holder": 0.0,
+              "age_at_enrollment": 0.0,
+              "international": 0.0,
+              "curricular_units_1st_sem_(credited)": 0.0,
+              "curricular_units_1st_sem_(enrolled)": 0.0,
+              "curricular_units_1st_sem_(evaluations)": 0.0,
+              "curricular_units_1st_sem_(approved)": 0.0,
+              "curricular_units_1st_sem_(grade)": 0.0,
+              "curricular_units_1st_sem_(without_evaluations)": 0.0,
+              "curricular_units_2nd_sem_(credited)": 0.0,
+              "curricular_units_2nd_sem_(enrolled)": 0.0,
+              "curricular_units_2nd_sem_(evaluations)": 0.0,
+              "curricular_units_2nd_sem_(approved)": 0.0,
+              "curricular_units_2nd_sem_(grade)": 0.0,
+              "curricular_units_2nd_sem_(without_evaluations)": 0.0,
+              "unemployment_rate": 0.0,
+              "inflation_rate": 0.0,
+              "gdp": 0.0
+            }
+          },
+          "preprocessing": {
+            "categorical_encoding": "one_hot",
+            "numeric_imputation": "median",
+            "categorical_imputation": "mode",
+            "numeric_scaling": false,
+            "numeric_outlier_clipping": true,
+            "remove_constant_features": true,
+            "correlation_threshold": null,
+            "drop_target_leakage_features": true,
+            "requires_all_features_numeric": true,
+            "allows_missing_feature_values": false
+          },
+          "eda_recommendations": [
+            "Drop ID-like columns from model features to reduce memorization risk."
+          ],
+          "eda_policy_actions": {
+            "applied": [
+              {
+                "recommendation": "Drop ID-like columns from model features to reduce memorization risk.",
+                "action": "dropped identifier-like categorical features during encoding"
+              }
+            ],
+            "deferred": []
+          }
+        },
+        "train_shape": [
+          61214,
+          38
+        ],
+        "test_shape": [
+          15304,
+          38
+        ],
+        "target_column": "target"
+      },
+      "task_type": "classification",
+      "target_column": "target",
+      "metric": "f1_weighted",
+      "cv_score": 0.8265891736834868,
+      "cv_scores": [],
+      "test_metrics": {
+        "accuracy": 0.8276921066387872,
+        "f1_weighted": 0.8253719709409806
+      },
+      "tuning": {
+        "status": "completed",
+        "failure_reason": "",
+        "baseline": {
+          "metric": "f1_weighted",
+          "cv": 3,
+          "scores": [
+            0.824023428240577,
+            0.8250155511579665,
+            0.8259324106036362
+          ],
+          "mean_cv_score": 0.82499046333406
+        },
+        "plan": {
+          "source": "llm",
+          "model_id": "gradient_boosting_classifier",
+          "task_type": "classification",
+          "metric": "f1_weighted",
+          "cv": 3,
+          "budget": "small",
+          "param_grid": {
+            "n_estimators": [
+              100,
+              150
+            ],
+            "learning_rate": [
+              0.03,
+              0.1
+            ],
+            "max_depth": [
+              2,
+              3
+            ],
+            "subsample": [
+              0.8
+            ]
+          },
+          "explanation": "The baseline performance is decent, but to explore potential improvements, we broadened the n_estimators and max_depth while keeping subsample fixed to maintain stability in the model."
+        },
+        "n_jobs": -1,
+        "best_params": {
+          "learning_rate": 0.1,
+          "max_depth": 3,
+          "n_estimators": 150,
+          "subsample": 0.8
+        },
+        "best_cv_score": 0.8265891736834868,
+        "explanation": "The baseline performance is decent, but to explore potential improvements, we broadened the n_estimators and max_depth while keeping subsample fixed to maintain stability in the model."
+      }
+    }
+  ],
+  "selected_model_id": "gradient_boosting_classifier",
+  "best_model": "gradient_boosting_classifier",
+  "best_cv_score": 0.8265891736834868,
+  "test_metrics": {
+    "accuracy": 0.8276921066387872,
+    "f1_weighted": 0.8253719709409806
+  },
+  "tuning": {
+    "enabled": true,
+    "strategy": "LLM-assisted tuning plan with deterministic validated GridSearchCV execution",
+    "selected_model_tuning": {
+      "status": "completed",
+      "failure_reason": "",
+      "baseline": {
+        "metric": "f1_weighted",
+        "cv": 3,
+        "scores": [
+          0.824023428240577,
+          0.8250155511579665,
+          0.8259324106036362
+        ],
+        "mean_cv_score": 0.82499046333406
+      },
+      "plan": {
+        "source": "llm",
+        "model_id": "gradient_boosting_classifier",
+        "task_type": "classification",
+        "metric": "f1_weighted",
+        "cv": 3,
+        "budget": "small",
+        "param_grid": {
+          "n_estimators": [
+            100,
+            150
+          ],
+          "learning_rate": [
+            0.03,
+            0.1
+          ],
+          "max_depth": [
+            2,
+            3
+          ],
+          "subsample": [
+            0.8
+          ]
+        },
+        "explanation": "The baseline performance is decent, but to explore potential improvements, we broadened the n_estimators and max_depth while keeping subsample fixed to maintain stability in the model."
+      },
+      "n_jobs": -1,
+      "best_params": {
+        "learning_rate": 0.1,
+        "max_depth": 3,
+        "n_estimators": 150,
+        "subsample": 0.8
+      },
+      "best_cv_score": 0.8265891736834868,
+      "explanation": "The baseline performance is decent, but to explore potential improvements, we broadened the n_estimators and max_depth while keeping subsample fixed to maintain stability in the model."
+    },
+    "candidate_tuning_status": {
+      "logistic_regression": "completed",
+      "random_forest_classifier": "completed",
+      "gradient_boosting_classifier": "completed"
+    }
+  },
+  "selected_model_report_path": "workspace/pipelines/gradient_boosting_classifier/model_report.json",
+  "selected_feature_importance_path": "workspace/pipelines/gradient_boosting_classifier/feature_importance.json"
+}
