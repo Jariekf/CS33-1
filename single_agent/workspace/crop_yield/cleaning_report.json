@@ -1,0 +1,149 @@
+{
+  "stage": "data_cleaning",
+  "status": "completed",
+  "target_column": "yield",
+  "input_mode": "single_file_split",
+  "data_description_used": true,
+  "profile_before": {
+    "rows": 2200,
+    "columns": 9,
+    "column_names": [
+      "nitrogen",
+      "phosphorus",
+      "potassium",
+      "temperature",
+      "humidity",
+      "ph_value",
+      "rainfall",
+      "crop",
+      "yield"
+    ],
+    "missing_ratio": {
+      "nitrogen": 0.0,
+      "phosphorus": 0.0,
+      "potassium": 0.0,
+      "temperature": 0.0,
+      "humidity": 0.0,
+      "ph_value": 0.0,
+      "rainfall": 0.0,
+      "crop": 0.0,
+      "yield": 0.0
+    },
+    "dtypes": {
+      "nitrogen": "int64",
+      "phosphorus": "int64",
+      "potassium": "int64",
+      "temperature": "float64",
+      "humidity": "float64",
+      "ph_value": "float64",
+      "rainfall": "float64",
+      "crop": "object",
+      "yield": "int64"
+    },
+    "duplicate_rows": 0,
+    "target_column": "yield",
+    "target_unique_values": 502,
+    "target_distribution": {
+      "1500": 57,
+      "1000": 56,
+      "500": 55,
+      "3000": 52,
+      "700": 51,
+      "2000": 50,
+      "900": 48,
+      "800": 44,
+      "2500": 43,
+      "1400": 40,
+      "1100": 36,
+      "4000": 35,
+      "1200": 35,
+      "3500": 35,
+      "1800": 32,
+      "1300": 31,
+      "3800": 28,
+      "600": 28,
+      "400": 28,
+      "5000": 27
+    }
+  },
+  "profile_after": {
+    "rows": 2200,
+    "columns": 9,
+    "column_names": [
+      "nitrogen",
+      "phosphorus",
+      "potassium",
+      "temperature",
+      "humidity",
+      "ph_value",
+      "rainfall",
+      "crop",
+      "yield"
+    ],
+    "missing_ratio": {
+      "nitrogen": 0.0,
+      "phosphorus": 0.0,
+      "potassium": 0.0,
+      "temperature": 0.0,
+      "humidity": 0.0,
+      "ph_value": 0.0,
+      "rainfall": 0.0,
+      "crop": 0.0,
+      "yield": 0.0
+    },
+    "dtypes": {
+      "nitrogen": "int64",
+      "phosphorus": "int64",
+      "potassium": "int64",
+      "temperature": "float64",
+      "humidity": "float64",
+      "ph_value": "float64",
+      "rainfall": "float64",
+      "crop": "object",
+      "yield": "int64"
+    },
+    "duplicate_rows": 0,
+    "target_column": "yield",
+    "target_unique_values": 502,
+    "target_distribution": {
+      "1500": 57,
+      "1000": 56,
+      "500": 55,
+      "3000": 52,
+      "700": 51,
+      "2000": 50,
+      "900": 48,
+      "800": 44,
+      "2500": 43,
+      "1400": 40,
+      "1100": 36,
+      "4000": 35,
+      "1200": 35,
+      "3500": 35,
+      "1800": 32,
+      "1300": 31,
+      "3800": 28,
+      "600": 28,
+      "400": 28,
+      "5000": 27
+    }
+  },
+  "provided_train_test_profile": null,
+  "row_loss": 0,
+  "row_loss_breakdown": {
+    "missing_target_rows_removed": 0,
+    "duplicate_rows_removed": 0
+  },
+  "duplicate_policy": {
+    "remove_duplicates": false,
+    "source": "deterministic",
+    "reason": "No exact duplicate rows were detected.",
+    "duplicate_rows_detected": 0
+  },
+  "numeric_like_conversions": [],
+  "split": {
+    "split_strategy": "random",
+    "test_size": 0.2,
+    "warning": ""
+  }
+}

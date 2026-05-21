@@ -1,0 +1,57 @@
+{
+  "task_type": "classification",
+  "target_column": "exited",
+  "model_id": "gradient_boosting_classifier",
+  "metric": "f1_weighted",
+  "cv_score": 0.8571085637334629,
+  "cv_scores": [],
+  "test_metrics": {
+    "accuracy": 0.865937528403066,
+    "f1_weighted": 0.8571895831603001
+  },
+  "tuning": {
+    "status": "completed",
+    "failure_reason": "",
+    "baseline": {
+      "metric": "f1_weighted",
+      "cv": 3,
+      "scores": [
+        0.8539322772156658,
+        0.8544178653856955,
+        0.8604961715554028
+      ],
+      "mean_cv_score": 0.8562821047189213
+    },
+    "plan": {
+      "source": "llm",
+      "model_id": "gradient_boosting_classifier",
+      "task_type": "classification",
+      "metric": "f1_weighted",
+      "cv": 3,
+      "budget": "small",
+      "param_grid": {
+        "n_estimators": [
+          100,
+          150
+        ],
+        "learning_rate": [
+          0.03,
+          0.1
+        ],
+        "max_depth": [
+          2,
+          3
+        ]
+      },
+      "explanation": "The baseline performance is decent but can be improved. Increasing n_estimators and exploring both learning rates while keeping max_depth compact allows for better model fitting without excessive complexity."
+    },
+    "n_jobs": 1,
+    "best_params": {
+      "learning_rate": 0.1,
+      "max_depth": 3,
+      "n_estimators": 150
+    },
+    "best_cv_score": 0.8571085637334629,
+    "explanation": "The baseline performance is decent but can be improved. Increasing n_estimators and exploring both learning rates while keeping max_depth compact allows for better model fitting without excessive complexity."
+  }
+}

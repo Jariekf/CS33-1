@@ -1,0 +1,215 @@
+{
+  "stage": "eda_analysis",
+  "status": "completed",
+  "leakage_policy": {
+    "data_quality_scope": "cleaned_data",
+    "feature_target_analysis_scope": "train_data_only",
+    "test_data_used_for_feature_target_analysis": false
+  },
+  "dataset_overview": {
+    "rows": 76518,
+    "columns": 38,
+    "numeric_columns": [
+      "id",
+      "marital_status",
+      "application_mode",
+      "application_order",
+      "course",
+      "daytime/evening_attendance",
+      "previous_qualification",
+      "previous_qualification_(grade)",
+      "nacionality",
+      "mother's_qualification",
+      "father's_qualification",
+      "mother's_occupation",
+      "father's_occupation",
+      "admission_grade",
+      "displaced",
+      "educational_special_needs",
+      "debtor",
+      "tuition_fees_up_to_date",
+      "gender",
+      "scholarship_holder",
+      "age_at_enrollment",
+      "international",
+      "curricular_units_1st_sem_(credited)",
+      "curricular_units_1st_sem_(enrolled)",
+      "curricular_units_1st_sem_(evaluations)",
+      "curricular_units_1st_sem_(approved)",
+      "curricular_units_1st_sem_(grade)",
+      "curricular_units_1st_sem_(without_evaluations)",
+      "curricular_units_2nd_sem_(credited)",
+      "curricular_units_2nd_sem_(enrolled)",
+      "curricular_units_2nd_sem_(evaluations)",
+      "curricular_units_2nd_sem_(approved)",
+      "curricular_units_2nd_sem_(grade)",
+      "curricular_units_2nd_sem_(without_evaluations)",
+      "unemployment_rate",
+      "inflation_rate",
+      "gdp"
+    ],
+    "categorical_columns": [
+      "target"
+    ],
+    "missing_ratio": {
+      "id": 0.0,
+      "marital_status": 0.0,
+      "application_mode": 0.0,
+      "application_order": 0.0,
+      "course": 0.0,
+      "daytime/evening_attendance": 0.0,
+      "previous_qualification": 0.0,
+      "previous_qualification_(grade)": 0.0,
+      "nacionality": 0.0,
+      "mother's_qualification": 0.0,
+      "father's_qualification": 0.0,
+      "mother's_occupation": 0.0,
+      "father's_occupation": 0.0,
+      "admission_grade": 0.0,
+      "displaced": 0.0,
+      "educational_special_needs": 0.0,
+      "debtor": 0.0,
+      "tuition_fees_up_to_date": 0.0,
+      "gender": 0.0,
+      "scholarship_holder": 0.0,
+      "age_at_enrollment": 0.0,
+      "international": 0.0,
+      "curricular_units_1st_sem_(credited)": 0.0,
+      "curricular_units_1st_sem_(enrolled)": 0.0,
+      "curricular_units_1st_sem_(evaluations)": 0.0,
+      "curricular_units_1st_sem_(approved)": 0.0,
+      "curricular_units_1st_sem_(grade)": 0.0,
+      "curricular_units_1st_sem_(without_evaluations)": 0.0,
+      "curricular_units_2nd_sem_(credited)": 0.0,
+      "curricular_units_2nd_sem_(enrolled)": 0.0,
+      "curricular_units_2nd_sem_(evaluations)": 0.0,
+      "curricular_units_2nd_sem_(approved)": 0.0,
+      "curricular_units_2nd_sem_(grade)": 0.0,
+      "curricular_units_2nd_sem_(without_evaluations)": 0.0,
+      "unemployment_rate": 0.0,
+      "inflation_rate": 0.0,
+      "gdp": 0.0,
+      "target": 0.0
+    },
+    "dtypes": {
+      "id": "int64",
+      "marital_status": "int64",
+      "application_mode": "int64",
+      "application_order": "int64",
+      "course": "int64",
+      "daytime/evening_attendance": "int64",
+      "previous_qualification": "int64",
+      "previous_qualification_(grade)": "float64",
+      "nacionality": "int64",
+      "mother's_qualification": "int64",
+      "father's_qualification": "int64",
+      "mother's_occupation": "int64",
+      "father's_occupation": "int64",
+      "admission_grade": "float64",
+      "displaced": "int64",
+      "educational_special_needs": "int64",
+      "debtor": "int64",
+      "tuition_fees_up_to_date": "int64",
+      "gender": "int64",
+      "scholarship_holder": "int64",
+      "age_at_enrollment": "int64",
+      "international": "int64",
+      "curricular_units_1st_sem_(credited)": "int64",
+      "curricular_units_1st_sem_(enrolled)": "int64",
+      "curricular_units_1st_sem_(evaluations)": "int64",
+      "curricular_units_1st_sem_(approved)": "int64",
+      "curricular_units_1st_sem_(grade)": "float64",
+      "curricular_units_1st_sem_(without_evaluations)": "int64",
+      "curricular_units_2nd_sem_(credited)": "int64",
+      "curricular_units_2nd_sem_(enrolled)": "int64",
+      "curricular_units_2nd_sem_(evaluations)": "int64",
+      "curricular_units_2nd_sem_(approved)": "int64",
+      "curricular_units_2nd_sem_(grade)": "float64",
+      "curricular_units_2nd_sem_(without_evaluations)": "int64",
+      "unemployment_rate": "float64",
+      "inflation_rate": "float64",
+      "gdp": "float64",
+      "target": "object"
+    },
+    "duplicate_rows": 0
+  },
+  "feature_quality": {
+    "high_missing_columns": [],
+    "high_cardinality_columns": [],
+    "id_like_columns": [
+      "id"
+    ],
+    "constant_columns": []
+  },
+  "target_analysis": {
+    "target_column": "target",
+    "task_type": "classification",
+    "class_distribution": {
+      "Graduate": 29025,
+      "Dropout": 20237,
+      "Enrolled": 11952
+    },
+    "majority_class_ratio": 0.4742,
+    "summary": "3 classes; majority ratio 0.47"
+  },
+  "feature_target_relationships": {
+    "top_numeric_relationships": [
+      {
+        "feature": "curricular_units_2nd_sem_(approved)",
+        "score_name": "abs_corr_with_target_code",
+        "score": 0.783
+      },
+      {
+        "feature": "curricular_units_1st_sem_(approved)",
+        "score_name": "abs_corr_with_target_code",
+        "score": 0.7262
+      },
+      {
+        "feature": "curricular_units_2nd_sem_(grade)",
+        "score_name": "abs_corr_with_target_code",
+        "score": 0.7202
+      },
+      {
+        "feature": "curricular_units_1st_sem_(grade)",
+        "score_name": "abs_corr_with_target_code",
+        "score": 0.6628
+      },
+      {
+        "feature": "tuition_fees_up_to_date",
+        "score_name": "abs_corr_with_target_code",
+        "score": 0.4153
+      },
+      {
+        "feature": "scholarship_holder",
+        "score_name": "abs_corr_with_target_code",
+        "score": 0.395
+      },
+      {
+        "feature": "gender",
+        "score_name": "abs_corr_with_target_code",
+        "score": 0.3312
+      },
+      {
+        "feature": "application_mode",
+        "score_name": "abs_corr_with_target_code",
+        "score": 0.3249
+      },
+      {
+        "feature": "age_at_enrollment",
+        "score_name": "abs_corr_with_target_code",
+        "score": 0.3209
+      },
+      {
+        "feature": "curricular_units_2nd_sem_(enrolled)",
+        "score_name": "abs_corr_with_target_code",
+        "score": 0.2903
+      }
+    ],
+    "top_categorical_relationships": []
+  },
+  "feature_engineering_recommendations": [
+    "Drop ID-like columns from model features to reduce memorization risk."
+  ],
+  "data_description_used": true,
+  "data_description": "Classification with an Academic Success Dataset\n\n\n============================================================\n1. Overview\n============================================================\n\nWelcome to the 2024 Kaggle Playground Series!\n\nWe plan to continue in the spirit of previous playgrounds, providing interesting and approachable datasets for our community to practice their machine learning skills, and anticipate a competition each month.\n\nYour Goal:\nThe goal of this competition is to predict academic risk of students in higher education.\n\n\n============================================================\n2. Evaluation\n============================================================\n\nSubmissions are evaluated using the accuracy score.\n\n\n============================================================\n3. Submission File\n============================================================\n\nFor each id row in the test set, you must predict the class value of the Target, which is a categorical academic risk assessment.\n\nThe file should contain a header and have the following format:\n\nid,Target\n76518,Graduate\n76519,Graduate\n76520,Graduate\netc.\n\n\n============================================================\n4. About the Tabular Playground Series\n============================================================\n\nThe goal of the Tabular Playground Series is to provide the Kaggle community with a variety of fairly light-weight challenges that can be used to learn and sharpen skills in different aspects of machine learning and data science.\n\nThe duration of each competition will generally only last a few weeks, and may have longer or shorter durations depending on the challenge.\n\nThe challenges will generally use fairly light-weight datasets that are synthetically generated from real-world data, and will provide an opportunity to quickly iterate through various model and feature engineering ideas, create visualizations, etc.\n\n\n============================================================\n5. Synthetically-Generated Datasets\n============================================================\n\nUsing synthetic data for Playground competitions allows us to strike a balance between having real-world data with named features and ensuring test labels are not publicly available.\n\nThis allows us to host competitions with more interesting datasets than in the past.\n\nWhile there are still challenges with synthetic data generation, the state-of-the-art is much better now than when we started the Tabular Playground Series two years ago, and that goal is to produce datasets that have far fewer artifacts.\n\nPlease feel free to give us feedback on the datasets for the different competitions so that we can continue to improve!\n\n\n============================================================\n6. Citation\n============================================================\n\nWalter Reade and Ashley Chow.\n\nClassification with an Academic Success Dataset.\n\nhttps://kaggle.com/competitions/playground-series-s4e6, 2024.\n\nKaggle.\n================\n\n============================================================\n7. Column Descriptions\n============================================================\n\nid:\nUnique row identifier in the local dataset.\n\nMarital status:\nEncoded marital status of the student at enrollment.\n\nApplication mode:\nEncoded admission or application channel used by the student.\n\nApplication order:\nPreference order in which the student applied for the course.\n\nCourse:\nEncoded academic program or degree course.\n\nDaytime/evening attendance:\nIndicator of whether the student attends during daytime or evening.\n\nPrevious qualification:\nEncoded type of qualification held before enrollment.\n\nPrevious qualification (grade):\nNumeric grade associated with the student's previous qualification.\n\nNacionality:\nEncoded nationality of the student.\n\nMother's qualification:\nEncoded education level of the student's mother.\n\nFather's qualification:\nEncoded education level of the student's father.\n\nMother's occupation:\nEncoded occupation category of the student's mother.\n\nFather's occupation:\nEncoded occupation category of the student's father.\n\nAdmission grade:\nStudent's admission score or grade at entry.\n\nDisplaced:\nBinary indicator related to displaced student status.\n\nEducational special needs:\nBinary indicator for special educational needs.\n\nDebtor:\nBinary indicator showing whether the student has outstanding debt.\n\nTuition fees up to date:\nBinary indicator showing whether tuition payments are current.\n\nGender:\nEncoded gender indicator.\n\nScholarship holder:\nBinary indicator for scholarship support.\n\nAge at enrollment:\nAge of the student when entering the program.\n\nInternational:\nBinary indicator for international student status.\n\nCurricular units 1st sem (credited):\nNumber of first-semester curricular units credited from prior work or transfer.\n\nCurricular units 1st sem (enrolled):\nNumber of first-semester curricular units enrolled.\n\nCurricular units 1st sem (evaluations):\nNumber of first-semester evaluations taken.\n\nCurricular units 1st sem (approved):\nNumber of first-semester curricular units successfully approved.\n\nCurricular units 1st sem (grade):\nAverage grade across first-semester curricular units.\n\nCurricular units 1st sem (without evaluations):\nNumber of first-semester curricular units without evaluation records.\n\nCurricular units 2nd sem (credited):\nNumber of second-semester curricular units credited from prior work or transfer.\n\nCurricular units 2nd sem (enrolled):\nNumber of second-semester curricular units enrolled.\n\nCurricular units 2nd sem (evaluations):\nNumber of second-semester evaluations taken.\n\nCurricular units 2nd sem (approved):\nNumber of second-semester curricular units successfully approved.\n\nCurricular units 2nd sem (grade):\nAverage grade across second-semester curricular units.\n\nCurricular units 2nd sem (without evaluations):\nNumber of second-semester curricular units without evaluation records.\n\nUnemployment rate:\nMacroeconomic unemployment rate associated with the observation period.\n\nInflation rate:\nMacroeconomic inflation rate associated with the observation period.\n\nGDP:\nMacroeconomic GDP-related indicator associated with the observation period.\n\nTarget:\nFinal student academic status. Values observed locally are Graduate, Dropout, and Enrolled."
+}

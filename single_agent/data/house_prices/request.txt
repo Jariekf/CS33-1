@@ -1,0 +1,1 @@
+Mortgage lending firm property valuation team. Build an automated valuation model to support underwriter collateral risk assessment. Highlight the features most predictive of sale price and flag patterns that indicate elevated risk.

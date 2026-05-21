@@ -1,0 +1,154 @@
+{
+  "stage": "eda_analysis",
+  "status": "completed",
+  "leakage_policy": {
+    "data_quality_scope": "cleaned_data",
+    "feature_target_analysis_scope": "train_data_only",
+    "test_data_used_for_feature_target_analysis": false
+  },
+  "dataset_overview": {
+    "rows": 20758,
+    "columns": 18,
+    "numeric_columns": [
+      "id",
+      "age",
+      "height",
+      "weight",
+      "fcvc",
+      "ncp",
+      "ch2o",
+      "faf",
+      "tue"
+    ],
+    "categorical_columns": [
+      "gender",
+      "family_history_with_overweight",
+      "favc",
+      "caec",
+      "smoke",
+      "scc",
+      "calc",
+      "mtrans",
+      "nobeyesdad"
+    ],
+    "missing_ratio": {
+      "id": 0.0,
+      "gender": 0.0,
+      "age": 0.0,
+      "height": 0.0,
+      "weight": 0.0,
+      "family_history_with_overweight": 0.0,
+      "favc": 0.0,
+      "fcvc": 0.0,
+      "ncp": 0.0,
+      "caec": 0.0,
+      "smoke": 0.0,
+      "ch2o": 0.0,
+      "scc": 0.0,
+      "faf": 0.0,
+      "tue": 0.0,
+      "calc": 0.0,
+      "mtrans": 0.0,
+      "nobeyesdad": 0.0
+    },
+    "dtypes": {
+      "id": "int64",
+      "gender": "object",
+      "age": "float64",
+      "height": "float64",
+      "weight": "float64",
+      "family_history_with_overweight": "object",
+      "favc": "object",
+      "fcvc": "float64",
+      "ncp": "float64",
+      "caec": "object",
+      "smoke": "object",
+      "ch2o": "float64",
+      "scc": "object",
+      "faf": "float64",
+      "tue": "float64",
+      "calc": "object",
+      "mtrans": "object",
+      "nobeyesdad": "object"
+    },
+    "duplicate_rows": 0
+  },
+  "feature_quality": {
+    "high_missing_columns": [],
+    "high_cardinality_columns": [],
+    "id_like_columns": [
+      "id"
+    ],
+    "constant_columns": []
+  },
+  "target_analysis": {
+    "target_column": "nobeyesdad",
+    "task_type": "classification",
+    "class_distribution": {
+      "Obesity_Type_III": 3237,
+      "Obesity_Type_II": 2598,
+      "Normal_Weight": 2465,
+      "Obesity_Type_I": 2328,
+      "Insufficient_Weight": 2018,
+      "Overweight_Level_II": 2018,
+      "Overweight_Level_I": 1942
+    },
+    "majority_class_ratio": 0.1949,
+    "summary": "7 classes; majority ratio 0.19"
+  },
+  "feature_target_relationships": {
+    "top_numeric_relationships": [
+      {
+        "feature": "weight",
+        "score_name": "abs_corr_with_target_code",
+        "score": 0.4311
+      },
+      {
+        "feature": "age",
+        "score_name": "abs_corr_with_target_code",
+        "score": 0.2808
+      },
+      {
+        "feature": "ch2o",
+        "score_name": "abs_corr_with_target_code",
+        "score": 0.1913
+      },
+      {
+        "feature": "faf",
+        "score_name": "abs_corr_with_target_code",
+        "score": 0.0909
+      },
+      {
+        "feature": "ncp",
+        "score_name": "abs_corr_with_target_code",
+        "score": 0.09
+      },
+      {
+        "feature": "tue",
+        "score_name": "abs_corr_with_target_code",
+        "score": 0.0778
+      },
+      {
+        "feature": "height",
+        "score_name": "abs_corr_with_target_code",
+        "score": 0.0648
+      },
+      {
+        "feature": "fcvc",
+        "score_name": "abs_corr_with_target_code",
+        "score": 0.0434
+      },
+      {
+        "feature": "id",
+        "score_name": "abs_corr_with_target_code",
+        "score": 0.0189
+      }
+    ],
+    "top_categorical_relationships": []
+  },
+  "feature_engineering_recommendations": [
+    "Drop ID-like columns from model features to reduce memorization risk."
+  ],
+  "data_description_used": true,
+  "data_description": "Multi-Class Prediction of Obesity Risk\nPlayground Series - Season 4, Episode 2\n\n\n============================================================\n1. Competition Basic Information\n============================================================\n\nCompetition Name:\nMulti-Class Prediction of Obesity Risk\n\nPlatform:\nKaggle\n\nSeries:\nPlayground Series - Season 4, Episode 2\n\nStatus:\nLate Submission\n\nCompetition Host:\nKaggle\n\nPrizes & Awards:\nSwag\n\nPoints or Medals:\nThis competition does not award Points or Medals.\n\n\n============================================================\n2. Main Pages\n============================================================\n\nOverview:\nhttps://www.kaggle.com/competitions/playground-series-s4e2/overview\n\nData:\nhttps://www.kaggle.com/competitions/playground-series-s4e2/data\n\nCode:\nhttps://www.kaggle.com/competitions/playground-series-s4e2/code\n\nModels:\nhttps://www.kaggle.com/competitions/playground-series-s4e2/models\n\nDiscussion:\nhttps://www.kaggle.com/competitions/playground-series-s4e2/discussion\n\nLeaderboard:\nhttps://www.kaggle.com/competitions/playground-series-s4e2/leaderboard\n\nRules:\nhttps://www.kaggle.com/competitions/playground-series-s4e2/rules\n\nTeam:\nhttps://www.kaggle.com/competitions/playground-series-s4e2/team\n\nSubmissions:\nhttps://www.kaggle.com/competitions/playground-series-s4e2/submissions\n\nHeader Image:\nhttps://www.kaggle.com/competitions/68479/images/header\n\n\n============================================================\n3. Overview\n============================================================\n\nWelcome to the 2024 Kaggle Playground Series.\n\nKaggle plans to continue the spirit of previous playground competitions by providing interesting and approachable datasets for the community to practice machine learning skills.\n\nThe Playground Series usually provides one competition each month.\n\n\n============================================================\n4. Goal\n============================================================\n\nThe goal of this competition is to use different factors to predict obesity risk in individuals.\n\nThis obesity risk is related to cardiovascular disease.\n\nTarget Variable:\nNObeyesdad\n\nTask Type:\nMulti-class classification\n\n\n============================================================\n5. Evaluation\n============================================================\n\nSubmissions are evaluated using accuracy score.\n\nEvaluation Metric:\nAccuracy Score\n\nMetric URL:\nhttps://en.wikipedia.org/wiki/Accuracy_and_precision\n\n\n============================================================\n6. Submission File Format\n============================================================\n\nFor each id row in the test set, participants must predict the class value of the target variable NObeyesdad.\n\nThe submission file must contain a header and follow this format:\n\nid,NObeyesdad\n20758,Normal_Weight\n20759,Normal_Weight\n20760,Normal_Weight\netc.\n\n\n============================================================\n7. About the Tabular Playground Series\n============================================================\n\nThe goal of the Tabular Playground Series is to provide the Kaggle community with lightweight challenges.\n\nThese challenges can be used to learn and improve skills in different areas of machine learning and data science.\n\nThe competitions usually last only a few weeks.\n\nThe datasets are generally lightweight and suitable for:\n- quick model iteration\n- feature engineering\n- visualization practice\n- machine learning skill development\n- data science experimentation\n\n\n============================================================\n8. Synthetically Generated Datasets\n============================================================\n\nThe Playground competitions use synthetic data.\n\nUsing synthetic data helps Kaggle balance two goals:\n- providing real-world-like data with named features\n- keeping test labels private\n\nThe datasets are generated from real-world data, but they are not exactly the same as the original datasets.\n\nThe goal is to create interesting datasets with fewer synthetic artifacts.\n\nKaggle also encourages feedback from participants to improve future competition datasets.\n\n\n============================================================\n9. Prizes\n============================================================\n\n1st Place:\nChoice of Kaggle merchandise\n\n2nd Place:\nChoice of Kaggle merchandise\n\n3rd Place:\nChoice of Kaggle merchandise\n\nNote:\nTo encourage more participation from beginners, Kaggle merchandise will only be awarded once per person in this series.\n\nIf a person has previously won, Kaggle will skip to the next team.\n\n\n============================================================\n10. Citation\n============================================================\n\nWalter Reade, Ashley Chow. (2024).\nMulti-Class Prediction of Obesity Risk.\nKaggle.\n\nCitation URL:\nhttps://kaggle.com/competitions/playground-series-s4e2\n\n\n============================================================\n11. Participation Information\n============================================================\n\nEntrants:\n8,346\n\nParticipants:\n3,746\n\nTeams:\n3,587\n\nSubmissions:\n29,669\n\n\n============================================================\n12. Tags\n============================================================\n\nBeginner:\nhttps://www.kaggle.com/competitions?tagIds=13102-Beginner\n\nTime Series Analysis:\nhttps://www.kaggle.com/competitions?tagIds=13209-Time+Series+Analysis\n\nTabular:\nhttps://www.kaggle.com/competitions?tagIds=14101-Tabular\n\nMulticlass Classification:\nhttps://www.kaggle.com/competitions?tagIds=14202-Multiclass+Classification\n\n\n============================================================\n13. Table of Contents\n============================================================\n\nOverview:\nhttps://www.kaggle.com/competitions/playground-series-s4e2/overview/abstract\n\nEvaluation:\nhttps://www.kaggle.com/competitions/playground-series-s4e2/overview/evaluation\n\nTimeline:\nhttps://www.kaggle.com/competitions/playground-series-s4e2/overview/timeline\n\nAbout the Tabular Playground Series:\nhttps://www.kaggle.com/competitions/playground-series-s4e2/overview/about-the-tabular-playground-series\n\nPrizes:\nhttps://www.kaggle.com/competitions/playground-series-s4e2/overview/prizes\n\nCitation:\nhttps://www.kaggle.com/competitions/playground-series-s4e2/overview/citation\n\n\n============================================================\n14. Data\n============================================================\n\nThe dataset for this competition, including both train and test files, was generated from a deep learning model.\n\nThe deep learning model was trained on the Obesity or CVD Risk dataset.\n\nOriginal Dataset:\nhttps://www.kaggle.com/datasets/aravindpcoder/obesity-or-cvd-risk-classifyregressorcluster\n\nThe feature distributions are close to the original dataset, but they are not exactly the same.\n\nParticipants are allowed to use the original dataset as part of this competition.\n\nThe original dataset can be used to:\n- explore differences between the synthetic dataset and the original dataset\n- check whether adding the original data improves model performance\n\n\n============================================================\n15. Dataset Note\n============================================================\n\nThis dataset is especially suitable for:\n- visualizations\n- clustering\n- general exploratory data analysis\n- EDA practice\n\n\n============================================================\n16. Files\n============================================================\n\ntrain.csv:\nThe training dataset.\nThe target variable NObeyesdad is included.\nNObeyesdad is a categorical target.\n\ntest.csv:\nThe test dataset.\nThe objective is to predict the class of NObeyesdad for each row.\n\nsample_submission.csv:\nA sample submission file in the correct format."
+}

@@ -1,0 +1,396 @@
+{
+  "dataset_intake": {
+    "source_path": "data/bank_churn/train.csv",
+    "data_reading_options": {
+      "sep": ",",
+      "encoding": "utf-8"
+    },
+    "encoding_detection": {
+      "encoding": "utf-8",
+      "confidence": "high"
+    },
+    "delimiter_detection": {
+      "delimiter": ",",
+      "confidence": "high"
+    },
+    "sample_size_bytes": 65536,
+    "preview_metadata": {
+      "source_file_size_bytes": 12350130,
+      "preview_rows": 200,
+      "preview_columns": 14,
+      "column_names": [
+        "id",
+        "customerid",
+        "surname",
+        "creditscore",
+        "geography",
+        "gender",
+        "age",
+        "tenure",
+        "balance",
+        "numofproducts",
+        "hascrcard",
+        "isactivemember",
+        "estimatedsalary",
+        "exited"
+      ],
+      "dtypes": {
+        "id": "int64",
+        "customerid": "int64",
+        "surname": "object",
+        "creditscore": "int64",
+        "geography": "object",
+        "gender": "object",
+        "age": "float64",
+        "tenure": "int64",
+        "balance": "float64",
+        "numofproducts": "int64",
+        "hascrcard": "float64",
+        "isactivemember": "float64",
+        "estimatedsalary": "float64",
+        "exited": "int64"
+      },
+      "missing_ratio": {
+        "id": 0.0,
+        "customerid": 0.0,
+        "surname": 0.0,
+        "creditscore": 0.0,
+        "geography": 0.0,
+        "gender": 0.0,
+        "age": 0.0,
+        "tenure": 0.0,
+        "balance": 0.0,
+        "numofproducts": 0.0,
+        "hascrcard": 0.0,
+        "isactivemember": 0.0,
+        "estimatedsalary": 0.0,
+        "exited": 0.0
+      },
+      "numeric_columns": [
+        "id",
+        "customerid",
+        "creditscore",
+        "age",
+        "tenure",
+        "balance",
+        "numofproducts",
+        "hascrcard",
+        "isactivemember",
+        "estimatedsalary",
+        "exited"
+      ],
+      "categorical_columns": [
+        "surname",
+        "geography",
+        "gender"
+      ]
+    }
+  },
+  "input_config": {
+    "input_mode": "single_file_split",
+    "train_data_path": "data/bank_churn/train.csv",
+    "test_data_path": null,
+    "test_data_reading_options": null,
+    "test_has_target": false
+  },
+  "test_dataset_intake": null,
+  "task_summary": {
+    "business_goal": "Retail bank retention team analysing customer churn. Identify\n  customers at high risk of leaving to support targeted retention campaigns and\n  personalised outreach. Surface the highest-risk segments with actionable\n  intervention priorities. Note: columns such as customer ID, row number, and\n  surname are identifiers with no predictive value and should be dropped during\n  data preparation.",
+    "data_description": "Binary Classification with a Bank Churn Dataset\nPlayground Series - Season 4, Episode 1\n\n============================================================\n1. Competition Basic Information\n============================================================\n\nCompetition Name:\nBinary Classification with a Bank Churn Dataset\n\nPlatform:\nKaggle\n\nStatus:\nLate Submission\n\nSeries:\n2024 Kaggle Playground Series\nSeason 4, Episode 1\n\n\n============================================================\n2. Main Pages\n============================================================\n\nOverview:\nhttps://www.kaggle.com/competitions/playground-series-s4e1/overview\n\nData:\nhttps://www.kaggle.com/competitions/playground-series-s4e1/data\n\nCode:\nhttps://www.kaggle.com/competitions/playground-series-s4e1/code\n\nModels:\nhttps://www.kaggle.com/competitions/playground-series-s4e1/models\n\nDiscussion:\nhttps://www.kaggle.com/competitions/playground-series-s4e1/discussion\n\nLeaderboard:\nhttps://www.kaggle.com/competitions/playground-series-s4e1/leaderboard\n\nRules:\nhttps://www.kaggle.com/competitions/playground-series-s4e1/rules\n\nTeam:\nhttps://www.kaggle.com/competitions/playground-series-s4e1/team\n\nSubmissions:\nhttps://www.kaggle.com/competitions/playground-series-s4e1/submissions\n\n\n============================================================\n3. Overview\n============================================================\n\nWelcome to the 2024 Kaggle Playground Series! Happy New Year! \n\nThis is the first episode of Season 4. The series continues the spirit of previous playground competitions by providing interesting and approachable datasets for the community to practice machine learning skills.\n\nThe Playground Series usually provides one competition each month.\n\n\n============================================================\n4. Goal\n============================================================\n\nThe task is to predict whether a customer continues with their bank account or closes it  (e.g., churns).\n\nTarget variable:\nExited\n\n============================================================\n5. Evaluation\n============================================================\n\nSubmissions are evaluated using the area under the ROC curve.\n\nEvaluation Metric:\nArea Under the ROC Curve\n\nReference:\nhttp://en.wikipedia.org/wiki/Receiver_operating_characteristic\n\nThe metric compares the predicted probability with the observed target value.\n\n\n============================================================\n6. Submission File Format\n============================================================\n\nFor each id in the test set, participants must predict the probability of the target variable Exited.\n\nThe submission file must contain a header and follow this format:\n\nid,Exited\n165034,0.9\n165035,0.1\n165036,0.5\netc.\n\n\n============================================================\n9. About the Tabular Playground Series\n============================================================\n\nThe goal of the Tabular Playground Series is to provide the Kaggle community with lightweight challenges.\n\nThese challenges help participants learn and practice different aspects of machine learning and data science.\n\nThe competitions usually last only a few weeks.\n\nThe datasets are generally lightweight and suitable for:\n- fast experimentation\n- model testing\n- feature engineering\n- visualization practice\n- machine learning skill development\n\n\n============================================================\n10. Synthetically Generated Datasets\n============================================================\n\nThe Playground competitions use synthetic data.\n\nThe purpose of synthetic data is to balance:\n- having real-world-like data with named features\n- preventing public access to test labels\n\nThe datasets are generated to be similar to real-world data, but they are not exactly the same as the original datasets.\n\nKaggle uses this approach to create more interesting competitions while keeping the test labels private.\n\n============================================================\n11. Citation\n============================================================\n\nWalter Reade, Ashley Chow. (2024).\nBinary Classification with a Bank Churn Dataset.\nKaggle.\n\nCitation URL:\nhttps://kaggle.com/competitions/playground-series-s4e1\n\n\n============================================================\n12. Dataset Description\n============================================================\n\nThe dataset for this competition (both train and test) was generated from a deep learning model trained on the Bank Customer Churn Prediction dataset. \n\nFeature distributions are close to, but not exactly the same, as the original. \n\nFeel free to use the original dataset as part of this competition, both to explore differences as well as to see whether incorporating the original in training improves model performance.\n\nOriginal Dataset:\nhttps://www.kaggle.com/datasets/shubhammeshram579/bank-customer-churn-prediction\n\nThe original dataset can be used to:\n- explore differences between the synthetic and original datasets\n- check whether adding original data improves model performance\n\n\n============================================================\n13. Files\n============================================================\n\ntrain.csv:\nThe training dataset.\nThe target variable Exited is included.\n\ntest.csv:\nThe test dataset.\nThe objective is to predict the probability of Exited.\n\nsample_submission.csv:\nA sample submission file in the correct format.\n\n\n============================================================\n14. About the Bank Customer Churn Dataset\n============================================================\n\nThe bank customer churn dataset is commonly used for predicting customer churn in the banking industry.\n\nIt contains information about bank customers who either:\n- left the bank\n- continued to be customers\n\nThe dataset can be used to understand which customer features may be related to churn behavior.\n\n\n============================================================\n15. Dataset Attributes\n============================================================\n\n1. id\nA unique row identifier.\n\n2. CustomerId\nA unique identifier for each customer.\n\n3. Surname\nThe customer's surname or last name.\n\n4. CreditScore\nA numerical value representing the customer's credit score.\n\n5. Geography\nThe country where the customer resides.\nPossible values include France, Spain, and Germany.\n\n6. Gender\nThe customer's gender.\nPossible values include Male and Female.\n\n7. Age\nThe customer's age.\n\n8. Tenure\nThe number of years the customer has been with the bank.\n\n9. Balance\nThe customer's account balance.\n\n10. NumOfProducts\nThe number of bank products the customer uses.\nExamples may include savings accounts or credit cards.\n\n11. HasCrCard\nWhether the customer has a credit card.\n1 = yes\n0 = no\n\n12. IsActiveMember\nWhether the customer is an active member.\n1 = yes\n0 = no\n\n13. EstimatedSalary\nThe estimated salary of the customer.\n\n14. Exited\nWhether the customer has churned.\n1 = yes\n0 = no",
+    "task_type": "classification",
+    "workflow_type": "supervised",
+    "supported_by_current_pipeline": true,
+    "target_column": "exited",
+    "initial_target_inference": {
+      "target_column": "id",
+      "task_type": "classification",
+      "confidence": 0.4,
+      "reason": "deterministic fallback inference",
+      "source": "rules"
+    },
+    "target_inference": {
+      "target_column": "exited",
+      "task_type": "classification",
+      "confidence": 1.0,
+      "reason": "The user goal is to identify customers at high risk of leaving the bank, which directly relates to predicting the 'exited' status of customers.",
+      "source": "llm"
+    },
+    "primary_metric": "f1_weighted",
+    "candidate_model_ids": [
+      "logistic_regression",
+      "random_forest_classifier",
+      "gradient_boosting_classifier"
+    ],
+    "candidate_models": [
+      {
+        "model_id": "logistic_regression",
+        "task_type": "classification",
+        "estimator": "LogisticRegression",
+        "preprocessing": {
+          "categorical_encoding": "one_hot",
+          "numeric_imputation": "median",
+          "categorical_imputation": "mode",
+          "numeric_scaling": true,
+          "numeric_outlier_clipping": true,
+          "remove_constant_features": true,
+          "correlation_threshold": 0.98,
+          "drop_target_leakage_features": true,
+          "requires_all_features_numeric": true,
+          "allows_missing_feature_values": false
+        },
+        "validation": {
+          "selection_metric": "f1_weighted",
+          "required_checks": [
+            "all_features_numeric",
+            "no_missing_feature_values",
+            "train_test_columns_match",
+            "target_column_present"
+          ]
+        }
+      },
+      {
+        "model_id": "random_forest_classifier",
+        "task_type": "classification",
+        "estimator": "RandomForestClassifier",
+        "preprocessing": {
+          "categorical_encoding": "one_hot",
+          "numeric_imputation": "median",
+          "categorical_imputation": "mode",
+          "numeric_scaling": false,
+          "numeric_outlier_clipping": true,
+          "remove_constant_features": true,
+          "correlation_threshold": null,
+          "drop_target_leakage_features": true,
+          "requires_all_features_numeric": true,
+          "allows_missing_feature_values": false
+        },
+        "validation": {
+          "selection_metric": "f1_weighted",
+          "required_checks": [
+            "all_features_numeric",
+            "no_missing_feature_values",
+            "train_test_columns_match",
+            "target_column_present"
+          ]
+        }
+      },
+      {
+        "model_id": "gradient_boosting_classifier",
+        "task_type": "classification",
+        "estimator": "GradientBoostingClassifier",
+        "preprocessing": {
+          "categorical_encoding": "one_hot",
+          "numeric_imputation": "median",
+          "categorical_imputation": "mode",
+          "numeric_scaling": false,
+          "numeric_outlier_clipping": true,
+          "remove_constant_features": true,
+          "correlation_threshold": null,
+          "drop_target_leakage_features": true,
+          "requires_all_features_numeric": true,
+          "allows_missing_feature_values": false
+        },
+        "validation": {
+          "selection_metric": "f1_weighted",
+          "required_checks": [
+            "all_features_numeric",
+            "no_missing_feature_values",
+            "train_test_columns_match",
+            "target_column_present"
+          ]
+        }
+      }
+    ],
+    "risk_notes": [],
+    "data_reading_options": {
+      "sep": ",",
+      "encoding": "utf-8"
+    },
+    "test_data_reading_options": null,
+    "input_mode": "single_file_split",
+    "initial_feature_engineering_policy": {
+      "mode": "light",
+      "can_be_skipped": true,
+      "decision_required_after_cleaning": true
+    }
+  },
+  "stage_contracts": {
+    "data_cleaning": {
+      "required_artifacts": [
+        "cleaned_data.csv",
+        "train_data.csv",
+        "test_data.csv",
+        "cleaning_report.json"
+      ],
+      "required_report_fields": [
+        "stage",
+        "status",
+        "target_column",
+        "profile_before",
+        "profile_after",
+        "row_loss",
+        "row_loss_breakdown",
+        "duplicate_policy",
+        "numeric_like_conversions",
+        "split",
+        "recommended_tool_gaps"
+      ],
+      "validation_rules": [
+        {
+          "id": "target_preserved",
+          "check": "target column exists after cleaning when workflow_type is supervised"
+        },
+        {
+          "id": "non_empty_columns",
+          "check": "cleaned dataset has at least one non-empty column"
+        },
+        {
+          "id": "row_loss_reported",
+          "check": "cleaning_report.json includes row_loss"
+        }
+      ],
+      "allowed_tools": [
+        "basic_clean_dataframe",
+        "decide_duplicate_removal",
+        "drop_duplicate_rows",
+        "drop_empty_columns",
+        "numeric_like_conversion_report",
+        "profile_dataframe",
+        "split_cleaned_data"
+      ],
+      "recommended_tool_gap_field": "recommended_tool_gaps"
+    },
+    "feature_engineering": {
+      "required_artifacts": [
+        "fe_train.csv",
+        "fe_test.csv",
+        "feature_policy_report.json",
+        "feature_report.json"
+      ],
+      "required_report_fields": [
+        "stage",
+        "status",
+        "policy",
+        "pipelines",
+        "execution",
+        "train_shape",
+        "test_shape",
+        "target_column",
+        "recommended_tool_gaps"
+      ],
+      "validation_rules": [
+        {
+          "id": "policy_justified",
+          "check": "feature policy mode and reason are reported"
+        },
+        {
+          "id": "matching_columns",
+          "check": "feature train/test columns match in order"
+        },
+        {
+          "id": "target_preserved",
+          "check": "target column remains present when workflow_type is supervised"
+        },
+        {
+          "id": "model_preprocessing_requirements",
+          "check": "feature policy accounts for candidate_models preprocessing requirements"
+        }
+      ],
+      "allowed_tools": [
+        "recommend_feature_engineering_policy",
+        "apply_model_feature_policy",
+        "align_and_validate_feature_matrices",
+        "clip_numeric_outliers_with_report",
+        "convert_boolean_like_features",
+        "create_datetime_features_with_report",
+        "create_missing_indicators_with_report",
+        "drop_target_leakage_features_with_report",
+        "encode_categorical_features_with_report",
+        "impute_missing_features",
+        "impute_missing_features_with_report",
+        "profile_features",
+        "remove_highly_correlated_features_with_report",
+        "remove_low_information_features_with_report",
+        "scale_numeric_features_with_report",
+        "validate_matching_columns"
+      ],
+      "recommended_tool_gap_field": "recommended_tool_gaps"
+    },
+    "eda_analysis": {
+      "required_artifacts": [
+        "eda_report.json",
+        "eda_summary.md"
+      ],
+      "required_report_fields": [
+        "stage",
+        "status",
+        "leakage_policy",
+        "dataset_overview",
+        "target_analysis",
+        "feature_target_relationships",
+        "feature_engineering_recommendations"
+      ],
+      "validation_rules": [
+        {
+          "id": "train_only_target_analysis",
+          "check": "feature-target analysis uses train_data only"
+        },
+        {
+          "id": "eda_summary_present",
+          "check": "eda_summary.md exists for business reporting"
+        }
+      ],
+      "allowed_tools": [
+        "build_eda_report",
+        "build_eda_summary"
+      ],
+      "recommended_tool_gap_field": "recommended_tool_gaps"
+    },
+    "model_selection": {
+      "required_artifacts": [
+        "model_report.json",
+        "feature_importance.json"
+      ],
+      "required_report_fields": [
+        "task_type",
+        "target_column",
+        "candidate_model_ids",
+        "metric",
+        "candidate_results",
+        "selected_model_id",
+        "best_model",
+        "best_cv_score",
+        "test_metrics",
+        "tuning",
+        "recommended_tool_gaps"
+      ],
+      "validation_rules": [
+        {
+          "id": "metric_matches_task",
+          "check": "selected metric matches task_summary.primary_metric"
+        },
+        {
+          "id": "test_metrics_reported",
+          "check": "model_report.json includes final test metrics"
+        },
+        {
+          "id": "supervised_only",
+          "check": "model selection runs only when supported_by_current_pipeline is true"
+        },
+        {
+          "id": "model_id_tracked",
+          "check": "model_report.json identifies evaluated and selected model IDs"
+        }
+      ],
+      "allowed_tools": [
+        "infer_task_type",
+        "default_tuning_plan",
+        "llm_tuning_plan",
+        "tune_and_evaluate_model",
+        "train_and_evaluate_model",
+        "validate_json_object"
+      ],
+      "recommended_tool_gap_field": "recommended_tool_gaps"
+    }
+  }
+}

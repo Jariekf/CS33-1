@@ -1,0 +1,61 @@
+{
+  "task_type": "classification",
+  "target_column": "nobeyesdad",
+  "model_id": "gradient_boosting_classifier",
+  "metric": "f1_weighted",
+  "cv_score": 0.9007330964117423,
+  "cv_scores": [],
+  "test_metrics": {
+    "accuracy": 0.9094412331406551,
+    "f1_weighted": 0.9091823273241026
+  },
+  "tuning": {
+    "status": "completed",
+    "failure_reason": "",
+    "baseline": {
+      "metric": "f1_weighted",
+      "cv": 3,
+      "scores": [
+        0.9039745987101581,
+        0.8903924619297205,
+        0.9029700465790118
+      ],
+      "mean_cv_score": 0.8991123690729635
+    },
+    "plan": {
+      "source": "llm",
+      "model_id": "gradient_boosting_classifier",
+      "task_type": "classification",
+      "metric": "f1_weighted",
+      "cv": 3,
+      "budget": "small",
+      "param_grid": {
+        "n_estimators": [
+          100,
+          150
+        ],
+        "learning_rate": [
+          0.03,
+          0.1
+        ],
+        "max_depth": [
+          2,
+          3
+        ],
+        "subsample": [
+          0.8
+        ]
+      },
+      "explanation": "The baseline performance is strong, but to ensure robustness, we broadened the n_estimators and max_depth parameters while keeping subsample fixed to maintain model stability."
+    },
+    "n_jobs": 1,
+    "best_params": {
+      "learning_rate": 0.1,
+      "max_depth": 3,
+      "n_estimators": 150,
+      "subsample": 0.8
+    },
+    "best_cv_score": 0.9007330964117423,
+    "explanation": "The baseline performance is strong, but to ensure robustness, we broadened the n_estimators and max_depth parameters while keeping subsample fixed to maintain model stability."
+  }
+}

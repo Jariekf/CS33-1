@@ -1,0 +1,1066 @@
+{
+  "task_type": "regression",
+  "target_column": "yield",
+  "candidate_model_ids": [
+    "ridge_regression",
+    "random_forest_regressor",
+    "gradient_boosting_regressor"
+  ],
+  "metric": "r2",
+  "candidate_results": [
+    {
+      "model_id": "ridge_regression",
+      "model_report_path": "workspace/pipelines/ridge_regression/model_report.json",
+      "feature_importance_path": "workspace/pipelines/ridge_regression/feature_importance.json",
+      "feature_pipeline": {
+        "model_id": "ridge_regression",
+        "train_path": "workspace/pipelines/ridge_regression/fe_train.csv",
+        "test_path": "workspace/pipelines/ridge_regression/fe_test.csv",
+        "execution": {
+          "model_id": "ridge_regression",
+          "steps": [
+            "create_missing_indicators",
+            "impute_missing_features",
+            "convert_boolean_like_features",
+            "create_datetime_features",
+            "encode_categorical_features",
+            "clip_numeric_outliers",
+            "remove_low_information_features",
+            "remove_highly_correlated_features",
+            "drop_target_leakage_features",
+            "align_and_validate_feature_matrices",
+            "scale_numeric_features"
+          ],
+          "step_reports": {
+            "create_missing_indicators": {
+              "source_columns": [],
+              "created_columns": []
+            },
+            "impute_missing_features": {
+              "numeric_strategy": "median",
+              "categorical_strategy": "mode",
+              "imputed_columns": [],
+              "fill_values": {}
+            },
+            "convert_boolean_like_features": {
+              "converted_columns": []
+            },
+            "create_datetime_features": {
+              "transformed_columns": [],
+              "created_columns": {}
+            },
+            "encode_categorical_features": {
+              "one_hot_encoded_columns": [],
+              "frequency_encoded_columns": [
+                "crop"
+              ],
+              "dropped_identifier_like_columns": [],
+              "output_column_count": 9
+            },
+            "clip_numeric_outliers": {
+              "clipped_columns": {
+                "nitrogen": {
+                  "lower": 0.0,
+                  "upper": 131.0,
+                  "train_values_clipped": 13,
+                  "test_values_clipped": 2
+                },
+                "phosphorus": {
+                  "lower": 5.0,
+                  "upper": 143.0,
+                  "train_values_clipped": 16,
+                  "test_values_clipped": 4
+                },
+                "potassium": {
+                  "lower": 7.0,
+                  "upper": 204.0,
+                  "train_values_clipped": 29,
+                  "test_values_clipped": 6
+                },
+                "temperature": {
+                  "lower": 11.8153675264,
+                  "upper": 40.89272258760002,
+                  "train_values_clipped": 36,
+                  "test_values_clipped": 8
+                },
+                "humidity": {
+                  "lower": 15.8102321934,
+                  "upper": 96.9314048236,
+                  "train_values_clipped": 36,
+                  "test_values_clipped": 20
+                },
+                "ph_value": {
+                  "lower": 4.61903039441,
+                  "upper": 8.74349545089,
+                  "train_values_clipped": 36,
+                  "test_values_clipped": 12
+                },
+                "rainfall": {
+                  "lower": 21.8815628703,
+                  "upper": 268.98706316600015,
+                  "train_values_clipped": 36,
+                  "test_values_clipped": 8
+                }
+              }
+            },
+            "remove_low_information_features": {
+              "removed_columns": []
+            },
+            "remove_highly_correlated_features": {
+              "removed_columns": [],
+              "threshold": 0.98
+            },
+            "drop_target_leakage_features": {
+              "removed_columns": [],
+              "warnings": []
+            },
+            "align_and_validate_feature_matrices": {
+              "train_test_columns_match": true,
+              "all_features_numeric": true,
+              "non_numeric_features": [],
+              "missing_feature_values_train": 0,
+              "missing_feature_values_test": 0,
+              "feature_count": 8
+            },
+            "scale_numeric_features": {
+              "scaled_columns": [
+                "nitrogen",
+                "phosphorus",
+                "potassium",
+                "temperature",
+                "humidity",
+                "ph_value",
+                "rainfall",
+                "crop_frequency"
+              ]
+            }
+          },
+          "input_profile": {
+            "train_shape": [
+              1760,
+              9
+            ],
+            "test_shape": [
+              440,
+              9
+            ],
+            "feature_count": 8,
+            "numeric_features": [
+              "nitrogen",
+              "phosphorus",
+              "potassium",
+              "temperature",
+              "humidity",
+              "ph_value",
+              "rainfall"
+            ],
+            "categorical_features": [
+              "crop"
+            ],
+            "datetime_like_features": [],
+            "boolean_like_features": [],
+            "id_like_features": [
+              "temperature",
+              "humidity",
+              "ph_value",
+              "rainfall"
+            ],
+            "high_cardinality_features": [
+              "nitrogen",
+              "phosphorus",
+              "potassium",
+              "crop"
+            ],
+            "missing_ratio_train": {
+              "nitrogen": 0.0,
+              "phosphorus": 0.0,
+              "potassium": 0.0,
+              "temperature": 0.0,
+              "humidity": 0.0,
+              "ph_value": 0.0,
+              "rainfall": 0.0,
+              "crop": 0.0
+            },
+            "missing_ratio_test": {
+              "nitrogen": 0.0,
+              "phosphorus": 0.0,
+              "potassium": 0.0,
+              "temperature": 0.0,
+              "humidity": 0.0,
+              "ph_value": 0.0,
+              "rainfall": 0.0,
+              "crop": 0.0
+            }
+          },
+          "output_profile": {
+            "train_shape": [
+              1760,
+              9
+            ],
+            "test_shape": [
+              440,
+              9
+            ],
+            "feature_count": 8,
+            "numeric_features": [
+              "nitrogen",
+              "phosphorus",
+              "potassium",
+              "temperature",
+              "humidity",
+              "ph_value",
+              "rainfall",
+              "crop_frequency"
+            ],
+            "categorical_features": [],
+            "datetime_like_features": [],
+            "boolean_like_features": [],
+            "id_like_features": [
+              "temperature",
+              "humidity",
+              "ph_value",
+              "rainfall"
+            ],
+            "high_cardinality_features": [
+              "nitrogen",
+              "phosphorus",
+              "potassium"
+            ],
+            "missing_ratio_train": {
+              "nitrogen": 0.0,
+              "phosphorus": 0.0,
+              "potassium": 0.0,
+              "temperature": 0.0,
+              "humidity": 0.0,
+              "ph_value": 0.0,
+              "rainfall": 0.0,
+              "crop_frequency": 0.0
+            },
+            "missing_ratio_test": {
+              "nitrogen": 0.0,
+              "phosphorus": 0.0,
+              "potassium": 0.0,
+              "temperature": 0.0,
+              "humidity": 0.0,
+              "ph_value": 0.0,
+              "rainfall": 0.0,
+              "crop_frequency": 0.0
+            }
+          },
+          "preprocessing": {
+            "categorical_encoding": "one_hot",
+            "numeric_imputation": "median",
+            "categorical_imputation": "mode",
+            "numeric_scaling": true,
+            "numeric_outlier_clipping": true,
+            "remove_constant_features": true,
+            "correlation_threshold": 0.98,
+            "drop_target_leakage_features": true,
+            "requires_all_features_numeric": true,
+            "allows_missing_feature_values": false
+          },
+          "eda_recommendations": [
+            "Use frequency encoding or drop high-cardinality categorical columns instead of wide one-hot encoding.",
+            "Drop ID-like columns from model features to reduce memorization risk.",
+            "Consider robust metrics or transformations for highly skewed regression targets."
+          ],
+          "eda_policy_actions": {
+            "applied": [
+              {
+                "recommendation": "Use frequency encoding or drop high-cardinality categorical columns instead of wide one-hot encoding.",
+                "action": "used frequency encoding for high-cardinality categorical features"
+              },
+              {
+                "recommendation": "Drop ID-like columns from model features to reduce memorization risk.",
+                "action": "dropped identifier-like categorical features during encoding"
+              }
+            ],
+            "deferred": [
+              {
+                "recommendation": "Consider robust metrics or transformations for highly skewed regression targets.",
+                "reason": "target transformation requires inverse-transform evaluation support"
+              }
+            ]
+          }
+        },
+        "train_shape": [
+          1760,
+          9
+        ],
+        "test_shape": [
+          440,
+          9
+        ],
+        "target_column": "yield"
+      },
+      "task_type": "regression",
+      "target_column": "yield",
+      "metric": "r2",
+      "cv_score": -0.012014529651025674,
+      "cv_scores": [],
+      "test_metrics": {
+        "r2": -0.023665408274816446,
+        "mae": 1820.8466486128762,
+        "rmse": 2646.684737210472
+      },
+      "tuning": {
+        "status": "completed",
+        "failure_reason": "",
+        "baseline": {
+          "metric": "r2",
+          "cv": 3,
+          "scores": [
+            -0.004080642211817143,
+            -0.02963593279944332,
+            -0.0036603541257880234
+          ],
+          "mean_cv_score": -0.012458976379016162
+        },
+        "plan": {
+          "source": "llm",
+          "model_id": "ridge_regression",
+          "task_type": "regression",
+          "metric": "r2",
+          "cv": 3,
+          "budget": "small",
+          "param_grid": {
+            "alpha": [
+              0.1,
+              1.0,
+              10.0
+            ]
+          },
+          "explanation": "The baseline report indicates weak performance with negative R2 scores. To improve the model, we broaden the search for the alpha parameter by including lower and mid-range values, which can help in finding a better regularization strength."
+        },
+        "n_jobs": 1,
+        "best_params": {
+          "alpha": 10.0
+        },
+        "best_cv_score": -0.012014529651025674,
+        "explanation": "The baseline report indicates weak performance with negative R2 scores. To improve the model, we broaden the search for the alpha parameter by including lower and mid-range values, which can help in finding a better regularization strength."
+      }
+    },
+    {
+      "model_id": "random_forest_regressor",
+      "model_report_path": "workspace/pipelines/random_forest_regressor/model_report.json",
+      "feature_importance_path": "workspace/pipelines/random_forest_regressor/feature_importance.json",
+      "feature_pipeline": {
+        "model_id": "random_forest_regressor",
+        "train_path": "workspace/pipelines/random_forest_regressor/fe_train.csv",
+        "test_path": "workspace/pipelines/random_forest_regressor/fe_test.csv",
+        "execution": {
+          "model_id": "random_forest_regressor",
+          "steps": [
+            "create_missing_indicators",
+            "impute_missing_features",
+            "convert_boolean_like_features",
+            "create_datetime_features",
+            "encode_categorical_features",
+            "clip_numeric_outliers",
+            "remove_low_information_features",
+            "drop_target_leakage_features",
+            "align_and_validate_feature_matrices"
+          ],
+          "step_reports": {
+            "create_missing_indicators": {
+              "source_columns": [],
+              "created_columns": []
+            },
+            "impute_missing_features": {
+              "numeric_strategy": "median",
+              "categorical_strategy": "mode",
+              "imputed_columns": [],
+              "fill_values": {}
+            },
+            "convert_boolean_like_features": {
+              "converted_columns": []
+            },
+            "create_datetime_features": {
+              "transformed_columns": [],
+              "created_columns": {}
+            },
+            "encode_categorical_features": {
+              "one_hot_encoded_columns": [],
+              "frequency_encoded_columns": [
+                "crop"
+              ],
+              "dropped_identifier_like_columns": [],
+              "output_column_count": 9
+            },
+            "clip_numeric_outliers": {
+              "clipped_columns": {
+                "nitrogen": {
+                  "lower": 0.0,
+                  "upper": 131.0,
+                  "train_values_clipped": 13,
+                  "test_values_clipped": 2
+                },
+                "phosphorus": {
+                  "lower": 5.0,
+                  "upper": 143.0,
+                  "train_values_clipped": 16,
+                  "test_values_clipped": 4
+                },
+                "potassium": {
+                  "lower": 7.0,
+                  "upper": 204.0,
+                  "train_values_clipped": 29,
+                  "test_values_clipped": 6
+                },
+                "temperature": {
+                  "lower": 11.8153675264,
+                  "upper": 40.89272258760002,
+                  "train_values_clipped": 36,
+                  "test_values_clipped": 8
+                },
+                "humidity": {
+                  "lower": 15.8102321934,
+                  "upper": 96.9314048236,
+                  "train_values_clipped": 36,
+                  "test_values_clipped": 20
+                },
+                "ph_value": {
+                  "lower": 4.61903039441,
+                  "upper": 8.74349545089,
+                  "train_values_clipped": 36,
+                  "test_values_clipped": 12
+                },
+                "rainfall": {
+                  "lower": 21.8815628703,
+                  "upper": 268.98706316600015,
+                  "train_values_clipped": 36,
+                  "test_values_clipped": 8
+                }
+              }
+            },
+            "remove_low_information_features": {
+              "removed_columns": []
+            },
+            "drop_target_leakage_features": {
+              "removed_columns": [],
+              "warnings": []
+            },
+            "align_and_validate_feature_matrices": {
+              "train_test_columns_match": true,
+              "all_features_numeric": true,
+              "non_numeric_features": [],
+              "missing_feature_values_train": 0,
+              "missing_feature_values_test": 0,
+              "feature_count": 8
+            }
+          },
+          "input_profile": {
+            "train_shape": [
+              1760,
+              9
+            ],
+            "test_shape": [
+              440,
+              9
+            ],
+            "feature_count": 8,
+            "numeric_features": [
+              "nitrogen",
+              "phosphorus",
+              "potassium",
+              "temperature",
+              "humidity",
+              "ph_value",
+              "rainfall"
+            ],
+            "categorical_features": [
+              "crop"
+            ],
+            "datetime_like_features": [],
+            "boolean_like_features": [],
+            "id_like_features": [
+              "temperature",
+              "humidity",
+              "ph_value",
+              "rainfall"
+            ],
+            "high_cardinality_features": [
+              "nitrogen",
+              "phosphorus",
+              "potassium",
+              "crop"
+            ],
+            "missing_ratio_train": {
+              "nitrogen": 0.0,
+              "phosphorus": 0.0,
+              "potassium": 0.0,
+              "temperature": 0.0,
+              "humidity": 0.0,
+              "ph_value": 0.0,
+              "rainfall": 0.0,
+              "crop": 0.0
+            },
+            "missing_ratio_test": {
+              "nitrogen": 0.0,
+              "phosphorus": 0.0,
+              "potassium": 0.0,
+              "temperature": 0.0,
+              "humidity": 0.0,
+              "ph_value": 0.0,
+              "rainfall": 0.0,
+              "crop": 0.0
+            }
+          },
+          "output_profile": {
+            "train_shape": [
+              1760,
+              9
+            ],
+            "test_shape": [
+              440,
+              9
+            ],
+            "feature_count": 8,
+            "numeric_features": [
+              "nitrogen",
+              "phosphorus",
+              "potassium",
+              "temperature",
+              "humidity",
+              "ph_value",
+              "rainfall",
+              "crop_frequency"
+            ],
+            "categorical_features": [],
+            "datetime_like_features": [],
+            "boolean_like_features": [],
+            "id_like_features": [
+              "temperature",
+              "humidity",
+              "ph_value",
+              "rainfall"
+            ],
+            "high_cardinality_features": [
+              "nitrogen",
+              "phosphorus",
+              "potassium"
+            ],
+            "missing_ratio_train": {
+              "nitrogen": 0.0,
+              "phosphorus": 0.0,
+              "potassium": 0.0,
+              "temperature": 0.0,
+              "humidity": 0.0,
+              "ph_value": 0.0,
+              "rainfall": 0.0,
+              "crop_frequency": 0.0
+            },
+            "missing_ratio_test": {
+              "nitrogen": 0.0,
+              "phosphorus": 0.0,
+              "potassium": 0.0,
+              "temperature": 0.0,
+              "humidity": 0.0,
+              "ph_value": 0.0,
+              "rainfall": 0.0,
+              "crop_frequency": 0.0
+            }
+          },
+          "preprocessing": {
+            "categorical_encoding": "one_hot",
+            "numeric_imputation": "median",
+            "categorical_imputation": "mode",
+            "numeric_scaling": false,
+            "numeric_outlier_clipping": true,
+            "remove_constant_features": true,
+            "correlation_threshold": null,
+            "drop_target_leakage_features": true,
+            "requires_all_features_numeric": true,
+            "allows_missing_feature_values": false
+          },
+          "eda_recommendations": [
+            "Use frequency encoding or drop high-cardinality categorical columns instead of wide one-hot encoding.",
+            "Drop ID-like columns from model features to reduce memorization risk.",
+            "Consider robust metrics or transformations for highly skewed regression targets."
+          ],
+          "eda_policy_actions": {
+            "applied": [
+              {
+                "recommendation": "Use frequency encoding or drop high-cardinality categorical columns instead of wide one-hot encoding.",
+                "action": "used frequency encoding for high-cardinality categorical features"
+              },
+              {
+                "recommendation": "Drop ID-like columns from model features to reduce memorization risk.",
+                "action": "dropped identifier-like categorical features during encoding"
+              }
+            ],
+            "deferred": [
+              {
+                "recommendation": "Consider robust metrics or transformations for highly skewed regression targets.",
+                "reason": "target transformation requires inverse-transform evaluation support"
+              }
+            ]
+          }
+        },
+        "train_shape": [
+          1760,
+          9
+        ],
+        "test_shape": [
+          440,
+          9
+        ],
+        "target_column": "yield"
+      },
+      "task_type": "regression",
+      "target_column": "yield",
+      "metric": "r2",
+      "cv_score": 0.017759497358692755,
+      "cv_scores": [],
+      "test_metrics": {
+        "r2": -0.0818704679169937,
+        "mae": 1796.219012826676,
+        "rmse": 2720.889044240805
+      },
+      "tuning": {
+        "status": "completed",
+        "failure_reason": "",
+        "baseline": {
+          "metric": "r2",
+          "cv": 3,
+          "scores": [
+            -0.09831417648092611,
+            -1.2869617437490994,
+            0.00014064863841578568
+          ],
+          "mean_cv_score": -0.4617117571972032
+        },
+        "plan": {
+          "source": "llm",
+          "model_id": "random_forest_regressor",
+          "task_type": "regression",
+          "metric": "r2",
+          "cv": 3,
+          "budget": "small",
+          "param_grid": {
+            "n_estimators": [
+              100,
+              200
+            ],
+            "max_depth": [
+              5,
+              10
+            ],
+            "min_samples_leaf": [
+              1,
+              2
+            ],
+            "max_features": [
+              "sqrt"
+            ]
+          },
+          "explanation": "The baseline report indicates weak performance, so we broadened the search space for max_depth and included multiple values for min_samples_leaf to explore their impact on model performance."
+        },
+        "n_jobs": 1,
+        "best_params": {
+          "max_depth": 10,
+          "max_features": "sqrt",
+          "min_samples_leaf": 2,
+          "n_estimators": 200
+        },
+        "best_cv_score": 0.017759497358692755,
+        "explanation": "The baseline report indicates weak performance, so we broadened the search space for max_depth and included multiple values for min_samples_leaf to explore their impact on model performance."
+      }
+    },
+    {
+      "model_id": "gradient_boosting_regressor",
+      "model_report_path": "workspace/pipelines/gradient_boosting_regressor/model_report.json",
+      "feature_importance_path": "workspace/pipelines/gradient_boosting_regressor/feature_importance.json",
+      "feature_pipeline": {
+        "model_id": "gradient_boosting_regressor",
+        "train_path": "workspace/pipelines/gradient_boosting_regressor/fe_train.csv",
+        "test_path": "workspace/pipelines/gradient_boosting_regressor/fe_test.csv",
+        "execution": {
+          "model_id": "gradient_boosting_regressor",
+          "steps": [
+            "create_missing_indicators",
+            "impute_missing_features",
+            "convert_boolean_like_features",
+            "create_datetime_features",
+            "encode_categorical_features",
+            "clip_numeric_outliers",
+            "remove_low_information_features",
+            "drop_target_leakage_features",
+            "align_and_validate_feature_matrices"
+          ],
+          "step_reports": {
+            "create_missing_indicators": {
+              "source_columns": [],
+              "created_columns": []
+            },
+            "impute_missing_features": {
+              "numeric_strategy": "median",
+              "categorical_strategy": "mode",
+              "imputed_columns": [],
+              "fill_values": {}
+            },
+            "convert_boolean_like_features": {
+              "converted_columns": []
+            },
+            "create_datetime_features": {
+              "transformed_columns": [],
+              "created_columns": {}
+            },
+            "encode_categorical_features": {
+              "one_hot_encoded_columns": [],
+              "frequency_encoded_columns": [
+                "crop"
+              ],
+              "dropped_identifier_like_columns": [],
+              "output_column_count": 9
+            },
+            "clip_numeric_outliers": {
+              "clipped_columns": {
+                "nitrogen": {
+                  "lower": 0.0,
+                  "upper": 131.0,
+                  "train_values_clipped": 13,
+                  "test_values_clipped": 2
+                },
+                "phosphorus": {
+                  "lower": 5.0,
+                  "upper": 143.0,
+                  "train_values_clipped": 16,
+                  "test_values_clipped": 4
+                },
+                "potassium": {
+                  "lower": 7.0,
+                  "upper": 204.0,
+                  "train_values_clipped": 29,
+                  "test_values_clipped": 6
+                },
+                "temperature": {
+                  "lower": 11.8153675264,
+                  "upper": 40.89272258760002,
+                  "train_values_clipped": 36,
+                  "test_values_clipped": 8
+                },
+                "humidity": {
+                  "lower": 15.8102321934,
+                  "upper": 96.9314048236,
+                  "train_values_clipped": 36,
+                  "test_values_clipped": 20
+                },
+                "ph_value": {
+                  "lower": 4.61903039441,
+                  "upper": 8.74349545089,
+                  "train_values_clipped": 36,
+                  "test_values_clipped": 12
+                },
+                "rainfall": {
+                  "lower": 21.8815628703,
+                  "upper": 268.98706316600015,
+                  "train_values_clipped": 36,
+                  "test_values_clipped": 8
+                }
+              }
+            },
+            "remove_low_information_features": {
+              "removed_columns": []
+            },
+            "drop_target_leakage_features": {
+              "removed_columns": [],
+              "warnings": []
+            },
+            "align_and_validate_feature_matrices": {
+              "train_test_columns_match": true,
+              "all_features_numeric": true,
+              "non_numeric_features": [],
+              "missing_feature_values_train": 0,
+              "missing_feature_values_test": 0,
+              "feature_count": 8
+            }
+          },
+          "input_profile": {
+            "train_shape": [
+              1760,
+              9
+            ],
+            "test_shape": [
+              440,
+              9
+            ],
+            "feature_count": 8,
+            "numeric_features": [
+              "nitrogen",
+              "phosphorus",
+              "potassium",
+              "temperature",
+              "humidity",
+              "ph_value",
+              "rainfall"
+            ],
+            "categorical_features": [
+              "crop"
+            ],
+            "datetime_like_features": [],
+            "boolean_like_features": [],
+            "id_like_features": [
+              "temperature",
+              "humidity",
+              "ph_value",
+              "rainfall"
+            ],
+            "high_cardinality_features": [
+              "nitrogen",
+              "phosphorus",
+              "potassium",
+              "crop"
+            ],
+            "missing_ratio_train": {
+              "nitrogen": 0.0,
+              "phosphorus": 0.0,
+              "potassium": 0.0,
+              "temperature": 0.0,
+              "humidity": 0.0,
+              "ph_value": 0.0,
+              "rainfall": 0.0,
+              "crop": 0.0
+            },
+            "missing_ratio_test": {
+              "nitrogen": 0.0,
+              "phosphorus": 0.0,
+              "potassium": 0.0,
+              "temperature": 0.0,
+              "humidity": 0.0,
+              "ph_value": 0.0,
+              "rainfall": 0.0,
+              "crop": 0.0
+            }
+          },
+          "output_profile": {
+            "train_shape": [
+              1760,
+              9
+            ],
+            "test_shape": [
+              440,
+              9
+            ],
+            "feature_count": 8,
+            "numeric_features": [
+              "nitrogen",
+              "phosphorus",
+              "potassium",
+              "temperature",
+              "humidity",
+              "ph_value",
+              "rainfall",
+              "crop_frequency"
+            ],
+            "categorical_features": [],
+            "datetime_like_features": [],
+            "boolean_like_features": [],
+            "id_like_features": [
+              "temperature",
+              "humidity",
+              "ph_value",
+              "rainfall"
+            ],
+            "high_cardinality_features": [
+              "nitrogen",
+              "phosphorus",
+              "potassium"
+            ],
+            "missing_ratio_train": {
+              "nitrogen": 0.0,
+              "phosphorus": 0.0,
+              "potassium": 0.0,
+              "temperature": 0.0,
+              "humidity": 0.0,
+              "ph_value": 0.0,
+              "rainfall": 0.0,
+              "crop_frequency": 0.0
+            },
+            "missing_ratio_test": {
+              "nitrogen": 0.0,
+              "phosphorus": 0.0,
+              "potassium": 0.0,
+              "temperature": 0.0,
+              "humidity": 0.0,
+              "ph_value": 0.0,
+              "rainfall": 0.0,
+              "crop_frequency": 0.0
+            }
+          },
+          "preprocessing": {
+            "categorical_encoding": "one_hot",
+            "numeric_imputation": "median",
+            "categorical_imputation": "mode",
+            "numeric_scaling": false,
+            "numeric_outlier_clipping": true,
+            "remove_constant_features": true,
+            "correlation_threshold": null,
+            "drop_target_leakage_features": true,
+            "requires_all_features_numeric": true,
+            "allows_missing_feature_values": false
+          },
+          "eda_recommendations": [
+            "Use frequency encoding or drop high-cardinality categorical columns instead of wide one-hot encoding.",
+            "Drop ID-like columns from model features to reduce memorization risk.",
+            "Consider robust metrics or transformations for highly skewed regression targets."
+          ],
+          "eda_policy_actions": {
+            "applied": [
+              {
+                "recommendation": "Use frequency encoding or drop high-cardinality categorical columns instead of wide one-hot encoding.",
+                "action": "used frequency encoding for high-cardinality categorical features"
+              },
+              {
+                "recommendation": "Drop ID-like columns from model features to reduce memorization risk.",
+                "action": "dropped identifier-like categorical features during encoding"
+              }
+            ],
+            "deferred": [
+              {
+                "recommendation": "Consider robust metrics or transformations for highly skewed regression targets.",
+                "reason": "target transformation requires inverse-transform evaluation support"
+              }
+            ]
+          }
+        },
+        "train_shape": [
+          1760,
+          9
+        ],
+        "test_shape": [
+          440,
+          9
+        ],
+        "target_column": "yield"
+      },
+      "task_type": "regression",
+      "target_column": "yield",
+      "metric": "r2",
+      "cv_score": -0.5367507141795386,
+      "cv_scores": [],
+      "test_metrics": {
+        "r2": -0.07772633557035769,
+        "mae": 1782.7200923046657,
+        "rmse": 2715.672826887451
+      },
+      "tuning": {
+        "status": "completed",
+        "failure_reason": "",
+        "baseline": {
+          "metric": "r2",
+          "cv": 3,
+          "scores": [
+            -1.342932269379431,
+            -2.1918677667669066,
+            0.005371690312312549
+          ],
+          "mean_cv_score": -1.1764761152780083
+        },
+        "plan": {
+          "source": "llm",
+          "model_id": "gradient_boosting_regressor",
+          "task_type": "regression",
+          "metric": "r2",
+          "cv": 3,
+          "budget": "small",
+          "param_grid": {
+            "n_estimators": [
+              100,
+              150
+            ],
+            "learning_rate": [
+              0.03,
+              0.1
+            ],
+            "max_depth": [
+              2,
+              3
+            ],
+            "subsample": [
+              0.8
+            ]
+          },
+          "explanation": "The baseline report indicates weak performance, so we broadened the n_estimators and max_depth to explore more complex models while keeping the subsample fixed for stability."
+        },
+        "n_jobs": 1,
+        "best_params": {
+          "learning_rate": 0.03,
+          "max_depth": 3,
+          "n_estimators": 100,
+          "subsample": 0.8
+        },
+        "best_cv_score": -0.5367507141795386,
+        "explanation": "The baseline report indicates weak performance, so we broadened the n_estimators and max_depth to explore more complex models while keeping the subsample fixed for stability."
+      }
+    }
+  ],
+  "selected_model_id": "random_forest_regressor",
+  "best_model": "random_forest_regressor",
+  "best_cv_score": 0.017759497358692755,
+  "test_metrics": {
+    "r2": -0.0818704679169937,
+    "mae": 1796.219012826676,
+    "rmse": 2720.889044240805
+  },
+  "tuning": {
+    "enabled": true,
+    "strategy": "LLM-assisted tuning plan with deterministic validated GridSearchCV execution",
+    "selected_model_tuning": {
+      "status": "completed",
+      "failure_reason": "",
+      "baseline": {
+        "metric": "r2",
+        "cv": 3,
+        "scores": [
+          -0.09831417648092611,
+          -1.2869617437490994,
+          0.00014064863841578568
+        ],
+        "mean_cv_score": -0.4617117571972032
+      },
+      "plan": {
+        "source": "llm",
+        "model_id": "random_forest_regressor",
+        "task_type": "regression",
+        "metric": "r2",
+        "cv": 3,
+        "budget": "small",
+        "param_grid": {
+          "n_estimators": [
+            100,
+            200
+          ],
+          "max_depth": [
+            5,
+            10
+          ],
+          "min_samples_leaf": [
+            1,
+            2
+          ],
+          "max_features": [
+            "sqrt"
+          ]
+        },
+        "explanation": "The baseline report indicates weak performance, so we broadened the search space for max_depth and included multiple values for min_samples_leaf to explore their impact on model performance."
+      },
+      "n_jobs": 1,
+      "best_params": {
+        "max_depth": 10,
+        "max_features": "sqrt",
+        "min_samples_leaf": 2,
+        "n_estimators": 200
+      },
+      "best_cv_score": 0.017759497358692755,
+      "explanation": "The baseline report indicates weak performance, so we broadened the search space for max_depth and included multiple values for min_samples_leaf to explore their impact on model performance."
+    },
+    "candidate_tuning_status": {
+      "ridge_regression": "completed",
+      "random_forest_regressor": "completed",
+      "gradient_boosting_regressor": "completed"
+    }
+  },
+  "selected_model_report_path": "workspace/pipelines/random_forest_regressor/model_report.json",
+  "selected_feature_importance_path": "workspace/pipelines/random_forest_regressor/feature_importance.json"
+}

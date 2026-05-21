@@ -1,0 +1,49 @@
+{
+  "task_type": "regression",
+  "target_column": "quality_score",
+  "model_id": "ridge_regression",
+  "metric": "r2",
+  "cv_score": 0.9844309675893498,
+  "cv_scores": [],
+  "test_metrics": {
+    "r2": 0.9826584869870758,
+    "mae": 0.06163690498654331,
+    "rmse": 0.0722539792728544
+  },
+  "tuning": {
+    "status": "completed",
+    "failure_reason": "",
+    "baseline": {
+      "metric": "r2",
+      "cv": 3,
+      "scores": [
+        0.9848054584461177,
+        0.9850355165343629,
+        0.9833539673292938
+      ],
+      "mean_cv_score": 0.9843983141032582
+    },
+    "plan": {
+      "source": "llm",
+      "model_id": "ridge_regression",
+      "task_type": "regression",
+      "metric": "r2",
+      "cv": 3,
+      "budget": "small",
+      "param_grid": {
+        "alpha": [
+          0.1,
+          1.0,
+          10.0
+        ]
+      },
+      "explanation": "The baseline performance is strong, so a compact grid is chosen to efficiently explore the alpha parameter, which has a significant impact on regularization strength."
+    },
+    "n_jobs": -1,
+    "best_params": {
+      "alpha": 0.1
+    },
+    "best_cv_score": 0.9844309675893498,
+    "explanation": "The baseline performance is strong, so a compact grid is chosen to efficiently explore the alpha parameter, which has a significant impact on regularization strength."
+  }
+}

@@ -1,0 +1,21 @@
+{
+  "stage": "feature_decision",
+  "feature_engineering_policy": {
+    "mode": "standard",
+    "reason": "At least one candidate model requires encoded numeric features and numeric scaling.",
+    "task_type": "regression",
+    "candidate_model_ids": [
+      "ridge_regression",
+      "random_forest_regressor",
+      "gradient_boosting_regressor"
+    ],
+    "candidate_model_requirements": {
+      "encoding_required": true,
+      "scaling_required": true
+    },
+    "eda_recommendations": [
+      "Use frequency encoding or drop high-cardinality categorical columns instead of wide one-hot encoding.",
+      "Drop ID-like columns from model features to reduce memorization risk."
+    ]
+  }
+}

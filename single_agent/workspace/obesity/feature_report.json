@@ -1,0 +1,1065 @@
+{
+  "stage": "feature_engineering",
+  "status": "completed",
+  "policy": {
+    "mode": "standard",
+    "reason": "At least one candidate model requires encoded numeric features and numeric scaling.",
+    "task_type": "classification",
+    "candidate_model_ids": [
+      "logistic_regression",
+      "random_forest_classifier",
+      "gradient_boosting_classifier"
+    ],
+    "candidate_model_requirements": {
+      "encoding_required": true,
+      "scaling_required": true
+    },
+    "eda_recommendations": [
+      "Drop ID-like columns from model features to reduce memorization risk."
+    ]
+  },
+  "pipelines": {
+    "logistic_regression": {
+      "model_id": "logistic_regression",
+      "train_path": "workspace/pipelines/logistic_regression/fe_train.csv",
+      "test_path": "workspace/pipelines/logistic_regression/fe_test.csv",
+      "execution": {
+        "model_id": "logistic_regression",
+        "steps": [
+          "create_missing_indicators",
+          "impute_missing_features",
+          "convert_boolean_like_features",
+          "create_datetime_features",
+          "encode_categorical_features",
+          "clip_numeric_outliers",
+          "remove_low_information_features",
+          "remove_highly_correlated_features",
+          "drop_target_leakage_features",
+          "align_and_validate_feature_matrices",
+          "scale_numeric_features"
+        ],
+        "step_reports": {
+          "create_missing_indicators": {
+            "source_columns": [],
+            "created_columns": []
+          },
+          "impute_missing_features": {
+            "numeric_strategy": "median",
+            "categorical_strategy": "mode",
+            "imputed_columns": [],
+            "fill_values": {}
+          },
+          "convert_boolean_like_features": {
+            "converted_columns": [
+              "family_history_with_overweight",
+              "favc",
+              "smoke",
+              "scc"
+            ]
+          },
+          "create_datetime_features": {
+            "transformed_columns": [],
+            "created_columns": {}
+          },
+          "encode_categorical_features": {
+            "one_hot_encoded_columns": [
+              "gender",
+              "caec",
+              "calc",
+              "mtrans"
+            ],
+            "frequency_encoded_columns": [],
+            "dropped_identifier_like_columns": [],
+            "output_column_count": 28
+          },
+          "clip_numeric_outliers": {
+            "clipped_columns": {
+              "id": {
+                "lower": 197.05,
+                "upper": 20547.95,
+                "train_values_clipped": 334,
+                "test_values_clipped": 74
+              },
+              "age": {
+                "lower": 16.9145885,
+                "upper": 41.0,
+                "train_values_clipped": 327,
+                "test_values_clipped": 91
+              },
+              "height": {
+                "lower": 1.5034794,
+                "upper": 1.8855218000000002,
+                "train_values_clipped": 334,
+                "test_values_clipped": 77
+              },
+              "weight": {
+                "lower": 42.0,
+                "upper": 137.852618,
+                "train_values_clipped": 261,
+                "test_values_clipped": 73
+              }
+            }
+          },
+          "remove_low_information_features": {
+            "removed_columns": []
+          },
+          "remove_highly_correlated_features": {
+            "removed_columns": [
+              "gender_Male"
+            ],
+            "threshold": 0.98
+          },
+          "drop_target_leakage_features": {
+            "removed_columns": [],
+            "warnings": []
+          },
+          "align_and_validate_feature_matrices": {
+            "train_test_columns_match": true,
+            "all_features_numeric": true,
+            "non_numeric_features": [],
+            "missing_feature_values_train": 0,
+            "missing_feature_values_test": 0,
+            "feature_count": 26
+          },
+          "scale_numeric_features": {
+            "scaled_columns": [
+              "id",
+              "age",
+              "height",
+              "weight",
+              "family_history_with_overweight",
+              "favc",
+              "fcvc",
+              "ncp",
+              "smoke",
+              "ch2o",
+              "scc",
+              "faf",
+              "tue",
+              "gender_Female",
+              "caec_Always",
+              "caec_Frequently",
+              "caec_Sometimes",
+              "caec_no",
+              "calc_Frequently",
+              "calc_Sometimes",
+              "calc_no",
+              "mtrans_Automobile",
+              "mtrans_Bike",
+              "mtrans_Motorbike",
+              "mtrans_Public_Transportation",
+              "mtrans_Walking"
+            ]
+          }
+        },
+        "input_profile": {
+          "train_shape": [
+            16606,
+            18
+          ],
+          "test_shape": [
+            4152,
+            18
+          ],
+          "feature_count": 17,
+          "numeric_features": [
+            "id",
+            "age",
+            "height",
+            "weight",
+            "fcvc",
+            "ncp",
+            "ch2o",
+            "faf",
+            "tue"
+          ],
+          "categorical_features": [
+            "gender",
+            "caec",
+            "calc",
+            "mtrans"
+          ],
+          "datetime_like_features": [],
+          "boolean_like_features": [
+            "family_history_with_overweight",
+            "favc",
+            "smoke",
+            "scc"
+          ],
+          "id_like_features": [
+            "id"
+          ],
+          "high_cardinality_features": [
+            "age",
+            "height",
+            "weight",
+            "fcvc",
+            "ncp",
+            "ch2o",
+            "faf",
+            "tue"
+          ],
+          "missing_ratio_train": {
+            "id": 0.0,
+            "gender": 0.0,
+            "age": 0.0,
+            "height": 0.0,
+            "weight": 0.0,
+            "family_history_with_overweight": 0.0,
+            "favc": 0.0,
+            "fcvc": 0.0,
+            "ncp": 0.0,
+            "caec": 0.0,
+            "smoke": 0.0,
+            "ch2o": 0.0,
+            "scc": 0.0,
+            "faf": 0.0,
+            "tue": 0.0,
+            "calc": 0.0,
+            "mtrans": 0.0
+          },
+          "missing_ratio_test": {
+            "id": 0.0,
+            "gender": 0.0,
+            "age": 0.0,
+            "height": 0.0,
+            "weight": 0.0,
+            "family_history_with_overweight": 0.0,
+            "favc": 0.0,
+            "fcvc": 0.0,
+            "ncp": 0.0,
+            "caec": 0.0,
+            "smoke": 0.0,
+            "ch2o": 0.0,
+            "scc": 0.0,
+            "faf": 0.0,
+            "tue": 0.0,
+            "calc": 0.0,
+            "mtrans": 0.0
+          }
+        },
+        "output_profile": {
+          "train_shape": [
+            16606,
+            27
+          ],
+          "test_shape": [
+            4152,
+            27
+          ],
+          "feature_count": 26,
+          "numeric_features": [
+            "id",
+            "age",
+            "height",
+            "weight",
+            "family_history_with_overweight",
+            "favc",
+            "fcvc",
+            "ncp",
+            "smoke",
+            "ch2o",
+            "scc",
+            "faf",
+            "tue",
+            "gender_Female",
+            "caec_Always",
+            "caec_Frequently",
+            "caec_Sometimes",
+            "caec_no",
+            "calc_Frequently",
+            "calc_Sometimes",
+            "calc_no",
+            "mtrans_Automobile",
+            "mtrans_Bike",
+            "mtrans_Motorbike",
+            "mtrans_Public_Transportation",
+            "mtrans_Walking"
+          ],
+          "categorical_features": [],
+          "datetime_like_features": [],
+          "boolean_like_features": [],
+          "id_like_features": [
+            "id"
+          ],
+          "high_cardinality_features": [
+            "age",
+            "height",
+            "weight",
+            "fcvc",
+            "ncp",
+            "ch2o",
+            "faf",
+            "tue"
+          ],
+          "missing_ratio_train": {
+            "id": 0.0,
+            "age": 0.0,
+            "height": 0.0,
+            "weight": 0.0,
+            "family_history_with_overweight": 0.0,
+            "favc": 0.0,
+            "fcvc": 0.0,
+            "ncp": 0.0,
+            "smoke": 0.0,
+            "ch2o": 0.0,
+            "scc": 0.0,
+            "faf": 0.0,
+            "tue": 0.0,
+            "gender_Female": 0.0,
+            "caec_Always": 0.0,
+            "caec_Frequently": 0.0,
+            "caec_Sometimes": 0.0,
+            "caec_no": 0.0,
+            "calc_Frequently": 0.0,
+            "calc_Sometimes": 0.0,
+            "calc_no": 0.0,
+            "mtrans_Automobile": 0.0,
+            "mtrans_Bike": 0.0,
+            "mtrans_Motorbike": 0.0,
+            "mtrans_Public_Transportation": 0.0,
+            "mtrans_Walking": 0.0
+          },
+          "missing_ratio_test": {
+            "id": 0.0,
+            "age": 0.0,
+            "height": 0.0,
+            "weight": 0.0,
+            "family_history_with_overweight": 0.0,
+            "favc": 0.0,
+            "fcvc": 0.0,
+            "ncp": 0.0,
+            "smoke": 0.0,
+            "ch2o": 0.0,
+            "scc": 0.0,
+            "faf": 0.0,
+            "tue": 0.0,
+            "gender_Female": 0.0,
+            "caec_Always": 0.0,
+            "caec_Frequently": 0.0,
+            "caec_Sometimes": 0.0,
+            "caec_no": 0.0,
+            "calc_Frequently": 0.0,
+            "calc_Sometimes": 0.0,
+            "calc_no": 0.0,
+            "mtrans_Automobile": 0.0,
+            "mtrans_Bike": 0.0,
+            "mtrans_Motorbike": 0.0,
+            "mtrans_Public_Transportation": 0.0,
+            "mtrans_Walking": 0.0
+          }
+        },
+        "preprocessing": {
+          "categorical_encoding": "one_hot",
+          "numeric_imputation": "median",
+          "categorical_imputation": "mode",
+          "numeric_scaling": true,
+          "numeric_outlier_clipping": true,
+          "remove_constant_features": true,
+          "correlation_threshold": 0.98,
+          "drop_target_leakage_features": true,
+          "requires_all_features_numeric": true,
+          "allows_missing_feature_values": false
+        },
+        "eda_recommendations": [
+          "Drop ID-like columns from model features to reduce memorization risk."
+        ],
+        "eda_policy_actions": {
+          "applied": [
+            {
+              "recommendation": "Drop ID-like columns from model features to reduce memorization risk.",
+              "action": "dropped identifier-like categorical features during encoding"
+            }
+          ],
+          "deferred": []
+        }
+      },
+      "train_shape": [
+        16606,
+        27
+      ],
+      "test_shape": [
+        4152,
+        27
+      ],
+      "target_column": "nobeyesdad"
+    },
+    "random_forest_classifier": {
+      "model_id": "random_forest_classifier",
+      "train_path": "workspace/pipelines/random_forest_classifier/fe_train.csv",
+      "test_path": "workspace/pipelines/random_forest_classifier/fe_test.csv",
+      "execution": {
+        "model_id": "random_forest_classifier",
+        "steps": [
+          "create_missing_indicators",
+          "impute_missing_features",
+          "convert_boolean_like_features",
+          "create_datetime_features",
+          "encode_categorical_features",
+          "clip_numeric_outliers",
+          "remove_low_information_features",
+          "drop_target_leakage_features",
+          "align_and_validate_feature_matrices"
+        ],
+        "step_reports": {
+          "create_missing_indicators": {
+            "source_columns": [],
+            "created_columns": []
+          },
+          "impute_missing_features": {
+            "numeric_strategy": "median",
+            "categorical_strategy": "mode",
+            "imputed_columns": [],
+            "fill_values": {}
+          },
+          "convert_boolean_like_features": {
+            "converted_columns": [
+              "family_history_with_overweight",
+              "favc",
+              "smoke",
+              "scc"
+            ]
+          },
+          "create_datetime_features": {
+            "transformed_columns": [],
+            "created_columns": {}
+          },
+          "encode_categorical_features": {
+            "one_hot_encoded_columns": [
+              "gender",
+              "caec",
+              "calc",
+              "mtrans"
+            ],
+            "frequency_encoded_columns": [],
+            "dropped_identifier_like_columns": [],
+            "output_column_count": 28
+          },
+          "clip_numeric_outliers": {
+            "clipped_columns": {
+              "id": {
+                "lower": 197.05,
+                "upper": 20547.95,
+                "train_values_clipped": 334,
+                "test_values_clipped": 74
+              },
+              "age": {
+                "lower": 16.9145885,
+                "upper": 41.0,
+                "train_values_clipped": 327,
+                "test_values_clipped": 91
+              },
+              "height": {
+                "lower": 1.5034794,
+                "upper": 1.8855218000000002,
+                "train_values_clipped": 334,
+                "test_values_clipped": 77
+              },
+              "weight": {
+                "lower": 42.0,
+                "upper": 137.852618,
+                "train_values_clipped": 261,
+                "test_values_clipped": 73
+              }
+            }
+          },
+          "remove_low_information_features": {
+            "removed_columns": []
+          },
+          "drop_target_leakage_features": {
+            "removed_columns": [],
+            "warnings": []
+          },
+          "align_and_validate_feature_matrices": {
+            "train_test_columns_match": true,
+            "all_features_numeric": true,
+            "non_numeric_features": [],
+            "missing_feature_values_train": 0,
+            "missing_feature_values_test": 0,
+            "feature_count": 27
+          }
+        },
+        "input_profile": {
+          "train_shape": [
+            16606,
+            18
+          ],
+          "test_shape": [
+            4152,
+            18
+          ],
+          "feature_count": 17,
+          "numeric_features": [
+            "id",
+            "age",
+            "height",
+            "weight",
+            "fcvc",
+            "ncp",
+            "ch2o",
+            "faf",
+            "tue"
+          ],
+          "categorical_features": [
+            "gender",
+            "caec",
+            "calc",
+            "mtrans"
+          ],
+          "datetime_like_features": [],
+          "boolean_like_features": [
+            "family_history_with_overweight",
+            "favc",
+            "smoke",
+            "scc"
+          ],
+          "id_like_features": [
+            "id"
+          ],
+          "high_cardinality_features": [
+            "age",
+            "height",
+            "weight",
+            "fcvc",
+            "ncp",
+            "ch2o",
+            "faf",
+            "tue"
+          ],
+          "missing_ratio_train": {
+            "id": 0.0,
+            "gender": 0.0,
+            "age": 0.0,
+            "height": 0.0,
+            "weight": 0.0,
+            "family_history_with_overweight": 0.0,
+            "favc": 0.0,
+            "fcvc": 0.0,
+            "ncp": 0.0,
+            "caec": 0.0,
+            "smoke": 0.0,
+            "ch2o": 0.0,
+            "scc": 0.0,
+            "faf": 0.0,
+            "tue": 0.0,
+            "calc": 0.0,
+            "mtrans": 0.0
+          },
+          "missing_ratio_test": {
+            "id": 0.0,
+            "gender": 0.0,
+            "age": 0.0,
+            "height": 0.0,
+            "weight": 0.0,
+            "family_history_with_overweight": 0.0,
+            "favc": 0.0,
+            "fcvc": 0.0,
+            "ncp": 0.0,
+            "caec": 0.0,
+            "smoke": 0.0,
+            "ch2o": 0.0,
+            "scc": 0.0,
+            "faf": 0.0,
+            "tue": 0.0,
+            "calc": 0.0,
+            "mtrans": 0.0
+          }
+        },
+        "output_profile": {
+          "train_shape": [
+            16606,
+            28
+          ],
+          "test_shape": [
+            4152,
+            28
+          ],
+          "feature_count": 27,
+          "numeric_features": [
+            "id",
+            "age",
+            "height",
+            "weight",
+            "family_history_with_overweight",
+            "favc",
+            "fcvc",
+            "ncp",
+            "smoke",
+            "ch2o",
+            "scc",
+            "faf",
+            "tue",
+            "gender_Female",
+            "gender_Male",
+            "caec_Always",
+            "caec_Frequently",
+            "caec_Sometimes",
+            "caec_no",
+            "calc_Frequently",
+            "calc_Sometimes",
+            "calc_no",
+            "mtrans_Automobile",
+            "mtrans_Bike",
+            "mtrans_Motorbike",
+            "mtrans_Public_Transportation",
+            "mtrans_Walking"
+          ],
+          "categorical_features": [],
+          "datetime_like_features": [],
+          "boolean_like_features": [],
+          "id_like_features": [
+            "id"
+          ],
+          "high_cardinality_features": [
+            "age",
+            "height",
+            "weight",
+            "fcvc",
+            "ncp",
+            "ch2o",
+            "faf",
+            "tue"
+          ],
+          "missing_ratio_train": {
+            "id": 0.0,
+            "age": 0.0,
+            "height": 0.0,
+            "weight": 0.0,
+            "family_history_with_overweight": 0.0,
+            "favc": 0.0,
+            "fcvc": 0.0,
+            "ncp": 0.0,
+            "smoke": 0.0,
+            "ch2o": 0.0,
+            "scc": 0.0,
+            "faf": 0.0,
+            "tue": 0.0,
+            "gender_Female": 0.0,
+            "gender_Male": 0.0,
+            "caec_Always": 0.0,
+            "caec_Frequently": 0.0,
+            "caec_Sometimes": 0.0,
+            "caec_no": 0.0,
+            "calc_Frequently": 0.0,
+            "calc_Sometimes": 0.0,
+            "calc_no": 0.0,
+            "mtrans_Automobile": 0.0,
+            "mtrans_Bike": 0.0,
+            "mtrans_Motorbike": 0.0,
+            "mtrans_Public_Transportation": 0.0,
+            "mtrans_Walking": 0.0
+          },
+          "missing_ratio_test": {
+            "id": 0.0,
+            "age": 0.0,
+            "height": 0.0,
+            "weight": 0.0,
+            "family_history_with_overweight": 0.0,
+            "favc": 0.0,
+            "fcvc": 0.0,
+            "ncp": 0.0,
+            "smoke": 0.0,
+            "ch2o": 0.0,
+            "scc": 0.0,
+            "faf": 0.0,
+            "tue": 0.0,
+            "gender_Female": 0.0,
+            "gender_Male": 0.0,
+            "caec_Always": 0.0,
+            "caec_Frequently": 0.0,
+            "caec_Sometimes": 0.0,
+            "caec_no": 0.0,
+            "calc_Frequently": 0.0,
+            "calc_Sometimes": 0.0,
+            "calc_no": 0.0,
+            "mtrans_Automobile": 0.0,
+            "mtrans_Bike": 0.0,
+            "mtrans_Motorbike": 0.0,
+            "mtrans_Public_Transportation": 0.0,
+            "mtrans_Walking": 0.0
+          }
+        },
+        "preprocessing": {
+          "categorical_encoding": "one_hot",
+          "numeric_imputation": "median",
+          "categorical_imputation": "mode",
+          "numeric_scaling": false,
+          "numeric_outlier_clipping": true,
+          "remove_constant_features": true,
+          "correlation_threshold": null,
+          "drop_target_leakage_features": true,
+          "requires_all_features_numeric": true,
+          "allows_missing_feature_values": false
+        },
+        "eda_recommendations": [
+          "Drop ID-like columns from model features to reduce memorization risk."
+        ],
+        "eda_policy_actions": {
+          "applied": [
+            {
+              "recommendation": "Drop ID-like columns from model features to reduce memorization risk.",
+              "action": "dropped identifier-like categorical features during encoding"
+            }
+          ],
+          "deferred": []
+        }
+      },
+      "train_shape": [
+        16606,
+        28
+      ],
+      "test_shape": [
+        4152,
+        28
+      ],
+      "target_column": "nobeyesdad"
+    },
+    "gradient_boosting_classifier": {
+      "model_id": "gradient_boosting_classifier",
+      "train_path": "workspace/pipelines/gradient_boosting_classifier/fe_train.csv",
+      "test_path": "workspace/pipelines/gradient_boosting_classifier/fe_test.csv",
+      "execution": {
+        "model_id": "gradient_boosting_classifier",
+        "steps": [
+          "create_missing_indicators",
+          "impute_missing_features",
+          "convert_boolean_like_features",
+          "create_datetime_features",
+          "encode_categorical_features",
+          "clip_numeric_outliers",
+          "remove_low_information_features",
+          "drop_target_leakage_features",
+          "align_and_validate_feature_matrices"
+        ],
+        "step_reports": {
+          "create_missing_indicators": {
+            "source_columns": [],
+            "created_columns": []
+          },
+          "impute_missing_features": {
+            "numeric_strategy": "median",
+            "categorical_strategy": "mode",
+            "imputed_columns": [],
+            "fill_values": {}
+          },
+          "convert_boolean_like_features": {
+            "converted_columns": [
+              "family_history_with_overweight",
+              "favc",
+              "smoke",
+              "scc"
+            ]
+          },
+          "create_datetime_features": {
+            "transformed_columns": [],
+            "created_columns": {}
+          },
+          "encode_categorical_features": {
+            "one_hot_encoded_columns": [
+              "gender",
+              "caec",
+              "calc",
+              "mtrans"
+            ],
+            "frequency_encoded_columns": [],
+            "dropped_identifier_like_columns": [],
+            "output_column_count": 28
+          },
+          "clip_numeric_outliers": {
+            "clipped_columns": {
+              "id": {
+                "lower": 197.05,
+                "upper": 20547.95,
+                "train_values_clipped": 334,
+                "test_values_clipped": 74
+              },
+              "age": {
+                "lower": 16.9145885,
+                "upper": 41.0,
+                "train_values_clipped": 327,
+                "test_values_clipped": 91
+              },
+              "height": {
+                "lower": 1.5034794,
+                "upper": 1.8855218000000002,
+                "train_values_clipped": 334,
+                "test_values_clipped": 77
+              },
+              "weight": {
+                "lower": 42.0,
+                "upper": 137.852618,
+                "train_values_clipped": 261,
+                "test_values_clipped": 73
+              }
+            }
+          },
+          "remove_low_information_features": {
+            "removed_columns": []
+          },
+          "drop_target_leakage_features": {
+            "removed_columns": [],
+            "warnings": []
+          },
+          "align_and_validate_feature_matrices": {
+            "train_test_columns_match": true,
+            "all_features_numeric": true,
+            "non_numeric_features": [],
+            "missing_feature_values_train": 0,
+            "missing_feature_values_test": 0,
+            "feature_count": 27
+          }
+        },
+        "input_profile": {
+          "train_shape": [
+            16606,
+            18
+          ],
+          "test_shape": [
+            4152,
+            18
+          ],
+          "feature_count": 17,
+          "numeric_features": [
+            "id",
+            "age",
+            "height",
+            "weight",
+            "fcvc",
+            "ncp",
+            "ch2o",
+            "faf",
+            "tue"
+          ],
+          "categorical_features": [
+            "gender",
+            "caec",
+            "calc",
+            "mtrans"
+          ],
+          "datetime_like_features": [],
+          "boolean_like_features": [
+            "family_history_with_overweight",
+            "favc",
+            "smoke",
+            "scc"
+          ],
+          "id_like_features": [
+            "id"
+          ],
+          "high_cardinality_features": [
+            "age",
+            "height",
+            "weight",
+            "fcvc",
+            "ncp",
+            "ch2o",
+            "faf",
+            "tue"
+          ],
+          "missing_ratio_train": {
+            "id": 0.0,
+            "gender": 0.0,
+            "age": 0.0,
+            "height": 0.0,
+            "weight": 0.0,
+            "family_history_with_overweight": 0.0,
+            "favc": 0.0,
+            "fcvc": 0.0,
+            "ncp": 0.0,
+            "caec": 0.0,
+            "smoke": 0.0,
+            "ch2o": 0.0,
+            "scc": 0.0,
+            "faf": 0.0,
+            "tue": 0.0,
+            "calc": 0.0,
+            "mtrans": 0.0
+          },
+          "missing_ratio_test": {
+            "id": 0.0,
+            "gender": 0.0,
+            "age": 0.0,
+            "height": 0.0,
+            "weight": 0.0,
+            "family_history_with_overweight": 0.0,
+            "favc": 0.0,
+            "fcvc": 0.0,
+            "ncp": 0.0,
+            "caec": 0.0,
+            "smoke": 0.0,
+            "ch2o": 0.0,
+            "scc": 0.0,
+            "faf": 0.0,
+            "tue": 0.0,
+            "calc": 0.0,
+            "mtrans": 0.0
+          }
+        },
+        "output_profile": {
+          "train_shape": [
+            16606,
+            28
+          ],
+          "test_shape": [
+            4152,
+            28
+          ],
+          "feature_count": 27,
+          "numeric_features": [
+            "id",
+            "age",
+            "height",
+            "weight",
+            "family_history_with_overweight",
+            "favc",
+            "fcvc",
+            "ncp",
+            "smoke",
+            "ch2o",
+            "scc",
+            "faf",
+            "tue",
+            "gender_Female",
+            "gender_Male",
+            "caec_Always",
+            "caec_Frequently",
+            "caec_Sometimes",
+            "caec_no",
+            "calc_Frequently",
+            "calc_Sometimes",
+            "calc_no",
+            "mtrans_Automobile",
+            "mtrans_Bike",
+            "mtrans_Motorbike",
+            "mtrans_Public_Transportation",
+            "mtrans_Walking"
+          ],
+          "categorical_features": [],
+          "datetime_like_features": [],
+          "boolean_like_features": [],
+          "id_like_features": [
+            "id"
+          ],
+          "high_cardinality_features": [
+            "age",
+            "height",
+            "weight",
+            "fcvc",
+            "ncp",
+            "ch2o",
+            "faf",
+            "tue"
+          ],
+          "missing_ratio_train": {
+            "id": 0.0,
+            "age": 0.0,
+            "height": 0.0,
+            "weight": 0.0,
+            "family_history_with_overweight": 0.0,
+            "favc": 0.0,
+            "fcvc": 0.0,
+            "ncp": 0.0,
+            "smoke": 0.0,
+            "ch2o": 0.0,
+            "scc": 0.0,
+            "faf": 0.0,
+            "tue": 0.0,
+            "gender_Female": 0.0,
+            "gender_Male": 0.0,
+            "caec_Always": 0.0,
+            "caec_Frequently": 0.0,
+            "caec_Sometimes": 0.0,
+            "caec_no": 0.0,
+            "calc_Frequently": 0.0,
+            "calc_Sometimes": 0.0,
+            "calc_no": 0.0,
+            "mtrans_Automobile": 0.0,
+            "mtrans_Bike": 0.0,
+            "mtrans_Motorbike": 0.0,
+            "mtrans_Public_Transportation": 0.0,
+            "mtrans_Walking": 0.0
+          },
+          "missing_ratio_test": {
+            "id": 0.0,
+            "age": 0.0,
+            "height": 0.0,
+            "weight": 0.0,
+            "family_history_with_overweight": 0.0,
+            "favc": 0.0,
+            "fcvc": 0.0,
+            "ncp": 0.0,
+            "smoke": 0.0,
+            "ch2o": 0.0,
+            "scc": 0.0,
+            "faf": 0.0,
+            "tue": 0.0,
+            "gender_Female": 0.0,
+            "gender_Male": 0.0,
+            "caec_Always": 0.0,
+            "caec_Frequently": 0.0,
+            "caec_Sometimes": 0.0,
+            "caec_no": 0.0,
+            "calc_Frequently": 0.0,
+            "calc_Sometimes": 0.0,
+            "calc_no": 0.0,
+            "mtrans_Automobile": 0.0,
+            "mtrans_Bike": 0.0,
+            "mtrans_Motorbike": 0.0,
+            "mtrans_Public_Transportation": 0.0,
+            "mtrans_Walking": 0.0
+          }
+        },
+        "preprocessing": {
+          "categorical_encoding": "one_hot",
+          "numeric_imputation": "median",
+          "categorical_imputation": "mode",
+          "numeric_scaling": false,
+          "numeric_outlier_clipping": true,
+          "remove_constant_features": true,
+          "correlation_threshold": null,
+          "drop_target_leakage_features": true,
+          "requires_all_features_numeric": true,
+          "allows_missing_feature_values": false
+        },
+        "eda_recommendations": [
+          "Drop ID-like columns from model features to reduce memorization risk."
+        ],
+        "eda_policy_actions": {
+          "applied": [
+            {
+              "recommendation": "Drop ID-like columns from model features to reduce memorization risk.",
+              "action": "dropped identifier-like categorical features during encoding"
+            }
+          ],
+          "deferred": []
+        }
+      },
+      "train_shape": [
+        16606,
+        28
+      ],
+      "test_shape": [
+        4152,
+        28
+      ],
+      "target_column": "nobeyesdad"
+    }
+  },
+  "execution": {
+    "pipeline_count": 3,
+    "model_ids": [
+      "logistic_regression",
+      "random_forest_classifier",
+      "gradient_boosting_classifier"
+    ]
+  },
+  "train_shape": [
+    16606,
+    27
+  ],
+  "test_shape": [
+    4152,
+    27
+  ],
+  "target_column": "nobeyesdad"
+}

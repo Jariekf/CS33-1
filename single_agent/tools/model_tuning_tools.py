@@ -118,7 +118,7 @@ def tune_and_evaluate_model(
         param_grid=tuning_plan["param_grid"],
         scoring=tuning_plan["metric"],
         cv=cv,
-        n_jobs=-1,
+        n_jobs=1,
         error_score="raise",
     )
     try:
@@ -149,7 +149,7 @@ def tune_and_evaluate_model(
             "failure_reason": failure_reason,
             "baseline": baseline_report,
             "plan": tuning_plan,
-            "n_jobs": -1,
+            "n_jobs": 1,
             "best_params": best_params,
             "best_cv_score": tuned_cv_score,
             "explanation": tuning_plan.get("explanation", ""),

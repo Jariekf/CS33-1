@@ -1,0 +1,143 @@
+{
+  "stage": "data_cleaning",
+  "status": "completed",
+  "target_column": "exited",
+  "input_mode": "single_file_split",
+  "data_description_used": true,
+  "profile_before": {
+    "rows": 165034,
+    "columns": 14,
+    "column_names": [
+      "id",
+      "customerid",
+      "surname",
+      "creditscore",
+      "geography",
+      "gender",
+      "age",
+      "tenure",
+      "balance",
+      "numofproducts",
+      "hascrcard",
+      "isactivemember",
+      "estimatedsalary",
+      "exited"
+    ],
+    "missing_ratio": {
+      "id": 0.0,
+      "customerid": 0.0,
+      "surname": 0.0,
+      "creditscore": 0.0,
+      "geography": 0.0,
+      "gender": 0.0,
+      "age": 0.0,
+      "tenure": 0.0,
+      "balance": 0.0,
+      "numofproducts": 0.0,
+      "hascrcard": 0.0,
+      "isactivemember": 0.0,
+      "estimatedsalary": 0.0,
+      "exited": 0.0
+    },
+    "dtypes": {
+      "id": "int64",
+      "customerid": "int64",
+      "surname": "object",
+      "creditscore": "int64",
+      "geography": "object",
+      "gender": "object",
+      "age": "float64",
+      "tenure": "int64",
+      "balance": "float64",
+      "numofproducts": "int64",
+      "hascrcard": "float64",
+      "isactivemember": "float64",
+      "estimatedsalary": "float64",
+      "exited": "int64"
+    },
+    "duplicate_rows": 0,
+    "target_column": "exited",
+    "target_unique_values": 2,
+    "target_distribution": {
+      "0": 130113,
+      "1": 34921
+    }
+  },
+  "profile_after": {
+    "rows": 165034,
+    "columns": 14,
+    "column_names": [
+      "id",
+      "customerid",
+      "surname",
+      "creditscore",
+      "geography",
+      "gender",
+      "age",
+      "tenure",
+      "balance",
+      "numofproducts",
+      "hascrcard",
+      "isactivemember",
+      "estimatedsalary",
+      "exited"
+    ],
+    "missing_ratio": {
+      "id": 0.0,
+      "customerid": 0.0,
+      "surname": 0.0,
+      "creditscore": 0.0,
+      "geography": 0.0,
+      "gender": 0.0,
+      "age": 0.0,
+      "tenure": 0.0,
+      "balance": 0.0,
+      "numofproducts": 0.0,
+      "hascrcard": 0.0,
+      "isactivemember": 0.0,
+      "estimatedsalary": 0.0,
+      "exited": 0.0
+    },
+    "dtypes": {
+      "id": "int64",
+      "customerid": "int64",
+      "surname": "object",
+      "creditscore": "int64",
+      "geography": "object",
+      "gender": "object",
+      "age": "float64",
+      "tenure": "int64",
+      "balance": "float64",
+      "numofproducts": "int64",
+      "hascrcard": "float64",
+      "isactivemember": "float64",
+      "estimatedsalary": "float64",
+      "exited": "int64"
+    },
+    "duplicate_rows": 0,
+    "target_column": "exited",
+    "target_unique_values": 2,
+    "target_distribution": {
+      "0": 130113,
+      "1": 34921
+    }
+  },
+  "provided_train_test_profile": null,
+  "row_loss": 0,
+  "row_loss_breakdown": {
+    "missing_target_rows_removed": 0,
+    "duplicate_rows_removed": 0
+  },
+  "duplicate_policy": {
+    "remove_duplicates": false,
+    "source": "deterministic",
+    "reason": "No exact duplicate rows were detected.",
+    "duplicate_rows_detected": 0
+  },
+  "numeric_like_conversions": [],
+  "split": {
+    "split_strategy": "stratified_random",
+    "test_size": 0.2,
+    "warning": ""
+  }
+}

@@ -1,0 +1,421 @@
+{
+  "dataset_intake": {
+    "source_path": "data/obesity_risk/train.csv",
+    "data_reading_options": {
+      "sep": ",",
+      "encoding": "utf-8"
+    },
+    "encoding_detection": {
+      "encoding": "utf-8",
+      "confidence": "high"
+    },
+    "delimiter_detection": {
+      "delimiter": ",",
+      "confidence": "high"
+    },
+    "sample_size_bytes": 65536,
+    "preview_metadata": {
+      "source_file_size_bytes": 2727634,
+      "preview_rows": 200,
+      "preview_columns": 18,
+      "column_names": [
+        "id",
+        "gender",
+        "age",
+        "height",
+        "weight",
+        "family_history_with_overweight",
+        "favc",
+        "fcvc",
+        "ncp",
+        "caec",
+        "smoke",
+        "ch2o",
+        "scc",
+        "faf",
+        "tue",
+        "calc",
+        "mtrans",
+        "nobeyesdad"
+      ],
+      "dtypes": {
+        "id": "int64",
+        "gender": "object",
+        "age": "float64",
+        "height": "float64",
+        "weight": "float64",
+        "family_history_with_overweight": "object",
+        "favc": "object",
+        "fcvc": "float64",
+        "ncp": "float64",
+        "caec": "object",
+        "smoke": "object",
+        "ch2o": "float64",
+        "scc": "object",
+        "faf": "float64",
+        "tue": "float64",
+        "calc": "object",
+        "mtrans": "object",
+        "nobeyesdad": "object"
+      },
+      "missing_ratio": {
+        "id": 0.0,
+        "gender": 0.0,
+        "age": 0.0,
+        "height": 0.0,
+        "weight": 0.0,
+        "family_history_with_overweight": 0.0,
+        "favc": 0.0,
+        "fcvc": 0.0,
+        "ncp": 0.0,
+        "caec": 0.0,
+        "smoke": 0.0,
+        "ch2o": 0.0,
+        "scc": 0.0,
+        "faf": 0.0,
+        "tue": 0.0,
+        "calc": 0.0,
+        "mtrans": 0.0,
+        "nobeyesdad": 0.0
+      },
+      "numeric_columns": [
+        "id",
+        "age",
+        "height",
+        "weight",
+        "fcvc",
+        "ncp",
+        "ch2o",
+        "faf",
+        "tue"
+      ],
+      "categorical_columns": [
+        "gender",
+        "family_history_with_overweight",
+        "favc",
+        "caec",
+        "smoke",
+        "scc",
+        "calc",
+        "mtrans",
+        "nobeyesdad"
+      ]
+    }
+  },
+  "input_config": {
+    "input_mode": "single_file_split",
+    "train_data_path": "data/obesity_risk/train.csv",
+    "test_data_path": null,
+    "test_data_reading_options": null,
+    "test_has_target": false
+  },
+  "test_dataset_intake": null,
+  "task_summary": {
+    "business_goal": "Health insurer public health analytics team. Identify members at\n  high obesity risk to inform preventive programme design. Surface the most\n  significant lifestyle and demographic risk factors with intervention\n  recommendations.",
+    "data_description": "Multi-Class Prediction of Obesity Risk\nPlayground Series - Season 4, Episode 2\n\n\n============================================================\n1. Competition Basic Information\n============================================================\n\nCompetition Name:\nMulti-Class Prediction of Obesity Risk\n\nPlatform:\nKaggle\n\nSeries:\nPlayground Series - Season 4, Episode 2\n\nStatus:\nLate Submission\n\nCompetition Host:\nKaggle\n\nPrizes & Awards:\nSwag\n\nPoints or Medals:\nThis competition does not award Points or Medals.\n\n\n============================================================\n2. Main Pages\n============================================================\n\nOverview:\nhttps://www.kaggle.com/competitions/playground-series-s4e2/overview\n\nData:\nhttps://www.kaggle.com/competitions/playground-series-s4e2/data\n\nCode:\nhttps://www.kaggle.com/competitions/playground-series-s4e2/code\n\nModels:\nhttps://www.kaggle.com/competitions/playground-series-s4e2/models\n\nDiscussion:\nhttps://www.kaggle.com/competitions/playground-series-s4e2/discussion\n\nLeaderboard:\nhttps://www.kaggle.com/competitions/playground-series-s4e2/leaderboard\n\nRules:\nhttps://www.kaggle.com/competitions/playground-series-s4e2/rules\n\nTeam:\nhttps://www.kaggle.com/competitions/playground-series-s4e2/team\n\nSubmissions:\nhttps://www.kaggle.com/competitions/playground-series-s4e2/submissions\n\nHeader Image:\nhttps://www.kaggle.com/competitions/68479/images/header\n\n\n============================================================\n3. Overview\n============================================================\n\nWelcome to the 2024 Kaggle Playground Series.\n\nKaggle plans to continue the spirit of previous playground competitions by providing interesting and approachable datasets for the community to practice machine learning skills.\n\nThe Playground Series usually provides one competition each month.\n\n\n============================================================\n4. Goal\n============================================================\n\nThe goal of this competition is to use different factors to predict obesity risk in individuals.\n\nThis obesity risk is related to cardiovascular disease.\n\nTarget Variable:\nNObeyesdad\n\nTask Type:\nMulti-class classification\n\n\n============================================================\n5. Evaluation\n============================================================\n\nSubmissions are evaluated using accuracy score.\n\nEvaluation Metric:\nAccuracy Score\n\nMetric URL:\nhttps://en.wikipedia.org/wiki/Accuracy_and_precision\n\n\n============================================================\n6. Submission File Format\n============================================================\n\nFor each id row in the test set, participants must predict the class value of the target variable NObeyesdad.\n\nThe submission file must contain a header and follow this format:\n\nid,NObeyesdad\n20758,Normal_Weight\n20759,Normal_Weight\n20760,Normal_Weight\netc.\n\n\n============================================================\n7. About the Tabular Playground Series\n============================================================\n\nThe goal of the Tabular Playground Series is to provide the Kaggle community with lightweight challenges.\n\nThese challenges can be used to learn and improve skills in different areas of machine learning and data science.\n\nThe competitions usually last only a few weeks.\n\nThe datasets are generally lightweight and suitable for:\n- quick model iteration\n- feature engineering\n- visualization practice\n- machine learning skill development\n- data science experimentation\n\n\n============================================================\n8. Synthetically Generated Datasets\n============================================================\n\nThe Playground competitions use synthetic data.\n\nUsing synthetic data helps Kaggle balance two goals:\n- providing real-world-like data with named features\n- keeping test labels private\n\nThe datasets are generated from real-world data, but they are not exactly the same as the original datasets.\n\nThe goal is to create interesting datasets with fewer synthetic artifacts.\n\nKaggle also encourages feedback from participants to improve future competition datasets.\n\n\n============================================================\n9. Prizes\n============================================================\n\n1st Place:\nChoice of Kaggle merchandise\n\n2nd Place:\nChoice of Kaggle merchandise\n\n3rd Place:\nChoice of Kaggle merchandise\n\nNote:\nTo encourage more participation from beginners, Kaggle merchandise will only be awarded once per person in this series.\n\nIf a person has previously won, Kaggle will skip to the next team.\n\n\n============================================================\n10. Citation\n============================================================\n\nWalter Reade, Ashley Chow. (2024).\nMulti-Class Prediction of Obesity Risk.\nKaggle.\n\nCitation URL:\nhttps://kaggle.com/competitions/playground-series-s4e2\n\n\n============================================================\n11. Participation Information\n============================================================\n\nEntrants:\n8,346\n\nParticipants:\n3,746\n\nTeams:\n3,587\n\nSubmissions:\n29,669\n\n\n============================================================\n12. Tags\n============================================================\n\nBeginner:\nhttps://www.kaggle.com/competitions?tagIds=13102-Beginner\n\nTime Series Analysis:\nhttps://www.kaggle.com/competitions?tagIds=13209-Time+Series+Analysis\n\nTabular:\nhttps://www.kaggle.com/competitions?tagIds=14101-Tabular\n\nMulticlass Classification:\nhttps://www.kaggle.com/competitions?tagIds=14202-Multiclass+Classification\n\n\n============================================================\n13. Table of Contents\n============================================================\n\nOverview:\nhttps://www.kaggle.com/competitions/playground-series-s4e2/overview/abstract\n\nEvaluation:\nhttps://www.kaggle.com/competitions/playground-series-s4e2/overview/evaluation\n\nTimeline:\nhttps://www.kaggle.com/competitions/playground-series-s4e2/overview/timeline\n\nAbout the Tabular Playground Series:\nhttps://www.kaggle.com/competitions/playground-series-s4e2/overview/about-the-tabular-playground-series\n\nPrizes:\nhttps://www.kaggle.com/competitions/playground-series-s4e2/overview/prizes\n\nCitation:\nhttps://www.kaggle.com/competitions/playground-series-s4e2/overview/citation\n\n\n============================================================\n14. Data\n============================================================\n\nThe dataset for this competition, including both train and test files, was generated from a deep learning model.\n\nThe deep learning model was trained on the Obesity or CVD Risk dataset.\n\nOriginal Dataset:\nhttps://www.kaggle.com/datasets/aravindpcoder/obesity-or-cvd-risk-classifyregressorcluster\n\nThe feature distributions are close to the original dataset, but they are not exactly the same.\n\nParticipants are allowed to use the original dataset as part of this competition.\n\nThe original dataset can be used to:\n- explore differences between the synthetic dataset and the original dataset\n- check whether adding the original data improves model performance\n\n\n============================================================\n15. Dataset Note\n============================================================\n\nThis dataset is especially suitable for:\n- visualizations\n- clustering\n- general exploratory data analysis\n- EDA practice\n\n\n============================================================\n16. Files\n============================================================\n\ntrain.csv:\nThe training dataset.\nThe target variable NObeyesdad is included.\nNObeyesdad is a categorical target.\n\ntest.csv:\nThe test dataset.\nThe objective is to predict the class of NObeyesdad for each row.\n\nsample_submission.csv:\nA sample submission file in the correct format.",
+    "task_type": "classification",
+    "workflow_type": "supervised",
+    "supported_by_current_pipeline": true,
+    "target_column": "nobeyesdad",
+    "initial_target_inference": {
+      "target_column": "nobeyesdad",
+      "task_type": "classification",
+      "confidence": 1.0,
+      "reason": "The user goal is to identify members at high obesity risk, which aligns with predicting the multi-class target variable 'nobeyesdad' that categorizes obesity risk levels.",
+      "source": "llm"
+    },
+    "target_inference": {
+      "target_column": "nobeyesdad",
+      "task_type": "classification",
+      "confidence": 1.0,
+      "reason": "The user goal is to identify members at high obesity risk, which aligns with predicting the multi-class target variable 'nobeyesdad' that categorizes obesity risk levels.",
+      "source": "llm"
+    },
+    "primary_metric": "f1_weighted",
+    "candidate_model_ids": [
+      "logistic_regression",
+      "random_forest_classifier",
+      "gradient_boosting_classifier"
+    ],
+    "candidate_models": [
+      {
+        "model_id": "logistic_regression",
+        "task_type": "classification",
+        "estimator": "LogisticRegression",
+        "preprocessing": {
+          "categorical_encoding": "one_hot",
+          "numeric_imputation": "median",
+          "categorical_imputation": "mode",
+          "numeric_scaling": true,
+          "numeric_outlier_clipping": true,
+          "remove_constant_features": true,
+          "correlation_threshold": 0.98,
+          "drop_target_leakage_features": true,
+          "requires_all_features_numeric": true,
+          "allows_missing_feature_values": false
+        },
+        "validation": {
+          "selection_metric": "f1_weighted",
+          "required_checks": [
+            "all_features_numeric",
+            "no_missing_feature_values",
+            "train_test_columns_match",
+            "target_column_present"
+          ]
+        }
+      },
+      {
+        "model_id": "random_forest_classifier",
+        "task_type": "classification",
+        "estimator": "RandomForestClassifier",
+        "preprocessing": {
+          "categorical_encoding": "one_hot",
+          "numeric_imputation": "median",
+          "categorical_imputation": "mode",
+          "numeric_scaling": false,
+          "numeric_outlier_clipping": true,
+          "remove_constant_features": true,
+          "correlation_threshold": null,
+          "drop_target_leakage_features": true,
+          "requires_all_features_numeric": true,
+          "allows_missing_feature_values": false
+        },
+        "validation": {
+          "selection_metric": "f1_weighted",
+          "required_checks": [
+            "all_features_numeric",
+            "no_missing_feature_values",
+            "train_test_columns_match",
+            "target_column_present"
+          ]
+        }
+      },
+      {
+        "model_id": "gradient_boosting_classifier",
+        "task_type": "classification",
+        "estimator": "GradientBoostingClassifier",
+        "preprocessing": {
+          "categorical_encoding": "one_hot",
+          "numeric_imputation": "median",
+          "categorical_imputation": "mode",
+          "numeric_scaling": false,
+          "numeric_outlier_clipping": true,
+          "remove_constant_features": true,
+          "correlation_threshold": null,
+          "drop_target_leakage_features": true,
+          "requires_all_features_numeric": true,
+          "allows_missing_feature_values": false
+        },
+        "validation": {
+          "selection_metric": "f1_weighted",
+          "required_checks": [
+            "all_features_numeric",
+            "no_missing_feature_values",
+            "train_test_columns_match",
+            "target_column_present"
+          ]
+        }
+      }
+    ],
+    "risk_notes": [],
+    "data_reading_options": {
+      "sep": ",",
+      "encoding": "utf-8"
+    },
+    "test_data_reading_options": null,
+    "input_mode": "single_file_split",
+    "initial_feature_engineering_policy": {
+      "mode": "light",
+      "can_be_skipped": true,
+      "decision_required_after_cleaning": true
+    }
+  },
+  "stage_contracts": {
+    "data_cleaning": {
+      "required_artifacts": [
+        "cleaned_data.csv",
+        "train_data.csv",
+        "test_data.csv",
+        "cleaning_report.json"
+      ],
+      "required_report_fields": [
+        "stage",
+        "status",
+        "target_column",
+        "profile_before",
+        "profile_after",
+        "row_loss",
+        "row_loss_breakdown",
+        "duplicate_policy",
+        "numeric_like_conversions",
+        "split",
+        "recommended_tool_gaps"
+      ],
+      "validation_rules": [
+        {
+          "id": "target_preserved",
+          "check": "target column exists after cleaning when workflow_type is supervised"
+        },
+        {
+          "id": "non_empty_columns",
+          "check": "cleaned dataset has at least one non-empty column"
+        },
+        {
+          "id": "row_loss_reported",
+          "check": "cleaning_report.json includes row_loss"
+        }
+      ],
+      "allowed_tools": [
+        "basic_clean_dataframe",
+        "decide_duplicate_removal",
+        "drop_duplicate_rows",
+        "drop_empty_columns",
+        "numeric_like_conversion_report",
+        "profile_dataframe",
+        "split_cleaned_data"
+      ],
+      "recommended_tool_gap_field": "recommended_tool_gaps"
+    },
+    "feature_engineering": {
+      "required_artifacts": [
+        "fe_train.csv",
+        "fe_test.csv",
+        "feature_policy_report.json",
+        "feature_report.json"
+      ],
+      "required_report_fields": [
+        "stage",
+        "status",
+        "policy",
+        "pipelines",
+        "execution",
+        "train_shape",
+        "test_shape",
+        "target_column",
+        "recommended_tool_gaps"
+      ],
+      "validation_rules": [
+        {
+          "id": "policy_justified",
+          "check": "feature policy mode and reason are reported"
+        },
+        {
+          "id": "matching_columns",
+          "check": "feature train/test columns match in order"
+        },
+        {
+          "id": "target_preserved",
+          "check": "target column remains present when workflow_type is supervised"
+        },
+        {
+          "id": "model_preprocessing_requirements",
+          "check": "feature policy accounts for candidate_models preprocessing requirements"
+        },
+        {
+          "id": "target_balance_reported",
+          "check": "feature_report.json reports target class balance before modelling"
+        }
+      ],
+      "allowed_tools": [
+        "recommend_feature_engineering_policy",
+        "apply_model_feature_policy",
+        "align_and_validate_feature_matrices",
+        "clip_numeric_outliers_with_report",
+        "convert_boolean_like_features",
+        "create_datetime_features_with_report",
+        "create_missing_indicators_with_report",
+        "drop_target_leakage_features_with_report",
+        "encode_categorical_features_with_report",
+        "impute_missing_features",
+        "impute_missing_features_with_report",
+        "profile_features",
+        "remove_highly_correlated_features_with_report",
+        "remove_low_information_features_with_report",
+        "scale_numeric_features_with_report",
+        "validate_matching_columns"
+      ],
+      "recommended_tool_gap_field": "recommended_tool_gaps"
+    },
+    "eda_analysis": {
+      "required_artifacts": [
+        "eda_report.json",
+        "eda_summary.md"
+      ],
+      "required_report_fields": [
+        "stage",
+        "status",
+        "leakage_policy",
+        "dataset_overview",
+        "target_analysis",
+        "feature_target_relationships",
+        "feature_engineering_recommendations"
+      ],
+      "validation_rules": [
+        {
+          "id": "train_only_target_analysis",
+          "check": "feature-target analysis uses train_data only"
+        },
+        {
+          "id": "eda_summary_present",
+          "check": "eda_summary.md exists for business reporting"
+        }
+      ],
+      "allowed_tools": [
+        "build_eda_report",
+        "build_eda_summary"
+      ],
+      "recommended_tool_gap_field": "recommended_tool_gaps"
+    },
+    "model_selection": {
+      "required_artifacts": [
+        "model_report.json",
+        "feature_importance.json"
+      ],
+      "required_report_fields": [
+        "task_type",
+        "target_column",
+        "candidate_model_ids",
+        "metric",
+        "candidate_results",
+        "selected_model_id",
+        "best_model",
+        "best_cv_score",
+        "test_metrics",
+        "tuning",
+        "recommended_tool_gaps"
+      ],
+      "validation_rules": [
+        {
+          "id": "metric_matches_task",
+          "check": "selected metric matches task_summary.primary_metric"
+        },
+        {
+          "id": "test_metrics_reported",
+          "check": "model_report.json includes final test metrics"
+        },
+        {
+          "id": "supervised_only",
+          "check": "model selection runs only when supported_by_current_pipeline is true"
+        },
+        {
+          "id": "model_id_tracked",
+          "check": "model_report.json identifies evaluated and selected model IDs"
+        },
+        {
+          "id": "class_imbalance_strategy",
+          "check": "model_report.json reports class imbalance handling strategy"
+        }
+      ],
+      "allowed_tools": [
+        "infer_task_type",
+        "default_tuning_plan",
+        "llm_tuning_plan",
+        "tune_and_evaluate_model",
+        "train_and_evaluate_model",
+        "validate_json_object"
+      ],
+      "recommended_tool_gap_field": "recommended_tool_gaps",
+      "imbalance_strategy": "class_weight_or_resampling"
+    }
+  }
+}

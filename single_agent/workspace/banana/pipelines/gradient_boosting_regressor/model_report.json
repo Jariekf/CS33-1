@@ -1,0 +1,62 @@
+{
+  "task_type": "regression",
+  "target_column": "quality_score",
+  "model_id": "gradient_boosting_regressor",
+  "metric": "r2",
+  "cv_score": 0.9762357286821786,
+  "cv_scores": [],
+  "test_metrics": {
+    "r2": 0.978787299947906,
+    "mae": 0.06401748499734873,
+    "rmse": 0.07991278248437361
+  },
+  "tuning": {
+    "status": "completed",
+    "failure_reason": "",
+    "baseline": {
+      "metric": "r2",
+      "cv": 3,
+      "scores": [
+        0.9728386836959513,
+        0.9620616291938764,
+        0.9703141056300587
+      ],
+      "mean_cv_score": 0.9684048061732954
+    },
+    "plan": {
+      "source": "llm",
+      "model_id": "gradient_boosting_regressor",
+      "task_type": "regression",
+      "metric": "r2",
+      "cv": 3,
+      "budget": "small",
+      "param_grid": {
+        "n_estimators": [
+          100,
+          150
+        ],
+        "learning_rate": [
+          0.03,
+          0.1
+        ],
+        "max_depth": [
+          2,
+          3
+        ],
+        "subsample": [
+          0.8
+        ]
+      },
+      "explanation": "The tuning plan focuses on a compact grid with a mix of n_estimators and learning_rate to explore their impact on performance, while max_depth is varied to allow for deeper trees, which can capture more complex patterns. Subsample is fixed to maintain model stability."
+    },
+    "n_jobs": -1,
+    "best_params": {
+      "learning_rate": 0.1,
+      "max_depth": 3,
+      "n_estimators": 150,
+      "subsample": 0.8
+    },
+    "best_cv_score": 0.9762357286821786,
+    "explanation": "The tuning plan focuses on a compact grid with a mix of n_estimators and learning_rate to explore their impact on performance, while max_depth is varied to allow for deeper trees, which can capture more complex patterns. Subsample is fixed to maintain model stability."
+  }
+}
