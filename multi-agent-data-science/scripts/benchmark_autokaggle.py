@@ -232,28 +232,28 @@ def _compute_regression_metrics(y_true, y_pred) -> dict:
     return metrics
 
 
-# ── ACS (aligned with benchmark_eval_system._compute_sr_anps_acs) ────────────
+# ── CS (aligned with benchmark_eval_system._compute_sr_nps_cs) ───────────────
 
-def _compute_sr_anps_acs_autokaggle(primary_key: str, primary_val, submission_rows: int) -> dict:
+def _compute_sr_nps_cs_autokaggle(primary_key: str, primary_val, submission_rows: int) -> dict:
     """
-    SR   = 1 if AutoKaggle produced a non-empty submission and primary metric is
-           computed, else 0.
-    ANPS = normalised primary metric (0–1, higher = better).
-           AUC / Accuracy → ANPS = primary_val directly.
-           RMSLE (lower-is-better) → ANPS = max(0, 1 − primary_val).
-    ACS  = 0.5 × SR + 0.5 × ANPS.
+    SR  = 1 if AutoKaggle produced a non-empty submission and primary metric is
+          computed, else 0.
+    NPS = normalised primary metric for this run (0–1, higher = better).
+          AUC / Accuracy → NPS = primary_val directly.
+          RMSLE (lower-is-better) → NPS = max(0, 1 − primary_val).
+    CS  = 0.5 × SR + 0.5 × NPS  (per-run composite score).
     """
     sr = 1 if (submission_rows > 0 and primary_val is not None) else 0
 
     if primary_val is None:
-        return {"SR": sr, "ANPS": None, "ACS": None}
+        return {"SR": sr, "NPS": None, "CS": None}
 
     if primary_key == "rmsle":
-        anps = round(max(0.0, 1.0 - float(primary_val)), 4)
+        nps = round(max(0.0, 1.0 - float(primary_val)), 4)
     else:
-        anps = round(float(primary_val), 4)
+        nps = round(float(primary_val), 4)
 
-    return {"SR": sr, "ANPS": anps, "ACS": round(0.5 * sr + 0.5 * anps, 4)}
+    return {"SR": sr, "NPS": nps, "CS": round(0.5 * sr + 0.5 * nps, 4)}
 
 
 # ── Resource parsing ──────────────────────────────────────────────────────────
@@ -374,10 +374,10 @@ def _flatten_record(record: dict) -> dict:
     for k, v in results['additional'].items():
         r[k] = v
 
-    acs = results.get("acs", {})
-    r["SR"] = acs.get("SR")
-    r["ANPS"] = acs.get("ANPS")
-    r["ACS"] = acs.get("ACS")
+    cs_d = results.get("cs", {})
+    r["SR"]  = cs_d.get("SR")
+    r["NPS"] = cs_d.get("NPS")
+    r["CS"]  = cs_d.get("CS")
 
     # resource — totals
     res = results.get('resource', {})
@@ -505,7 +505,7 @@ def evaluate(competition: str, test_path: str,
                           if k != primary_key and not k.endswith('_skipped_reason')}
 
     primary_val = primary_metrics.get(primary_key)
-    acs = _compute_sr_anps_acs_autokaggle(primary_key, primary_val, len(submission))
+    cs  = _compute_sr_nps_cs_autokaggle(primary_key, primary_val, len(submission))
 
     # Resource
     log_path = os.path.join(comp_dir, f'{competition}.log')
@@ -531,8 +531,8 @@ def evaluate(competition: str, test_path: str,
     for k, v in primary_metrics.items():
         print(f"    {k}: {v}")
 
-    print(f"  [ACS COMPONENTS]")
-    print(f"    SR={acs['SR']}  ANPS={acs['ANPS']}  ACS={acs['ACS']}")
+    print(f"  [CS COMPONENTS]")
+    print(f"    SR={cs['SR']}  NPS={cs['NPS']}  CS={cs['CS']}")
 
     print(f"  [ADDITIONAL]")
     for k, v in additional_metrics.items():
@@ -579,7 +579,7 @@ def evaluate(competition: str, test_path: str,
         'results': {
             'primary':    primary_metrics,
             'additional': additional_metrics,
-            'acs':        acs,
+            'cs':         cs,
             'resource':   resource,
         },
     }

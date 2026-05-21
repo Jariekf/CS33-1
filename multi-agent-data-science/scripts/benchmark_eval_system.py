@@ -1,7 +1,7 @@
 """Our System Benchmark Evaluation Script
 ------------------------------------------
 Reads a completed pipeline run-dir, extracts all metrics from the state
-snapshot (*_state.json), computes ACS and BAT Report Maturity scores from
+snapshot (*_state.json), computes CS and BAT Report Maturity scores from
 run artifacts, and upserts a structured record into the shared experiment
 log (JSONL + CSV).  The same (run_dir, competition, system_name) triple
 overwrites the previous row instead of duplicating.
@@ -216,27 +216,27 @@ def _extract_metrics(state: dict, primary_key: str, comp_metric: str) -> tuple[d
     return primary, additional
 
 
-# ── ACS ──────────────────────────────────────────────────────────────────────
+# ── CS ───────────────────────────────────────────────────────────────────────
 
-def _compute_sr_anps_acs(state: dict, primary_key: str, primary_val) -> dict:
+def _compute_sr_nps_cs(state: dict, primary_key: str, primary_val) -> dict:
     """
-    SR   = 1 if pipeline produced a best_model, else 0.
-    ANPS = normalised primary metric (0–1, higher = better).
-           AUC / Accuracy → ANPS = primary_val directly.
-           RMSLE (lower-is-better) → ANPS = max(0, 1 – primary_val).
-    ACS  = 0.5 × SR + 0.5 × ANPS.
+    SR  = 1 if pipeline produced a best_model, else 0.
+    NPS = normalised primary metric for this run (0–1, higher = better).
+          AUC / Accuracy → NPS = primary_val directly.
+          RMSLE (lower-is-better) → NPS = max(0, 1 – primary_val).
+    CS  = 0.5 × SR + 0.5 × NPS  (per-run composite score).
     """
     sr = 1 if (state.get("best_model") and primary_val is not None) else 0
 
     if primary_val is None:
-        return {"SR": sr, "ANPS": None, "ACS": None}
+        return {"SR": sr, "NPS": None, "CS": None}
 
     if primary_key == "rmsle":
-        anps = round(max(0.0, 1.0 - float(primary_val)), 4)
+        nps = round(max(0.0, 1.0 - float(primary_val)), 4)
     else:
-        anps = round(float(primary_val), 4)
+        nps = round(float(primary_val), 4)
 
-    return {"SR": sr, "ANPS": anps, "ACS": round(0.5 * sr + 0.5 * anps, 4)}
+    return {"SR": sr, "NPS": nps, "CS": round(0.5 * sr + 0.5 * nps, 4)}
 
 
 # ── Interpretability metrics ──────────────────────────────────────────────────
@@ -624,10 +624,10 @@ def _flatten_record(record: dict) -> dict:
         if not k.endswith("_skipped_reason"):
             r[k] = v
 
-    acs = results.get("acs", {})
-    r["SR"]   = acs.get("SR")
-    r["ANPS"] = acs.get("ANPS")
-    r["ACS"]  = acs.get("ACS")
+    cs_d = results.get("cs", {})
+    r["SR"]  = cs_d.get("SR")
+    r["NPS"] = cs_d.get("NPS")
+    r["CS"]  = cs_d.get("CS")
 
     res = results.get("resource") or {}
     rt  = res.get("runtime", {})
@@ -756,7 +756,7 @@ def evaluate(
 
     primary, additional = _extract_metrics(state, primary_key, comp_metric)
     primary_val = primary.get(primary_key)
-    acs         = _compute_sr_anps_acs(state, primary_key, primary_val)
+    cs          = _compute_sr_nps_cs(state, primary_key, primary_val)
     token_usage = _load_token_usage(run_dir_key)
     resource    = {"runtime": _parse_timing(state.get("timing")), "tokens": token_usage}
 
@@ -774,8 +774,14 @@ def evaluate(
     }
 
     SEP = "=" * 66
-    now     = datetime.now()
-    case_id = now.strftime("%Y%m%d-%H%M%S")
+    # Derive timestamp from the run_dir name (YYYY-MM-DD-HH-MM) so that
+    # re-running eval on an existing artifact keeps the same case_id.
+    _dir_name = Path(run_dir_key).name
+    try:
+        now = datetime.strptime(_dir_name, "%Y-%m-%d-%H-%M")
+    except ValueError:
+        now = datetime.now()
+    case_id = now.strftime("%Y%m%d-%H%M")
 
     # Build the full report in memory first, then print once to avoid
     # partial-flush artifacts in Windows terminals.
@@ -795,8 +801,8 @@ def evaluate(
     for k, v in primary.items():
         lines.append(f"    {k}: {v}")
 
-    lines.append("  [ACS COMPONENTS]")
-    lines.append(f"    SR={acs['SR']}  ANPS={acs['ANPS']}  ACS={acs['ACS']}")
+    lines.append("  [CS COMPONENTS]")
+    lines.append(f"    SR={cs['SR']}  NPS={cs['NPS']}  CS={cs['CS']}")
 
     lines.append("  [ADDITIONAL]")
     for k, v in additional.items():
@@ -876,7 +882,7 @@ def evaluate(
         "results": {
             "primary":          primary,
             "additional":       additional,
-            "acs":              acs,
+            "cs":               cs,
             "resource":         resource,
             "interpretability": interpretability,
         },
