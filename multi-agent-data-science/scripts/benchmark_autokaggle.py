@@ -8,15 +8,15 @@ competition key, system name) instead of appending duplicates.
 
 Usage:
     # Step 1: replace AutoKaggle's input files with your project's split data
-    python benchmark_eval.py prepare --competition bank_churn \
+    python benchmark_autokaggle.py prepare --competition bank_churn \
         --train path/to/split_train.csv \
         --test  path/to/split_test_with_labels.csv
 
     # Step 2: run AutoKaggle
-    python framework.py --competition bank_churn --model gpt_4o
+    python framework.py --competition bank_churn --model gpt_4o_mini
 
     # Step 3: evaluate and record results
-    python benchmark_eval.py evaluate --competition bank_churn \
+    python benchmark_autokaggle.py evaluate --competition bank_churn \
         --test path/to/split_test_with_labels.csv \
         [--system-name AutoKaggle] [--system-type "SOTA multi-agent"]
 """
@@ -156,7 +156,7 @@ def prepare(competition: str, train_path: str, test_path: str):
     if removed:
         print(f"[prepare] Cleaned up: {removed}")
 
-    print(f"\n[prepare] Done. Now run:\n  python framework.py --competition {competition} --model gpt_4o")
+    print(f"\n[prepare] Done. Now run:\n  python framework.py --competition {competition} --model gpt_4o_mini")
 
 
 # ── Metrics ───────────────────────────────────────────────────────────────────
@@ -511,10 +511,28 @@ def evaluate(competition: str, test_path: str,
     log_path = os.path.join(comp_dir, f'{competition}.log')
     resource = parse_resource_usage(log_path) if os.path.exists(log_path) else {}
 
+    # ── Derive timestamp and run_dir from test_path (same artefact as our system) ──
+    _TS_RE = re.compile(r'^\d{4}-\d{2}-\d{2}-\d{2}-\d{2}$')
+    resolved = Path(test_path).resolve()
+    parts    = resolved.parts
+    artefact_dir: str | None = None
+    for i, part in enumerate(parts):
+        if _TS_RE.match(part):
+            artefact_dir = str(Path(*parts[:i + 1]))
+            break
+
+    if artefact_dir:
+        try:
+            now = datetime.strptime(Path(artefact_dir).name, "%Y-%m-%d-%H-%M")
+        except ValueError:
+            now = datetime.now()
+    else:
+        now = datetime.now()
+
+    case_id = now.strftime('%Y%m%d-%H%M')
+
     # ── Print ──
     SEP = '=' * 62
-    now = datetime.now()
-    case_id = now.strftime('%Y%m%d-%H%M%S')
 
     print(f"\n{SEP}")
     print(f"  EXPERIMENT RECORD  {case_id}")
@@ -569,7 +587,7 @@ def evaluate(competition: str, test_path: str,
     record = {
         'case_id':   case_id,
         'timestamp': now.isoformat(timespec='seconds'),
-        'run_dir':   comp_dir_key,
+        'run_dir':   artefact_dir if artefact_dir else comp_dir_key,
         'competition': competition,
         'system': {
             'name': system_name,
