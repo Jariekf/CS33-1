@@ -398,7 +398,14 @@ _L1_MODEL_CHART_RE = re.compile(
 )
 
 # L2 — Interpretation layer regexes
-_L2_IMPLICATION_RE = re.compile(r"\*{0,2}Implication\*{0,2}\s*:", re.IGNORECASE)
+# Match the "## Strategic Implications" section heading (LLM consistently generates this).
+_L2_STRAT_IMPL_RE = re.compile(
+    r"^#{1,3}\s+Strategic\s+Implications?", re.IGNORECASE | re.MULTILINE
+)
+_L2_NEXT_HEADING_RE = re.compile(r"^#{1,3}\s+", re.MULTILINE)
+
+# Minimum non-whitespace chars in the Strategic Implications section body to pass.
+_L2_IMPL_MIN_CHARS = 100
 
 # SAS pass threshold: semantic alignment score ≥ this value counts as l2_semantic_alignment
 _L2_SAS_THRESHOLD = 0.5
@@ -407,7 +414,15 @@ _L2_SAS_THRESHOLD = 0.5
 _L3_SCQA_EXEC_RE   = re.compile(r"executive\s+summary", re.IGNORECASE)
 _L3_SCQA_SIT_RE    = re.compile(r"situation|complication", re.IGNORECASE)
 _L3_ACTION_SEC_RE  = re.compile(r"recommended\s+action|action\s+plan", re.IGNORECASE)
-_L3_SPECIFICITY_RE = re.compile(r"owner\s*:|metric\s*:|timeframe\s*:", re.IGNORECASE)
+# Owner: any explicit ownership label (label-based, stable across LLM variants)
+_L3_OWNER_RE       = re.compile(r"owner\s*:|lead\s*:|responsible\s*:", re.IGNORECASE)
+# Time: duration pattern (number + time unit) — robust against label variation
+# (catches "30 days", "6 months", "2 weeks", "90-day" etc.)
+_L3_TIME_RE        = re.compile(
+    r"\b\d+[\-\s]*(day|week|month|quarter|year)s?\b", re.IGNORECASE
+)
+# Metric: tracked but optional — not required for specificity pass
+_L3_METRIC_RE      = re.compile(r"metric\s*:|kpi\s*:|target\s*:|measure\s*:", re.IGNORECASE)
 
 
 def _bat_report_maturity(
@@ -423,36 +438,49 @@ def _bat_report_maturity(
     L1   Evidence         (weight 0.2, 3 checks):
       l1_chart_eda        — ≥1 EDA chart (plots/*.png) embedded in report
       l1_chart_model      — ≥1 model-explanation chart (explain/*.png / shap / rf_)
-      l1_external_evidence— RAP succeeded: bat_rag_buckets non-empty OR bat_arxiv_papers
-                            non-empty (state-level check; independent of report text)
+      l1_external_evidence— RAP succeeded: manager_rap_context non-empty (Manager-level
+                            arxiv+web fusion) OR bat_rag_buckets non-empty (BAT vector-DB)
+                            OR bat_arxiv_papers non-empty (BAT arxiv fallback)
     L2   Interpretation   (weight 0.3, 2 checks):
-      l2_implication_presence — ≥2 'Implication:' paragraphs in Key Findings
+      l2_implication_presence — '## Strategic Implications' section exists with ≥100 chars of body
       l2_semantic_alignment   — pre-computed SAS score ≥ _L2_SAS_THRESHOLD (0.5)
     L3   Action           (weight 0.4, 4 checks):
       l3_mckinsey_structure — ≥2 McKinsey-style section headings
       l3_scqa_structure     — both Executive Summary AND Situation/Complication headings
       l3_action_section     — Recommended Actions heading present
-      l3_action_specificity — ≥1 action with Owner + Metric + Timeframe triple
+      l3_action_specificity — fractional score (owner + time + metric) / 3:
+                              owner label (owner:/lead:/responsible:),
+                              time-duration pattern (e.g. "30 days", "6 months"),
+                              metric/KPI label (metric:/kpi:/target:)
 
     Final: brm_score = pa_score*0.1 + l1_score*0.2 + l2_score*0.3 + l3_score*0.4
     """
     detail: dict = {}
 
     # ── L1 external_evidence: state-level RAP check ───────────────────────────
-    # Succeeds if either the vector-DB RAG buckets OR the ArXiv fallback returned results.
+    # Three independent RAP sources; any one succeeding counts.
+    # 1. Manager-level RAP: arxiv + web retrieval fused into manager_rap_context.
+    manager_ctx = state.get("manager_rap_context") or ""
+    manager_hit = bool(manager_ctx.strip())
+
+    # 2. BAT agent vector-DB buckets (McKinsey knowledge base).
     rag_buckets = state.get("bat_rag_buckets") or {}
     rag_hit = bool(
         rag_buckets and any(
             isinstance(v, list) and len(v) > 0 for v in rag_buckets.values()
         )
     )
+
+    # 3. BAT agent ArXiv fallback papers.
     arxiv_papers = state.get("bat_arxiv_papers") or []
     arxiv_hit    = bool(arxiv_papers)
-    rap_success  = rag_hit or arxiv_hit
 
-    detail["l1_external_evidence"]  = rap_success
-    detail["l1_ext_rag_hit"]        = rag_hit
-    detail["l1_ext_arxiv_hit"]      = arxiv_hit
+    rap_success  = manager_hit or rag_hit or arxiv_hit
+
+    detail["l1_external_evidence"]    = rap_success
+    detail["l1_ext_manager_rap_hit"]  = manager_hit
+    detail["l1_ext_rag_hit"]          = rag_hit
+    detail["l1_ext_arxiv_hit"]        = arxiv_hit
 
     # ── PA pass-through ───────────────────────────────────────────────────────
     pa_val = pa_score if pa_score is not None else 0.0
@@ -469,9 +497,10 @@ def _bat_report_maturity(
             detail[k] = False
         detail["note"] = "business_insight_report.md not found"
         l1_passed = int(rap_success)
-        sas_pass  = sas_score is not None and sas_score >= _L2_SAS_THRESHOLD
-        detail["l2_semantic_alignment"] = sas_pass
-        detail["l2_sas_score"]          = sas_score
+        sas_pass = sas_score is not None and sas_score >= _L2_SAS_THRESHOLD
+        detail["l2_implication_content_len"] = 0
+        detail["l2_semantic_alignment"]      = sas_pass
+        detail["l2_sas_score"]               = sas_score
         l2_passed = int(sas_pass)
         brm_score = round(pa_val * 0.1 + l1_passed / 3 * 0.2 + l2_passed / 2 * 0.3, 4)
         return {
@@ -499,13 +528,25 @@ def _bat_report_maturity(
     l1_score  = round(l1_passed / 3, 4)
 
     # ── L2 Interpretation ────────────────────────────────────────────────────
-    impl_hits = _L2_IMPLICATION_RE.findall(report_text)
-    sas_pass  = sas_score is not None and sas_score >= _L2_SAS_THRESHOLD
+    # Check "## Strategic Implications" section exists and has substantive content.
+    strat_match = _L2_STRAT_IMPL_RE.search(report_text)
+    if strat_match:
+        body_start = strat_match.end()
+        next_h = _L2_NEXT_HEADING_RE.search(report_text, body_start)
+        section_body = (
+            report_text[body_start: body_start + next_h.start()]
+            if next_h else report_text[body_start:]
+        )
+        impl_content_len = len(section_body.strip())
+    else:
+        impl_content_len = 0
 
-    detail["l2_implication_presence"] = len(impl_hits) >= 2
-    detail["l2_implication_count"]    = len(impl_hits)
-    detail["l2_semantic_alignment"]   = sas_pass
-    detail["l2_sas_score"]            = sas_score
+    sas_pass = sas_score is not None and sas_score >= _L2_SAS_THRESHOLD
+
+    detail["l2_implication_presence"]     = impl_content_len >= _L2_IMPL_MIN_CHARS
+    detail["l2_implication_content_len"]  = impl_content_len
+    detail["l2_semantic_alignment"]       = sas_pass
+    detail["l2_sas_score"]               = sas_score
 
     l2_passed = sum(int(detail[k]) for k in ("l2_implication_presence", "l2_semantic_alignment"))
     l2_score  = round(l2_passed / 2, 4)
@@ -521,13 +562,10 @@ def _bat_report_maturity(
     action_match = _L3_ACTION_SEC_RE.search(report_text)
     if action_match:
         action_block = report_text[action_match.start():]
-    spec_hits = _L3_SPECIFICITY_RE.findall(action_block)
-    # need owner+metric+timeframe — check each specifier type independently
-    spec_types  = {h.rstrip(": ").lower() for h in spec_hits}
-    owner_ok    = "owner" in spec_types
-    metric_ok   = "metric" in spec_types
-    time_ok     = "timeframe" in spec_types
-    specificity = owner_ok and metric_ok and time_ok
+    owner_ok   = bool(_L3_OWNER_RE.search(action_block))
+    time_ok    = bool(_L3_TIME_RE.search(action_block))
+    metric_ok  = bool(_L3_METRIC_RE.search(action_block))
+    spec_score = round((int(owner_ok) + int(time_ok) + int(metric_ok)) / 3, 4)
 
     detail["l3_mckinsey_structure"]     = len(mck_hits) >= 2
     detail["l3_mckinsey_hits_count"]    = len(mck_hits)
@@ -535,16 +573,16 @@ def _bat_report_maturity(
     detail["l3_scqa_has_exec"]          = has_exec
     detail["l3_scqa_has_situation"]     = has_sit
     detail["l3_action_section"]         = has_action
-    detail["l3_action_specificity"]     = specificity
+    detail["l3_action_specificity"]     = spec_score
     detail["l3_specificity_owner"]      = owner_ok
+    detail["l3_specificity_time"]       = time_ok
     detail["l3_specificity_metric"]     = metric_ok
-    detail["l3_specificity_timeframe"]  = time_ok
 
-    l3_passed = sum(int(detail[k]) for k in (
-        "l3_mckinsey_structure", "l3_scqa_structure",
-        "l3_action_section", "l3_action_specificity",
+    l3_binary = sum(int(detail[k]) for k in (
+        "l3_mckinsey_structure", "l3_scqa_structure", "l3_action_section",
     ))
-    l3_score = round(l3_passed / 4, 4)
+    l3_passed = round(l3_binary + spec_score, 4)
+    l3_score  = round(l3_passed / 4, 4)
 
     brm_score = round(pa_val * 0.1 + l1_score * 0.2 + l2_score * 0.3 + l3_score * 0.4, 4)
 
@@ -808,13 +846,18 @@ def evaluate(
         f"  SAS{_ck(brm_d.get('l2_semantic_alignment', False))}"
         f"(score={brm_d.get('l2_sas_score')})"
     )
+    spec_val = brm_d.get("l3_action_specificity", 0)
+    spec_owner  = brm_d.get("l3_specificity_owner", False)
+    spec_time   = brm_d.get("l3_specificity_time", False)
+    spec_metric = brm_d.get("l3_specificity_metric", False)
     lines.append(
         f"    Action              (L3): {brm.get('l3_score', 0.0):.4f}"
-        f"  {brm.get('l3_passed', '?')}/{brm.get('l3_total', 4)}"
+        f"  {brm.get('l3_passed', '?')}/4"
         f"  McKinsey{_ck(brm_d.get('l3_mckinsey_structure', False))}"
         f"  SCQA{_ck(brm_d.get('l3_scqa_structure', False))}"
         f"  Actions{_ck(brm_d.get('l3_action_section', False))}"
-        f"  Specificity{_ck(brm_d.get('l3_action_specificity', False))}"
+        f"  Specificity({int(spec_owner)+int(spec_time)+int(spec_metric)}/3"
+        f" owner{_ck(spec_owner)} time{_ck(spec_time)} metric{_ck(spec_metric)})"
     )
     lines.append(SEP)
 
