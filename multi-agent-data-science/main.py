@@ -363,33 +363,14 @@ def _description_from_cli_or_exit(args: argparse.Namespace) -> str:
 
 
 def _run_benchmark_eval(final_state: dict, args: argparse.Namespace) -> None:
-    """Auto-call benchmark evaluate() when --competition is set.
-
-    eval_test resolution (first match wins):
-      1. --eval-test <path>  (explicit override)
-      2. final_state["testing_data_path"]  (auto, covers --data single-file mode
-         where split_agent creates the labeled test split on disk)
-    """
-    competition  = (getattr(args, "competition",  "") or "").strip()
-    system_name  = (getattr(args, "system_name",  "MAC-ADS") or "MAC-ADS").strip()
-    desc_file    = (getattr(args, "description_file", "") or "").strip()
-    run_dir      = (final_state.get("run_dir") or "").strip()
+    """Auto-call benchmark evaluate() when --competition is set."""
+    competition = (getattr(args, "competition",  "") or "").strip()
+    system_name = (getattr(args, "system_name",  "MAC-ADS") or "MAC-ADS").strip()
+    desc_file   = (getattr(args, "description_file", "") or "").strip()
+    run_dir     = (final_state.get("run_dir") or "").strip()
 
     if not (competition and run_dir):
         return  # --competition not supplied — skip silently
-
-    # Resolve test path
-    eval_test = (getattr(args, "eval_test", "") or "").strip()
-    if not eval_test:
-        eval_test = (final_state.get("testing_data_path") or "").strip()
-    if not eval_test:
-        print("[benchmark] Cannot resolve test path: supply --eval-test or use "
-              "--data mode so split_agent produces testing_data_path.", file=sys.stderr)
-        return
-
-    if not Path(eval_test).is_file():
-        print(f"[benchmark] test file not found: {eval_test}", file=sys.stderr)
-        return
 
     # Import evaluate() from scripts/benchmark_eval_system.py
     scripts_dir = PROJECT_ROOT / "scripts"
@@ -407,7 +388,6 @@ def _run_benchmark_eval(final_state: dict, args: argparse.Namespace) -> None:
         evaluate(
             run_dir=run_dir,
             competition=competition,
-            test_path=eval_test,
             description_file=desc_file,
             system_name=system_name,
             system_type="multi-agent DS pipeline",
