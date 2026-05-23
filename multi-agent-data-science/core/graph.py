@@ -20,7 +20,7 @@ from agent.data_clean_agent import build_data_clean_agent
 from agent.eda_agent import build_eda_agent
 from agent.feature_agent import build_feature_agent, _get_current_model
 from agent.model_agent import build_model_agent
-from agent.split_agent import build_split_agent
+from agent.agent_manager_split import build_agent_manager_split
 from agent.supervisor import make_supervisor
 from core.global_state import GlobalState
 from core.report_writer import log_node, save_state_snapshot
@@ -52,7 +52,7 @@ def _route_after_init(state: GlobalState) -> str:
     """If train/test paths are already provided, skip splitting and go directly to agent_manager."""
     if state.get("is_split"):
         return "agent_manager"
-    return "split_agent"
+    return "Agent_Manager_split"
 
 
 def _route_after_eda(state: GlobalState) -> str:
@@ -187,7 +187,7 @@ def _route_supervisor_split(state: GlobalState) -> str:
     if not hint:
         return "agent_manager"
     if retry <= _MAX_SUPERVISOR_RETRY:
-        return "split_agent"
+        return "Agent_Manager_split"
     return END
 
 
@@ -244,7 +244,7 @@ def _route_supervisor_feature(state: GlobalState) -> str:
 
 
 def build_full_pipeline(show_graph: bool = False):
-    split_graph = build_split_agent(show_graph=False)
+    split_graph = build_agent_manager_split(show_graph=False)
     manager_graph = build_agent_manager(show_graph=False)
     clean_train_graph = build_data_clean_agent(show_graph=False)
     clean_test_graph = build_data_clean_agent(show_graph=False)
@@ -255,7 +255,7 @@ def build_full_pipeline(show_graph: bool = False):
 
     graph = StateGraph(GlobalState)
     graph.add_node("init_run", _init_run_node)
-    graph.add_node("split_agent", split_graph)
+    graph.add_node("Agent_Manager_split", split_graph)
     graph.add_node("supervisor_split", make_supervisor("split"))
     graph.add_node("agent_manager", manager_graph)
     graph.add_node("set_clean_train", _set_clean_train)
@@ -279,14 +279,14 @@ def build_full_pipeline(show_graph: bool = False):
     graph.add_conditional_edges(
         "init_run",
         _route_after_init,
-        {"split_agent": "split_agent", "agent_manager": "agent_manager"},
+        {"Agent_Manager_split": "Agent_Manager_split", "agent_manager": "agent_manager"},
     )
-    # split → supervisor_split → (pass: agent_manager / retry: split_agent / exhaust: END)
-    graph.add_edge("split_agent", "supervisor_split")
+    # split → supervisor_split → (pass: agent_manager / retry: Agent_Manager_split / exhaust: END)
+    graph.add_edge("Agent_Manager_split", "supervisor_split")
     graph.add_conditional_edges(
         "supervisor_split",
         _route_supervisor_split,
-        {"agent_manager": "agent_manager", "split_agent": "split_agent", END: END},
+        {"agent_manager": "agent_manager", "Agent_Manager_split": "Agent_Manager_split", END: END},
     )
 
     graph.add_edge("agent_manager", "set_clean_train")

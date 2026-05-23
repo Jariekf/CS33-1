@@ -37,7 +37,7 @@ def test_pipeline_graph_contains_all_nodes():
     graph = pipeline.get_graph()
     for node in [
         "init_run",
-        "split_agent",
+        "Agent_Manager_split",
         "supervisor_split",
         "agent_manager",
         "set_clean_train",
@@ -58,8 +58,8 @@ def test_pipeline_graph_contains_all_nodes():
     edges = {(edge.source, edge.target) for edge in graph.edges}
     assert ("__start__", "init_run") in edges
     assert ("init_run", "agent_manager") in edges
-    assert ("init_run", "split_agent") in edges
-    assert ("split_agent", "supervisor_split") in edges
+    assert ("init_run", "Agent_Manager_split") in edges
+    assert ("Agent_Manager_split", "supervisor_split") in edges
     assert ("agent_manager", "set_clean_train") in edges
     assert ("data_clean_train", "supervisor_clean_train") in edges
     assert ("data_clean_test", "supervisor_clean_test") in edges
@@ -80,7 +80,7 @@ def test_route_model_to_end_without_best_model():
     }) == END
 
 
-# ── Routing: init_run → split_agent / agent_manager ─────────────────────────────
+# ── Routing: init_run → Agent_Manager_split / agent_manager ─────────────────────────────
 
 
 def test_route_init_skips_split_when_presplit_paths():
@@ -92,9 +92,9 @@ def test_route_init_skips_split_when_presplit_paths():
     )
 
 
-def test_route_init_goes_split_agent_when_not_presplit():
-    assert _route_after_init({"is_split": False}) == "split_agent"
-    assert _route_after_init({}) == "split_agent"
+def test_route_init_goes_Agent_Manager_split_when_not_presplit():
+    assert _route_after_init({"is_split": False}) == "Agent_Manager_split"
+    assert _route_after_init({}) == "Agent_Manager_split"
 
 
 def test_route_train_cleaning_guard_to_next_or_end():
@@ -141,7 +141,7 @@ def test_pipeline_graph_contains_init_run_node():
     edges = {(e.source, e.target) for e in graph.edges}
     assert ("__start__", "init_run") in edges
     assert ("init_run", "agent_manager") in edges
-    assert ("init_run", "split_agent") in edges
+    assert ("init_run", "Agent_Manager_split") in edges
 
 
 # ── LLM invoke integration tests (requires API Key)────────────────────────────────────────

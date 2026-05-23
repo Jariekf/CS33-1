@@ -1,4 +1,4 @@
-"""Split Agent: First determine the task type, then split the dataset."""
+"""Agent_Manager_split: First determine the task type, then split the dataset."""
 
 from __future__ import annotations
 
@@ -25,7 +25,7 @@ tools = [infer_task, split_dataset]
 llm_with_tools = llm_for("split").bind_tools(tools)
 
 
-def _split_agent_node(state: GlobalState) -> GlobalState:
+def _agent_manager_split_node(state: GlobalState) -> GlobalState:
     data_path = state.get("data_path", "")
     description = state.get("description", "")
     user_request = state.get("user_request", "")
@@ -106,28 +106,28 @@ def _update_split_state(state: GlobalState, msg: ToolMessage) -> GlobalState:
     }
 
 
-def _route_after_split_agent(state: GlobalState) -> str:
+def _route_after_agent_manager_split(state: GlobalState) -> str:
     last_msg = state["messages"][-1]
     if isinstance(last_msg, AIMessage) and last_msg.tool_calls:
         return "tools"
-    save_agent_report("split_agent", last_msg)
+    save_agent_report("Agent_Manager_split", last_msg)
     return "timer_end"
 
 
-def build_split_agent(show_graph: bool = False):
+def build_agent_manager_split(show_graph: bool = False):
     graph = StateGraph(GlobalState)
-    graph.add_node("timer_start", make_timer_start("split_agent"))
-    graph.add_node("split_agent", _split_agent_node)
+    graph.add_node("timer_start", make_timer_start("Agent_Manager_split"))
+    graph.add_node("Agent_Manager_split", _agent_manager_split_node)
     graph.add_node("tools", ToolNode(tools))
     graph.add_node("tool_state_update", _tool_state_update_node)
-    graph.add_node("timer_end", make_timer_end("split_agent"))
+    graph.add_node("timer_end", make_timer_end("Agent_Manager_split"))
     graph.set_entry_point("timer_start")
-    graph.add_edge("timer_start", "split_agent")
+    graph.add_edge("timer_start", "Agent_Manager_split")
     graph.add_conditional_edges(
-        "split_agent", _route_after_split_agent, {"tools": "tools", "timer_end": "timer_end"}
+        "Agent_Manager_split", _route_after_agent_manager_split, {"tools": "tools", "timer_end": "timer_end"}
     )
     graph.add_edge("tools", "tool_state_update")
-    graph.add_edge("tool_state_update", "split_agent")
+    graph.add_edge("tool_state_update", "Agent_Manager_split")
     graph.add_edge("timer_end", END)
     compiled_graph = graph.compile()
     if show_graph:
@@ -138,19 +138,19 @@ def build_split_agent(show_graph: bool = False):
 def _show_graph(compiled) -> None:
     out = PROJECT_ROOT / "artifacts" / "graphs"
     out.mkdir(parents=True, exist_ok=True)
-    mmd_path = out / "split_agent_graph.mmd"
+    mmd_path = out / "Agent_Manager_split_graph.mmd"
     mmd_path.write_text(compiled.get_graph().draw_mermaid(), encoding="utf-8")
-    print(f"Split Agent Mermaid source saved: {mmd_path}")
+    print(f"Agent_Manager_split Mermaid source saved: {mmd_path}")
     try:
-        path = out / "split_agent_graph.png"
+        path = out / "Agent_Manager_split_graph.png"
         path.write_bytes(compiled.get_graph().draw_mermaid_png())
-        print(f"Split Agent graph saved: {path}")
+        print(f"Agent_Manager_split graph saved: {path}")
     except Exception as exc:
         print(f"Graph render failed: {exc}")
 
 
 if __name__ == "__main__":
-    agent = build_split_agent(show_graph=True)
+    agent = build_agent_manager_split(show_graph=True)
     user_input = input("Please enter: ")
     events = agent.stream(
         {

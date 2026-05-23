@@ -91,7 +91,7 @@ DATASET_META = {
 }
 
 # Per-agent timing keys → display names
-# split_agent is intentionally omitted: its runtime is merged into Agent Manager.
+# Agent_Manager_split is intentionally omitted: its runtime is merged into Agent Manager.
 # supervisor has no standalone timer (routing node); business_translator is the
 # correct state key for the BAT subgraph.
 AGENT_TIMING_DISPLAY = {
@@ -158,8 +158,8 @@ def _parse_timing(timing: dict | None) -> dict:
         if entry and "start" in entry and "end" in entry:
             groups[label] = round(entry["end"] - entry["start"], 1)
 
-    # Merge split_agent time into Agent Manager (split is a lightweight prereq)
-    split_entry = timing.get("split_agent")
+    # Merge Agent_Manager_split time into Agent Manager (split is a lightweight prereq)
+    split_entry = timing.get("Agent_Manager_split")
     if split_entry and "start" in split_entry and "end" in split_entry:
         split_s = round(split_entry["end"] - split_entry["start"], 1)
         groups["Agent Manager"] = round(groups.get("Agent Manager", 0) + split_s, 1)

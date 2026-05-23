@@ -4,7 +4,7 @@ Usage (single CSV, train/test split happens inside the graph):
   python main.py --data datasets/bank-full.csv --description "..." --request "..."
   or: python main.py --data ... --description-file datasets/desc.txt --request "..."
 
-Usage (pre-split train / test provided, skips split_agent; recommended to also set target column and task type):
+Usage (pre-split train / test provided, skips Agent_Manager_split; recommended to also set target column and task type):
   python main.py --train datasets/train.csv --test datasets/test.csv \\
                  --task-type classification --target y \\
                  --description "..." --request "..."
@@ -76,7 +76,7 @@ def run_pipeline(
         user_request:        User instruction describing the task objective.
         show_graph:          If True, write Mermaid and PNG to artifacts/graphs/ (full_pipeline.mmd / full_pipeline.png).
         recursion_limit:     LangGraph maximum recursion steps; increase for longer pipelines.
-        training_data_path:  If provided together with testing_data_path, init_run sets is_split=True and skips split_agent.
+        training_data_path:  If provided together with testing_data_path, init_run sets is_split=True and skips Agent_Manager_split.
         testing_data_path:   See above.
         target_column:       Optional. When non-empty together with a valid task_type, written to state so Agent Manager skips infer_task.
         task_type:           classification or regression; must be paired with target_column.
@@ -92,11 +92,11 @@ def run_pipeline(
     train_t = (training_data_path or "").strip()
     test_t = (testing_data_path or "").strip()
     if train_t and test_t:
-        print("Mode: pre-split (train / test provided, skipping split_agent)")
+        print("Mode: pre-split (train / test provided, skipping Agent_Manager_split)")
         print(f"train CSV: {train_t}")
         print(f"test CSV : {test_t}")
     else:
-        print(f"Mode: single file -> split_agent will split internally")
+        print(f"Mode: single file -> Agent_Manager_split will split internally")
         print(f"Dataset: {data_path}")
 
     tc = (target_column or "").strip()
@@ -190,8 +190,8 @@ def _build_arg_parser() -> argparse.ArgumentParser:
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog="""
 Data source (choose one):
-  - Single CSV: --data <path>  (split_agent splits internally)
-  - Pre-split:  --train <path> --test <path>  (skips split_agent)
+  - Single CSV: --data <path>  (Agent_Manager_split splits internally)
+  - Pre-split:  --train <path> --test <path>  (skips Agent_Manager_split)
 
 Dataset description (choose one):
   - --description "TEXT"
@@ -218,13 +218,13 @@ Examples:
         "--data",
         default="",
         metavar="PATH",
-        help="Single-file CSV: path to the raw dataset; split_agent will split it into train/test",
+        help="Single-file CSV: path to the raw dataset; Agent_Manager_split will split it into train/test",
     )
     src.add_argument(
         "--train",
         default="",
         metavar="PATH",
-        help="Used with --test: path to the training CSV (pre-split mode, skips split_agent)",
+        help="Used with --test: path to the training CSV (pre-split mode, skips Agent_Manager_split)",
     )
     parser.add_argument(
         "--test",
@@ -299,7 +299,7 @@ Examples:
         dest="eval_test",
         metavar="PATH",
         help="Split test CSV with true labels. Optional when using --data: "
-             "split_agent's test split is used automatically.",
+             "Agent_Manager_split's test split is used automatically.",
     )
     eval_grp.add_argument(
         "--system-name",
