@@ -153,6 +153,17 @@ def _feature_node(state: GlobalState) -> GlobalState:
         if supervisor_hint else ""
     )
 
+    is_xgboost = (current_model or "").lower() in {"xgboost", "xgboostregressor"}
+    xgb_target_warning = (
+        "\n⚠️ CRITICAL — XGBoost target encoding (mandatory):\n"
+        "XGBoost / XGBoostRegressor CANNOT use string target labels (e.g. 'Graduate', 'Dropout', 'Enrolled').\n"
+        "After step 1 (load data), you MUST call `encode_target_column` before any other feature step or save.\n"
+        "Do NOT skip this tool call and do NOT proceed until the tool returns status=\"encoded\" "
+        "or status=\"already_numeric\".\n"
+        "If you skip this step, downstream model training will fail.\n"
+        if is_xgboost else ""
+    )
+
     system_content = (
         "You are the Feature Engineering Agent. "
         f"Your current task is to synchronize the features of the training and test sets for the model [{current_model}].\n"
@@ -162,15 +173,17 @@ def _feature_node(state: GlobalState) -> GlobalState:
         f"All candidate models: {candidate_models}, completed: {list(feature_dataset_ids.keys())}.\n"
         f"Working directory for this run: {run_dir or 'Not set'}.\n"
         + hint_line
+        + xgb_target_warning
         + f"\nFeature engineering plan for the current model [{current_model}]:\n{plan_text}\n"
         "Workflow (executed in sequence):\n"
         f"1. Call `load_dataset_to_store` to load the training dataset ({training_data_path}) into memory and retrieve `train_id`;\n"
         f"{test_load_step}"
-        "2. Call `encode_target_column`, passing in: \n"
-        f"   dataset_id=train_id, target_column={target_column}, model_name={current_model},\n"
-        f"   task_type={task_type}, run_dir=\"{run_dir}\", {test_id_arg};\n"
-        "   - XGBoost and XGBoostRegressor require 0/1 integer labels; the tool automatically encodes the data and processes the test set accordingly;\n"
-        "   - Other models return `status=skipped`, and the target column in the test set remains unchanged;\n"
+        "2. Call `encode_target_column` (REQUIRED for XGBoost / XGBoostRegressor; optional but safe for others), passing in: \n"
+        f"   dataset_id=train_id, target_column=\"{target_column}\", model_name=\"{current_model}\",\n"
+        f"   task_type=\"{task_type}\", run_dir=\"{run_dir}\", {test_id_arg};\n"
+        "   - For XGBoost / XGBoostRegressor: this step is mandatory — string labels must be encoded to 0/1/2...;\n"
+        "   - Wait for status=\"encoded\" or status=\"already_numeric\" before continuing;\n"
+        "   - Other models return status=\"skipped\", and the target column remains unchanged;\n"
         "3. Based on the plan above, call `scale_features` and `encode_categorical` as needed, passing the following arguments to both:\n"
         f"   dataset_id=train_id, run_dir=\"{run_dir}\", {test_id_arg};\n"
         "   - Target columns are not included in feature scaling or one-hot encoding;\n"
@@ -197,8 +210,14 @@ def _feature_node(state: GlobalState) -> GlobalState:
             SystemMessage(content=system_content),
             HumanMessage(
                 content=(
-                    f"Please begin feature engineering for model [{current_model}],"
-                    "Strictly follow steps 1 through 5 of the system prompts above to invoke each tool in sequence; do not output only text descriptions."
+                    f"Please begin feature engineering for model [{current_model}]. "
+                    + (
+                        "This is XGBoost: call `encode_target_column` immediately after loading data, "
+                        "before encode_categorical, scale_features, or save_featured_dataset. "
+                        if is_xgboost else ""
+                    )
+                    + "Strictly follow steps 1 through 5 of the system prompts above to invoke each tool in sequence; "
+                    "do not output only text descriptions."
                 )
             ),
         ]
