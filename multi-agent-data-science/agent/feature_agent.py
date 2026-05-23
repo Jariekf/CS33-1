@@ -97,20 +97,18 @@ def _feature_node(state: GlobalState) -> GlobalState:
     candidate_models = state.get("candidate_models") or []
     feature_dataset_ids = state.get("feature_dataset_ids") or {}
 
-    # ── Idle detection: If the previous LLM did not call any tools, but the current model has not yet saved features, the cumulative count ──
+    # ── Idle detection: count consecutive no-tool rounds across subgraph invocations ──
+    # Check threshold FIRST (against counts accumulated in previous invocations) so that
+    # each new subgraph invocation always gets one real LLM attempt before force-skipping.
     no_tool_rounds = dict(state.get("feature_no_tool_rounds") or {})
-    if current_model and messages:
-        last_msg = messages[-1]
-        if isinstance(last_msg, AIMessage) and not getattr(last_msg, "tool_calls", None):
-            no_tool_rounds[current_model] = no_tool_rounds.get(current_model, 0) + 1
 
     # ── Reached limit: Force the current model to be marked as "skipped" to prevent an infinite loop ───
     if current_model and no_tool_rounds.get(current_model, 0) >= _MAX_NO_TOOL_ROUNDS:
         ids = dict(feature_dataset_ids)
         ids[current_model] = "skipped"
+        idle_count = no_tool_rounds[current_model]
         print(
-            f"[feature_agent] {current_model} Idling "
-            f"{no_tool_rounds[current_model]} times the tool was not called; force marking as skipped "
+            f"[feature_agent] {current_model} idled {idle_count} consecutive round(s) without calling tools; force-marking as skipped"
         )
         return {
             "feature_dataset_ids": ids,
@@ -118,12 +116,19 @@ def _feature_node(state: GlobalState) -> GlobalState:
             "messages": [
                 AIMessage(
                     content=(
-                        f"[forced skip] Model {current_model} continuous "
-                        f"{no_tool_rounds[current_model]} The tool has not been called yet and has been marked as skipped. "
+                        f"[forced skip] Model {current_model} was skipped after {idle_count} consecutive round(s) "
+                        f"without any tool calls."
                     )
                 )
             ],
         }
+
+    # Increment idle counter AFTER the threshold check so each new subgraph invocation
+    # always calls the LLM at least once before force-skipping.
+    if current_model and messages:
+        last_msg = messages[-1]
+        if isinstance(last_msg, AIMessage) and not getattr(last_msg, "tool_calls", None):
+            no_tool_rounds[current_model] = no_tool_rounds.get(current_model, 0) + 1
 
     model_plan = feature_engineering_plan.get(current_model, {}) if current_model else {}
     plan_text = json.dumps(model_plan, ensure_ascii=False, indent=2) if model_plan else "No specific plan; we'll handle it as needed."
@@ -137,7 +142,7 @@ def _feature_node(state: GlobalState) -> GlobalState:
     )
     test_id_arg = "test_dataset_id=test_id(Retrieved from Step 1b)" if has_test else "test_dataset_id is not provided (no test set)"
     test_save_step = (
-        f"5. Call `save_featured_dataset(dataset_id=test_id, model_name=current_model_name, "
+        f"5. Call `save_featured_dataset(dataset_id=test_id, model_name=\"{current_model}\", "
         f"output_dir=\"{output_dir}\", split=\"test\")` to save the preprocessed test set.\n"
         if has_test else ""
     )
@@ -172,14 +177,14 @@ def _feature_node(state: GlobalState) -> GlobalState:
         "   - Tree-based models (XGBoost, RandomForest) typically do not require `scale_features`;\n"
         "   - Linear models (LogisticRegression, LinearRegression, Ridge) typically require `scale_features`;\n"
         "   - Both `scale_features` and `encode_categorical` are fitted on the training set, and the test set is transformed accordingly;\n"
-        f"4. Call `save_featured_dataset(dataset_id=train_id, model_name=current_model_name, "
+        f"4. Call `save_featured_dataset(dataset_id=train_id, model_name=\"{current_model}\", "
         f"output_dir=\"{output_dir}\", split=\"train\")` to save the preprocessed training dataset;\n"
         f"{test_save_step}"
         "Important requirement: You must complete the above steps by calling the tool via `tool_call`; simply outputting a text description to pretend the task is complete is not allowed. \n"
         "Stop when finished; do not process any other models.\n"
-        "The final written response should only report the feature engineering steps and results for the current model (encoding method, scaling, and save path),"
-        "Do not describe the training and evaluation of the model or the processing details of other candidate models,"
-        "and do not mention anything related to data cleaning or EDA; simply report the feature engineering steps and results."
+        f"The final written response must begin with 'Feature engineering steps and results for the model [{current_model}]:' "
+        f"and only describe what you actually performed for [{current_model}] (encoding method, scaling, and save path). "
+        "Do not mention other candidate models, model training, data cleaning, or EDA."
     )
 
     # ── Key Fix: Send only the current round's feature processing chain to the LLM ──────
@@ -376,9 +381,22 @@ def _route_after_feature(state: GlobalState) -> str:
     last_msg = state["messages"][-1]
     if isinstance(last_msg, AIMessage) and last_msg.tool_calls:
         return "tools"
+
     feature_ids = state.get("feature_dataset_ids") or {}
-    model = next(reversed(feature_ids), "unknown")
-    save_agent_report("feature_agent", last_msg, model=model, run_dir=state.get("run_dir") or "")
+    no_tool_rounds = state.get("feature_no_tool_rounds") or {}
+    content = str(getattr(last_msg, "content", ""))
+    is_forced_skip = content.startswith("[forced skip]")
+
+    # Only write a report for meaningful completions; skip idle no-tool rounds that
+    # will be retried by the outer supervisor:
+    #   - Forced skip: the model was just added to feature_ids as "skipped"
+    #   - Successful save: _handle_save_featured resets no_tool_rounds to {}
+    # Idle rounds have a non-empty no_tool_rounds and no forced-skip marker,
+    # so we skip them to avoid duplicate / wrong-model-header report entries.
+    should_save = is_forced_skip or not no_tool_rounds
+    if should_save:
+        model = next(reversed(feature_ids), "unknown")
+        save_agent_report("feature_agent", last_msg, model=model, run_dir=state.get("run_dir") or "")
     return "timer_end"
 
 
