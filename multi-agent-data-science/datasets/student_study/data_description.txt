@@ -618,7 +618,7 @@ Missing Values:
 No
 
 
-32. OUTPUT Grade
+32. GRADE
 Role:
 Target
 
@@ -626,6 +626,7 @@ Type:
 Categorical
 
 Description:
+End-of-term grade (column name in CSV: GRADE).
 0 = Fail
 1 = DD
 2 = DC
@@ -688,7 +689,7 @@ Student ID
 29- Cumulative grade point average in the last semester (/4.00): (1: <2.00, 2: 2.00-2.49, 3: 2.50-2.99, 4: 3.00-3.49, 5: above 3.49)
 30- Expected Cumulative grade point average in the graduation (/4.00): (1: <2.00, 2: 2.00-2.49, 3: 2.50-2.99, 4: 3.00-3.49, 5: above 3.49)
 31- Course ID
-32- OUTPUT Grade (0: Fail, 1: DD, 2: DC, 3: CC, 4: CB, 5: BB, 6: BA, 7: AA)
+32- GRADE (0: Fail, 1: DD, 2: DC, 3: CC, 4: CB, 5: BB, 6: BA, 7: AA)
 
 
 ============================================================
