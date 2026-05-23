@@ -290,6 +290,7 @@ Examples:
             "", "bank_churn", "house_prices",
             "obesity_risks",
             "classification_with_an_academic_success_dataset",
+            "student_study",
         ],
         help="Competition key for benchmark evaluation",
     )

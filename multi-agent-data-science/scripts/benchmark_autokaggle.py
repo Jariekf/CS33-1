@@ -64,6 +64,11 @@ COMPETITION_CONFIG = {
         'id_col':    'id',
         'metric':    'accuracy',
     },
+    'student_study': {
+        'label_col': 'GRADE',
+        'id_col':    'STUDENT ID',
+        'metric':    'accuracy',
+    },
 }
 
 DATASET_META = {
@@ -93,6 +98,13 @@ DATASET_META = {
         'source':         'AutoKaggle / Kaggle Competition',
         'task_type':      'Tabular Multi-class Classification',
         'industry':       'Education / Student Support',
+        'primary_metric': 'Accuracy',
+    },
+    'student_study': {
+        'name':           'Student Study Performance',
+        'source':         'UCI Machine Learning Repository',
+        'task_type':      'Tabular Multi-class Classification',
+        'industry':       'Education / Student Performance',
         'primary_metric': 'Accuracy',
     },
 }
