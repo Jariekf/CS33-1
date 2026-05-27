@@ -25,7 +25,7 @@ llm_with_tools = llm_for("agent_manager").bind_tools(tools)
 
 
 def _has_complete_task_meta(state: GlobalState) -> bool:
-    """When tasks have already been injected by split_agent or the CLI, skip `infer_task` to avoid duplicate inference."""
+    """When tasks have already been injected by Agent_Manager_split or the CLI, skip `infer_task` to avoid duplicate inference."""
     tt = (state.get("task_type") or "").strip().lower()
     tc = (state.get("target_column") or "").strip()
     return tt in {"classification", "regression"} and bool(tc)
@@ -69,7 +69,7 @@ def _manager_node(state: GlobalState) -> GlobalState:
             "3. Call create_cleaning_plan(target='train', ...) Develop a plan for cleaning the training set;\n"
             "4. Call create_cleaning_plan(target='test', ...) Develop a test dataset cleaning plan"
             "   (The process for the test set is typically the same as for the training set, except that no operations based on the label distribution are performed.)\n"
-            "Note: The current state already contains valid `task_type` and `target_column` values (from `split_agent` or specified by the user)"
+            "Note: The current state already contains valid `task_type` and `target_column` values (from `Agent_Manager_split` or specified by the user)"
             "Do not call `infer_task`.\n"
             "When developing a cleaning plan, use the Manager RAP context as a reference, but rely on the actual data profile.\n"
             "Once you have completed the steps above, stop the process and generate the report."
